@@ -21,8 +21,15 @@ jobs:
           distribution: 'temurin'
           cache: gradle
 
+      - name: Start infrastructure
+        run: docker compose up -d
+
       - name: Grant execute permission for Gradle
         run: chmod +x gradlew
 
       - name: Build and Test
         run: ./gradlew clean build
+
+      - name: Stop infrastructure
+        if: always()
+        run: docker compose down
