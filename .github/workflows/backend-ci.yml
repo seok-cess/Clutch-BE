@@ -24,6 +24,9 @@ jobs:
       - name: Start infrastructure
         run: docker compose up -d
 
+      - name: Check containers
+        run: docker ps
+
       - name: Grant execute permission for Gradle
         run: chmod +x gradlew
 
