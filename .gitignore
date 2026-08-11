@@ -43,3 +43,6 @@ out/
 
 ### k6 output ###
 k6/results/
+
+### Local documentation ###
+/docs/
