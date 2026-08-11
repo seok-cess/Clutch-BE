@@ -39,3 +39,26 @@ management:
     health:
       probes:
         enabled: true
+
+# ---- lolesports 비공식 피드 연동 ----
+lolesports:
+  # lolesports.com 프론트엔드에 공개된 공용 키
+  api-key: ${LOLESPORTS_API_KEY:0TvQnueqKa5mxJntVWt0w4LpLfEkrV1Ta8rQBb9Z}
+  esports-api-base-url: https://esports-api.lolesports.com/persisted/gw
+  live-stats-base-url: https://feed.lolesports.com/livestats/v1
+  locale: ko-KR
+  # getLeagues 실호출로 확인한 LCK id
+  league-id: "98767991310872058"
+  # getTournamentsForLeague 로 확인 — 시즌이 바뀌면 교체해야 한다
+  tournament-id: "115548147890329817"
+  # livestats 는 "요청 창의 끝이 N초 이상 과거"여야 응답한다 (경기마다 다름).
+  # 400 응답 본문의 요구치를 읽어 자동 상향되므로 초기값만 둔다.
+  live-stats-lag-seconds: 30
+  # 재생 여유(초). 소스가 10초 블록으로 주므로 그만큼 뒤에서 재생해야 끊기지 않는다.
+  display-lag-seconds: 15
+  poll:
+    live-check-ms: 60000    # getLive 감시 주기
+    in-game-ms: 1000        # window/details 인게임 폴링 주기
+    meta-ms: 300000         # 일정/순위 갱신 (5분)
+    backoff-base-ms: 5000   # 연속 실패 시 백오프 시작 간격
+    backoff-max-ms: 300000  # 백오프 상한
