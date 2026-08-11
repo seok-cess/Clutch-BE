@@ -76,7 +76,7 @@ public class PollingScheduler {
 
     // ---- 1) 라이브 경기 감시 (60초) ----
 
-    @Scheduled(fixedDelayString = "${lolesports.poll.live-check-ms}")
+    @Scheduled(fixedDelayString = "${lolesports.poll.live-check-ms:60000}")
     public void pollLiveMatches() {
         if (!liveBackoff.allowed()) {
             return;
@@ -157,7 +157,7 @@ public class PollingScheduler {
 
     // ---- 2) 인게임 스탯 (활성 게임 있을 때만, 1초 간격) ----
 
-    @Scheduled(fixedDelayString = "${lolesports.poll.in-game-ms}")
+    @Scheduled(fixedDelayString = "${lolesports.poll.in-game-ms:1000}")
     public void pollInGameStats() {
         // 통계 404 게임은 잠시 제외 — 그 404 때문에 정상 경기 폴링까지 백오프되면 안 된다.
         // 다만 영구 제외는 아니라서, 대기 시간이 지나면 자동으로 다시 폴링된다.
@@ -267,7 +267,7 @@ public class PollingScheduler {
 
     // ---- 3) 일정/순위 (앱 시작시 1회 + 5분) ----
 
-    @Scheduled(fixedDelayString = "${lolesports.poll.meta-ms}")
+    @Scheduled(fixedDelayString = "${lolesports.poll.meta-ms:300000}")
     public void pollMeta() {
         if (!metaBackoff.allowed()) {
             return;
