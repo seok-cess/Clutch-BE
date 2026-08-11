@@ -1,0 +1,85 @@
+package com.clutch.lolesports.config;
+
+import org.springframework.boot.context.properties.ConfigurationProperties;
+
+/**
+ * lolesports.* 프로퍼티 바인딩.
+ *
+ * 설정이 없어도 동작하도록 모든 값에 기본값을 둔다.
+ * (application.yaml 은 gitignore 대상이라 CI·신규 클론 환경에는 존재하지 않는다.
+ *  기본값이 없으면 poll 이 null 이 되어 기동 시 NPE 가 난다.)
+ * 값을 바꾸려면 application.yaml 이나 환경변수로 덮어쓰면 된다.
+ */
+@ConfigurationProperties(prefix = "lolesports")
+public record LolesportsProperties(
+        String apiKey,
+        String esportsApiBaseUrl,
+        String liveStatsBaseUrl,
+        String locale,
+        String leagueId,
+        String tournamentId,
+        /** livestats startingTime 을 현재보다 몇 초 과거로 잡을지 (하한 30초 — 창 끝이 20초 이상 과거여야 함) */
+        long liveStatsLagSeconds,
+        /** 화면 재생 시점 = now - 이 값(초). 프레임 버퍼에서 이 시점 프레임을 골라 응답 */
+        long displayLagSeconds,
+        Poll poll
+) {
+
+    /** lolesports.com 프론트엔드에 공개된 공용 키 */
+    private static final String DEFAULT_API_KEY = "0TvQnueqKa5mxJntVWt0w4LpLfEkrV1Ta8rQBb9Z";
+    private static final String DEFAULT_ESPORTS_API = "https://esports-api.lolesports.com/persisted/gw";
+    private static final String DEFAULT_LIVE_STATS = "https://feed.lolesports.com/livestats/v1";
+    private static final String DEFAULT_LOCALE = "ko-KR";
+    /** getLeagues 실호출로 확인한 LCK id */
+    private static final String DEFAULT_LEAGUE_ID = "98767991310872058";
+    /** getTournamentsForLeague 로 확인 — 시즌이 바뀌면 교체해야 한다 */
+    private static final String DEFAULT_TOURNAMENT_ID = "115548147890329817";
+
+    public LolesportsProperties {
+        apiKey = orDefault(apiKey, DEFAULT_API_KEY);
+        esportsApiBaseUrl = orDefault(esportsApiBaseUrl, DEFAULT_ESPORTS_API);
+        liveStatsBaseUrl = orDefault(liveStatsBaseUrl, DEFAULT_LIVE_STATS);
+        locale = orDefault(locale, DEFAULT_LOCALE);
+        leagueId = orDefault(leagueId, DEFAULT_LEAGUE_ID);
+        tournamentId = orDefault(tournamentId, DEFAULT_TOURNAMENT_ID);
+        if (liveStatsLagSeconds <= 0) {
+            liveStatsLagSeconds = 30;
+        }
+        if (displayLagSeconds <= 0) {
+            displayLagSeconds = 15;
+        }
+        if (poll == null) {
+            poll = new Poll(0, 0, 0, 0, 0);   // Poll 의 기본값 보정에 위임
+        }
+    }
+
+    private static String orDefault(String value, String fallback) {
+        return (value == null || value.isBlank()) ? fallback : value;
+    }
+
+    public record Poll(
+            long liveCheckMs,
+            long inGameMs,
+            long metaMs,
+            long backoffBaseMs,
+            long backoffMaxMs
+    ) {
+        public Poll {
+            if (liveCheckMs <= 0) {
+                liveCheckMs = 60_000;    // getLive 감시 주기
+            }
+            if (inGameMs <= 0) {
+                inGameMs = 1_000;        // window/details 인게임 폴링 주기
+            }
+            if (metaMs <= 0) {
+                metaMs = 300_000;        // 일정·순위 갱신 (5분)
+            }
+            if (backoffBaseMs <= 0) {
+                backoffBaseMs = 5_000;   // 연속 실패 시 백오프 시작 간격
+            }
+            if (backoffMaxMs <= 0) {
+                backoffMaxMs = 300_000;  // 백오프 상한
+            }
+        }
+    }
+}

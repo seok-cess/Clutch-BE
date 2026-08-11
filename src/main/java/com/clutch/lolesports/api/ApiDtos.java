@@ -1,0 +1,192 @@
+package com.clutch.lolesports.api;
+
+import java.util.List;
+
+/**
+ * 프론트에 노출하는 가공 응답 DTO 모음.
+ */
+public final class ApiDtos {
+
+    private ApiDtos() {
+    }
+
+    // ---- /api/schedule ----
+
+    public record ScheduleItem(
+            String startTime,
+            String state,        // unstarted | inProgress | completed
+            String blockName,
+            String matchId,
+            Integer bestOf,
+            List<ScheduleTeam> teams
+    ) {
+    }
+
+    public record ScheduleTeam(
+            String id,           // 스코어보드의 esportsTeamId 와 매칭해 진영(블루/레드) 판별
+            String name,
+            String code,
+            String image,
+            String outcome,      // win | loss | null
+            Integer gameWins,
+            Integer wins,        // 시즌 전적
+            Integer losses
+    ) {
+    }
+
+    // ---- 전적 (최근 폼 / 상대 전적) ----
+
+    /** 한 팀 관점에서 본 완료 경기 하나 */
+    public record RecentMatch(
+            String startTime,
+            String opponentCode,
+            String opponentName,
+            String outcome,        // win | loss
+            Integer gameWins,      // 내 세트 득점
+            Integer opponentGameWins
+    ) {
+    }
+
+    /** 두 팀의 상대 전적 */
+    public record HeadToHead(
+            String teamA,
+            String teamB,
+            int winsA,
+            int winsB,
+            List<RecentMatch> meetings   // 최신순
+    ) {
+    }
+
+    // ---- /api/standings ----
+
+    public record StandingsSection(
+            String stageName,    // 예: "그룹", "플레이-인"
+            String sectionName,  // 예: "레전드 그룹"
+            List<RankingRow> rankings
+    ) {
+    }
+
+    public record RankingRow(Integer ordinal, List<RankedTeam> teams) {
+    }
+
+    public record RankedTeam(String name, String code, String image, Integer wins, Integer losses) {
+    }
+
+    // ---- /api/live ----
+
+    public record LiveSummary(boolean live, List<LiveMatchItem> matches) {
+    }
+
+    public record LiveMatchItem(
+            String matchId,
+            String leagueName,
+            String blockName,
+            String startTime,
+            List<ScheduleTeam> teams,
+            List<GameItem> games,
+            String activeGameId
+    ) {
+    }
+
+    public record GameItem(String gameId, Integer number, String state) {
+    }
+
+    // ---- /api/live/{gameId}/scoreboard ----
+
+    public record Scoreboard(
+            String gameId,
+            String rfc460Timestamp,
+            String gameState,
+            String patchVersion,
+            // 피드에 게임 시계 필드가 없어 첫 프레임 기준으로 계산한 값 (시작 시각 미확정 시 null)
+            Long gameTimeSeconds,
+            Long goldDiff,       // blue - red
+            TeamScoreboard blue,
+            TeamScoreboard red
+    ) {
+    }
+
+    public record TeamScoreboard(
+            String esportsTeamId,
+            Long totalGold,
+            Integer totalKills,
+            Integer towers,
+            Integer inhibitors,
+            Integer barons,
+            List<String> dragons,
+            List<PlayerRow> participants
+    ) {
+    }
+
+    public record PlayerRow(
+            Integer participantId,
+            String summonerName,
+            String championId,
+            String role,
+            Integer level,
+            Integer kills,
+            Integer deaths,
+            Integer assists,
+            Integer creepScore,
+            Long totalGold,
+            Integer currentHealth,
+            Integer maxHealth
+    ) {
+    }
+
+    // ---- /api/live/{gameId}/history ----
+
+    /** 골드차 추이 한 점 */
+    public record HistoryPoint(
+            Long gameTimeSeconds,  // 게임 시작 기준 경과 초
+            Long goldDiff,         // blue - red
+            Long blueGold,
+            Long redGold,
+            Integer blueKills,
+            Integer redKills
+    ) {
+    }
+
+    /**
+     * 오브젝트 획득 이벤트.
+     * 피드에 이벤트 타임스탬프가 없어, 프레임 간 개수 증가를 감지해 시점을 역산한다
+     * (프레임 간격만큼의 오차가 있다).
+     */
+    public record ObjectiveEvent(
+            Long gameTimeSeconds,
+            String side,      // blue | red
+            String type,      // dragon | baron | tower | inhibitor
+            String subtype    // 용 종류 (chemtech/ocean/...) — 그 외는 null
+    ) {
+    }
+
+    public record GameHistory(
+            String gameId,
+            List<HistoryPoint> points,
+            List<ObjectiveEvent> objectives
+    ) {
+    }
+
+    // ---- /api/live/{gameId}/details ----
+
+    public record GameDetails(
+            String gameId,
+            String rfc460Timestamp,
+            List<PlayerDetail> participants
+    ) {
+    }
+
+    public record PlayerDetail(
+            Integer participantId,
+            String summonerName,   // window 메타데이터에서 보강 (없으면 null)
+            String championId,
+            Double killParticipation,
+            Double championDamageShare,
+            Integer wardsPlaced,
+            Integer wardsDestroyed,
+            Long totalGoldEarned,
+            List<Long> items,      // 아이템 ID 그대로 노출. TODO: Data Dragon 매핑으로 이름/아이콘 변환 (다음 단계)
+            List<Long> perks       // perkMetadata.perks 그대로. TODO: 룬 이름 매핑 (다음 단계)
+    ) {
+    }
+}
