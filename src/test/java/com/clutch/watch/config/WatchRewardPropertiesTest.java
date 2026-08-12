@@ -1,5 +1,6 @@
 package com.clutch.watch.config;
 
+import com.clutch.watch.exception.WatchException;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
@@ -47,7 +48,7 @@ class WatchRewardPropertiesTest {
                 Duration.ofSeconds(60),
                 10
         ))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(WatchException.class)
                 .hasMessage("Alive TTL은 heartbeat 주기보다 길어야 합니다.");
     }
 }

@@ -1,6 +1,8 @@
 package com.clutch.watch.redis;
 
 import com.clutch.watch.config.WatchRewardProperties;
+import com.clutch.watch.exception.WatchError;
+import com.clutch.watch.exception.WatchException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Repository;
@@ -67,8 +69,7 @@ public class WatchSessionRedisRepository {
      *
      * @param sessionKey 조회할 시청 세션 외부 식별자
      * @return session Hash가 있으면 snapshot, 없으면 빈 Optional
-     * @throws IllegalStateException session Hash에 필수 필드가 없는 경우
-     * @throws NumberFormatException 숫자 필드가 long으로 변환될 수 없는 경우
+     * @throws WatchException session Hash 필드가 없거나 숫자 형식이 올바르지 않은 경우
      */
     public Optional<WatchSessionSnapshot> findSession(String sessionKey) {
         Map<Object, Object> fields = redisTemplate.opsForHash().entries(redisSessionKey(sessionKey));
@@ -86,7 +87,7 @@ public class WatchSessionRedisRepository {
      * @param sequence 프론트엔드가 증가시킨 heartbeat 순번
      * @param nowMillis 서버가 확정한 heartbeat 수신 시각(epoch milliseconds)
      * @return heartbeat 처리 결과
-     * @throws IllegalStateException Lua 스크립트 결과가 없거나 정의되지 않은 경우
+     * @throws WatchException Lua 스크립트 결과가 없거나 정의되지 않은 경우
      */
     public HeartbeatResult heartbeat(
             long userId,
@@ -112,7 +113,7 @@ public class WatchSessionRedisRepository {
                 Long.toString(properties.sessionTtl().toMillis())
         );
         if (result == null) {
-            throw new IllegalStateException("Heartbeat Lua 스크립트 결과가 없습니다.");
+            throw new WatchException(WatchError.HEARTBEAT_RESULT_MISSING);
         }
         return HeartbeatResult.from(result);
     }

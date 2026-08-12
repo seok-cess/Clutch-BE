@@ -7,6 +7,7 @@ import com.clutch.watch.config.WatchRewardProperties;
 import com.clutch.watch.domain.WatchPointTransaction;
 import com.clutch.watch.domain.WatchSession;
 import com.clutch.watch.domain.WatchSessionStatus;
+import com.clutch.watch.exception.WatchException;
 import com.clutch.watch.redis.WatchSessionSnapshot;
 import com.clutch.watch.repository.WatchPointTransactionRepository;
 import com.clutch.watch.repository.WatchSessionRepository;
@@ -154,7 +155,7 @@ class WatchRewardServiceTest {
         when(watchSessionRepository.findBySessionKey(SESSION_KEY)).thenReturn(Optional.of(watchSession));
 
         assertThatThrownBy(() -> service.settle(snapshot))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(WatchException.class)
                 .hasMessage("Redis 세션의 사용자 ID가 DB 세션과 일치하지 않습니다.");
     }
 
@@ -174,7 +175,7 @@ class WatchRewardServiceTest {
         );
 
         assertThatThrownBy(() -> service.settle(snapshot))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(WatchException.class)
                 .hasMessage("유효 시청시간은 음수일 수 없습니다.");
         verify(watchSessionRepository, never()).findBySessionKey(SESSION_KEY);
     }

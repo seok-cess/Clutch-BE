@@ -1,5 +1,8 @@
 package com.clutch.watch.redis;
 
+import com.clutch.watch.exception.WatchError;
+import com.clutch.watch.exception.WatchException;
+
 import java.util.Map;
 
 /**
@@ -21,8 +24,7 @@ public record WatchSessionSnapshot(
      * @param sessionKey 시청 세션 외부 식별자
      * @param fields Redis session Hash의 필드와 값
      * @return 변환된 시청 세션 snapshot
-     * @throws IllegalStateException 필수 필드가 존재하지 않는 경우
-     * @throws NumberFormatException 숫자 필드가 long으로 변환될 수 없는 경우
+     * @throws WatchException 필수 필드가 없거나 숫자 형식이 올바르지 않은 경우
      */
     static WatchSessionSnapshot from(String sessionKey, Map<Object, Object> fields) {
         return new WatchSessionSnapshot(
@@ -42,14 +44,17 @@ public record WatchSessionSnapshot(
      * @param fields Redis session Hash의 필드와 값
      * @param field 조회할 필드 이름
      * @return 필드 값을 변환한 long 값
-     * @throws IllegalStateException 필드가 존재하지 않는 경우
-     * @throws NumberFormatException 필드 값이 long으로 변환될 수 없는 경우
+     * @throws WatchException 필드가 없거나 long으로 변환할 수 없는 경우
      */
     private static long getRequiredLong(Map<Object, Object> fields, String field) {
         Object value = fields.get(field);
         if (value == null) {
-            throw new IllegalStateException("Redis 시청 세션에 " + field + " 필드가 없습니다.");
+            throw new WatchException(WatchError.REDIS_SESSION_FIELD_MISSING);
         }
-        return Long.parseLong(value.toString());
+        try {
+            return Long.parseLong(value.toString());
+        } catch (NumberFormatException exception) {
+            throw new WatchException(WatchError.REDIS_SESSION_FIELD_INVALID, exception);
+        }
     }
 }

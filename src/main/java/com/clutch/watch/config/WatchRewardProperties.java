@@ -1,5 +1,7 @@
 package com.clutch.watch.config;
 
+import com.clutch.watch.exception.WatchError;
+import com.clutch.watch.exception.WatchException;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.time.Duration;
@@ -36,13 +38,13 @@ public record WatchRewardProperties(
         pointsPerMinute = pointsPerMinute > 0 ? pointsPerMinute : DEFAULT_POINTS_PER_MINUTE;
 
         if (aliveTtl.compareTo(heartbeatInterval) <= 0) {
-            throw new IllegalArgumentException("Alive TTL은 heartbeat 주기보다 길어야 합니다.");
+            throw new WatchException(WatchError.ALIVE_TTL_NOT_LONGER_THAN_HEARTBEAT);
         }
         if (activeTtl.compareTo(aliveTtl) <= 0) {
-            throw new IllegalArgumentException("Active TTL은 Alive TTL보다 길어야 합니다.");
+            throw new WatchException(WatchError.ACTIVE_TTL_NOT_LONGER_THAN_ALIVE);
         }
         if (sessionTtl.compareTo(activeTtl) <= 0) {
-            throw new IllegalArgumentException("Session TTL은 Active TTL보다 길어야 합니다.");
+            throw new WatchException(WatchError.SESSION_TTL_NOT_LONGER_THAN_ACTIVE);
         }
     }
 

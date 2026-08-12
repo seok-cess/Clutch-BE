@@ -1,5 +1,6 @@
 package com.clutch.watch.domain;
 
+import com.clutch.watch.exception.WatchException;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
@@ -53,7 +54,7 @@ class WatchSessionTest {
         session.complete(enteredAt.plusMinutes(1), 60_000L);
 
         assertThatThrownBy(() -> session.complete(enteredAt.plusMinutes(2), 120_000L))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(WatchException.class)
                 .hasMessage("이미 완료된 시청 세션입니다.");
     }
 }

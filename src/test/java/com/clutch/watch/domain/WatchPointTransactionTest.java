@@ -1,5 +1,6 @@
 package com.clutch.watch.domain;
 
+import com.clutch.watch.exception.WatchException;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -26,7 +27,7 @@ class WatchPointTransactionTest {
     @Test
     void rejectsNegativeAwardedPoint() {
         assertThatThrownBy(() -> WatchPointTransaction.create(100L, 300L, 200L, -1L))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(WatchException.class)
                 .hasMessage("지급 포인트는 음수일 수 없습니다.");
     }
 }

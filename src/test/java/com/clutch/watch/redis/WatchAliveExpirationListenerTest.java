@@ -1,5 +1,7 @@
 package com.clutch.watch.redis;
 
+import com.clutch.watch.exception.WatchError;
+import com.clutch.watch.exception.WatchException;
 import com.clutch.watch.service.WatchRewardService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -91,11 +93,12 @@ class WatchAliveExpirationListenerTest {
     void preservesRedisStateWhenRewardFails() {
         WatchSessionSnapshot snapshot = snapshot();
         when(watchSessionRedisRepository.findSession(SESSION_KEY)).thenReturn(Optional.of(snapshot));
-        when(watchRewardService.settle(snapshot)).thenThrow(new IllegalStateException("포인트 지급 실패"));
+        when(watchRewardService.settle(snapshot))
+                .thenThrow(new WatchException(WatchError.POINT_TRANSACTION_NOT_FOUND));
 
         assertThatThrownBy(() -> listener.handleExpiredKey("watch:alive:" + USER_ID + ":" + SESSION_KEY))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessage("포인트 지급 실패");
+                .isInstanceOf(WatchException.class)
+                .hasMessage("완료된 시청 세션의 포인트 거래를 찾을 수 없습니다.");
 
         verify(watchSessionRedisRepository, never()).deleteActiveIfMatches(USER_ID, SESSION_KEY);
         verify(watchSessionRedisRepository, never()).deleteSession(SESSION_KEY);

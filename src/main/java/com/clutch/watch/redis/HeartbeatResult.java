@@ -1,5 +1,8 @@
 package com.clutch.watch.redis;
 
+import com.clutch.watch.exception.WatchError;
+import com.clutch.watch.exception.WatchException;
+
 /**
  * Heartbeat Lua 스크립트 처리 결과.
  */
@@ -17,13 +20,13 @@ public enum HeartbeatResult {
      *
      * @param value Lua 스크립트가 반환한 결과 문자열
      * @return 문자열에 대응하는 heartbeat 처리 결과
-     * @throws IllegalStateException 정의되지 않은 결과 문자열인 경우
+     * @throws WatchException 정의되지 않은 결과 문자열인 경우
      */
     static HeartbeatResult from(String value) {
         try {
             return HeartbeatResult.valueOf(value);
         } catch (IllegalArgumentException exception) {
-            throw new IllegalStateException("알 수 없는 heartbeat 처리 결과입니다: " + value, exception);
+            throw new WatchException(WatchError.HEARTBEAT_RESULT_UNKNOWN, exception);
         }
     }
 }

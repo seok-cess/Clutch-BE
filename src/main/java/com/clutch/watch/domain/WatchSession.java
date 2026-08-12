@@ -1,5 +1,7 @@
 package com.clutch.watch.domain;
 
+import com.clutch.watch.exception.WatchError;
+import com.clutch.watch.exception.WatchException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -15,7 +17,6 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
-import java.util.Objects;
 
 /**
  * 경기 시청시간과 정산 상태를 보존하는 엔티티.
@@ -68,12 +69,21 @@ public class WatchSession {
             LocalDateTime enteredAt
     ) {
         if (sessionKey == null || sessionKey.isBlank()) {
-            throw new IllegalArgumentException("세션 키는 필수입니다.");
+            throw new WatchException(WatchError.SESSION_KEY_REQUIRED);
         }
         this.sessionKey = sessionKey;
-        this.userId = Objects.requireNonNull(userId, "사용자 ID는 필수입니다.");
-        this.esportsMatchId = Objects.requireNonNull(esportsMatchId, "경기 ID는 필수입니다.");
-        this.enteredAt = Objects.requireNonNull(enteredAt, "입장 시각은 필수입니다.");
+        if (userId == null) {
+            throw new WatchException(WatchError.USER_ID_REQUIRED);
+        }
+        if (esportsMatchId == null) {
+            throw new WatchException(WatchError.MATCH_ID_REQUIRED);
+        }
+        if (enteredAt == null) {
+            throw new WatchException(WatchError.ENTERED_AT_REQUIRED);
+        }
+        this.userId = userId;
+        this.esportsMatchId = esportsMatchId;
+        this.enteredAt = enteredAt;
         this.lastSeenAt = enteredAt;
         this.eligibleMilliseconds = 0L;
         this.status = WatchSessionStatus.WATCHING;
@@ -93,14 +103,16 @@ public class WatchSession {
      */
     public void complete(LocalDateTime lastSeenAt, long eligibleMilliseconds) {
         if (status != WatchSessionStatus.WATCHING) {
-            throw new IllegalStateException("이미 완료된 시청 세션입니다.");
+            throw new WatchException(WatchError.WATCH_SESSION_ALREADY_COMPLETED);
         }
-        Objects.requireNonNull(lastSeenAt, "마지막 확인 시각은 필수입니다.");
+        if (lastSeenAt == null) {
+            throw new WatchException(WatchError.LAST_SEEN_AT_REQUIRED);
+        }
         if (lastSeenAt.isBefore(enteredAt)) {
-            throw new IllegalArgumentException("마지막 확인 시각은 입장 시각보다 이전일 수 없습니다.");
+            throw new WatchException(WatchError.LAST_SEEN_BEFORE_ENTERED_AT);
         }
         if (eligibleMilliseconds < 0) {
-            throw new IllegalArgumentException("유효 시청시간은 음수일 수 없습니다.");
+            throw new WatchException(WatchError.ELIGIBLE_TIME_NEGATIVE);
         }
         this.lastSeenAt = lastSeenAt;
         this.eligibleMilliseconds = eligibleMilliseconds;

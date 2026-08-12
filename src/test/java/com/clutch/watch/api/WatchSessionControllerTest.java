@@ -1,7 +1,7 @@
 package com.clutch.watch.api;
 
-import com.clutch.watch.exception.WatchSessionError;
-import com.clutch.watch.exception.WatchSessionException;
+import com.clutch.watch.exception.WatchError;
+import com.clutch.watch.exception.WatchException;
 import com.clutch.watch.redis.HeartbeatResult;
 import com.clutch.watch.service.WatchSessionService;
 import com.clutch.watch.service.WatchSessionStartResult;
@@ -46,7 +46,7 @@ class WatchSessionControllerTest {
     void setUp() {
         mockMvc = MockMvcBuilders
                 .standaloneSetup(new WatchSessionController(watchSessionService))
-                .setControllerAdvice(new WatchSessionExceptionHandler())
+                .setControllerAdvice(new WatchExceptionHandler())
                 .build();
     }
 
@@ -145,7 +145,7 @@ class WatchSessionControllerTest {
     @Test
     void returnsApiErrorWhenMatchIsNotWatchable() throws Exception {
         when(watchSessionService.start(USER_ID, MATCH_ID))
-                .thenThrow(new WatchSessionException(WatchSessionError.MATCH_NOT_WATCHABLE));
+                .thenThrow(new WatchException(WatchError.MATCH_NOT_WATCHABLE));
 
         mockMvc.perform(post("/api/users/{userId}/matches/{matchId}/watch-sessions", USER_ID, MATCH_ID))
                 .andExpect(status().isConflict())

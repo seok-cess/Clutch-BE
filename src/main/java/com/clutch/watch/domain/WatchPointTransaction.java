@@ -1,5 +1,7 @@
 package com.clutch.watch.domain;
 
+import com.clutch.watch.exception.WatchError;
+import com.clutch.watch.exception.WatchException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -13,7 +15,6 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
-import java.util.Objects;
 
 /**
  * 시청 세션의 최종 포인트 지급 결과를 기록하는 엔티티.
@@ -55,12 +56,21 @@ public class WatchPointTransaction {
             Long esportsMatchId,
             long awardedPoint
     ) {
-        this.userId = Objects.requireNonNull(userId, "사용자 ID는 필수입니다.");
-        this.watchSessionId = Objects.requireNonNull(watchSessionId, "시청 세션 ID는 필수입니다.");
-        this.esportsMatchId = Objects.requireNonNull(esportsMatchId, "경기 ID는 필수입니다.");
-        if (awardedPoint < 0) {
-            throw new IllegalArgumentException("지급 포인트는 음수일 수 없습니다.");
+        if (userId == null) {
+            throw new WatchException(WatchError.USER_ID_REQUIRED);
         }
+        if (watchSessionId == null) {
+            throw new WatchException(WatchError.WATCH_SESSION_ID_REQUIRED);
+        }
+        if (esportsMatchId == null) {
+            throw new WatchException(WatchError.MATCH_ID_REQUIRED);
+        }
+        if (awardedPoint < 0) {
+            throw new WatchException(WatchError.AWARDED_POINT_NEGATIVE);
+        }
+        this.userId = userId;
+        this.watchSessionId = watchSessionId;
+        this.esportsMatchId = esportsMatchId;
         this.awardedPoint = awardedPoint;
     }
 

@@ -5,7 +5,8 @@ import com.clutch.lolesports.repository.EsportsMatchRepository;
 import com.clutch.user.repository.UserRepository;
 import com.clutch.watch.config.WatchRewardProperties;
 import com.clutch.watch.domain.WatchSession;
-import com.clutch.watch.exception.WatchSessionException;
+import com.clutch.watch.exception.WatchError;
+import com.clutch.watch.exception.WatchException;
 import com.clutch.watch.redis.HeartbeatResult;
 import com.clutch.watch.redis.WatchSessionRedisRepository;
 import com.clutch.watch.redis.WatchSessionSnapshot;
@@ -134,7 +135,7 @@ class WatchSessionServiceTest {
                 .thenReturn(false);
 
         assertThatThrownBy(() -> service.start(USER_ID, MATCH_ID))
-                .isInstanceOf(WatchSessionException.class)
+                .isInstanceOf(WatchException.class)
                 .hasMessage("시청 세션 전환이 진행 중입니다.");
 
         verify(watchSessionRedisRepository, never()).findActiveSessionKey(USER_ID);
@@ -154,11 +155,12 @@ class WatchSessionServiceTest {
                 .thenReturn(Optional.of(OLD_SESSION_KEY));
         when(watchSessionRedisRepository.findSession(OLD_SESSION_KEY))
                 .thenReturn(Optional.of(snapshot));
-        when(watchRewardService.settle(snapshot)).thenThrow(new IllegalStateException("포인트 지급 실패"));
+        when(watchRewardService.settle(snapshot))
+                .thenThrow(new WatchException(WatchError.POINT_TRANSACTION_NOT_FOUND));
 
         assertThatThrownBy(() -> service.start(USER_ID, MATCH_ID))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessage("포인트 지급 실패");
+                .isInstanceOf(WatchException.class)
+                .hasMessage("완료된 시청 세션의 포인트 거래를 찾을 수 없습니다.");
 
         verifyLockReleasedWithOwnerToken();
         verify(watchSessionRepository, never()).save(any(WatchSession.class));
@@ -223,7 +225,7 @@ class WatchSessionServiceTest {
                 .thenReturn(Optional.of(completedMatch()));
 
         assertThatThrownBy(() -> service.heartbeat(USER_ID, OLD_SESSION_KEY, 3L))
-                .isInstanceOf(WatchSessionException.class)
+                .isInstanceOf(WatchException.class)
                 .hasMessage("현재 시청 가능한 경기가 아닙니다.");
 
         verify(watchSessionRedisRepository, never())

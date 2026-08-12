@@ -5,8 +5,8 @@ import com.clutch.lolesports.repository.EsportsMatchRepository;
 import com.clutch.user.repository.UserRepository;
 import com.clutch.watch.config.WatchRewardProperties;
 import com.clutch.watch.domain.WatchSession;
-import com.clutch.watch.exception.WatchSessionError;
-import com.clutch.watch.exception.WatchSessionException;
+import com.clutch.watch.exception.WatchError;
+import com.clutch.watch.exception.WatchException;
 import com.clutch.watch.redis.HeartbeatResult;
 import com.clutch.watch.redis.WatchSessionRedisRepository;
 import com.clutch.watch.redis.WatchSessionSnapshot;
@@ -43,7 +43,7 @@ public class WatchSessionService {
      * @param userId 경기를 시청할 사용자 ID
      * @param matchId 시청할 경기 ID
      * @return 새 시청 세션과 heartbeat 정책을 담은 결과
-     * @throws WatchSessionException 사용자나 경기가 없거나, 경기가 시청 불가능하거나,
+     * @throws WatchException 사용자나 경기가 없거나, 경기가 시청 불가능하거나,
      *                               동일 사용자의 세션 전환이 진행 중인 경우
      */
     @Transactional
@@ -53,7 +53,7 @@ public class WatchSessionService {
 
         String lockToken = UUID.randomUUID().toString();
         if (!watchSessionRedisRepository.tryAcquireSwitchLock(userId, lockToken)) {
-            throw new WatchSessionException(WatchSessionError.WATCH_SESSION_SWITCHING);
+            throw new WatchException(WatchError.WATCH_SESSION_SWITCHING);
         }
 
         try {
@@ -72,7 +72,7 @@ public class WatchSessionService {
      * @param sessionKey heartbeat 대상 시청 세션 외부 식별자
      * @param sequence 프론트엔드가 이전 값보다 증가시킨 heartbeat 순번
      * @return Redis에서 처리한 heartbeat 결과
-     * @throws WatchSessionException Redis 세션의 경기가 없거나 현재 시청 가능한 상태가 아닌 경우
+     * @throws WatchException Redis 세션의 경기가 없거나 현재 시청 가능한 상태가 아닌 경우
      */
     @Transactional(readOnly = true)
     public HeartbeatResult heartbeat(long userId, String sessionKey, long sequence) {
@@ -95,11 +95,11 @@ public class WatchSessionService {
      * 시청 세션을 시작할 사용자가 존재하는지 검증한다.
      *
      * @param userId 검증할 사용자 ID
-     * @throws WatchSessionException 사용자가 존재하지 않는 경우
+     * @throws WatchException 사용자가 존재하지 않는 경우
      */
     private void validateUser(long userId) {
         if (!userRepository.existsById(userId)) {
-            throw new WatchSessionException(WatchSessionError.USER_NOT_FOUND);
+            throw new WatchException(WatchError.USER_NOT_FOUND);
         }
     }
 
@@ -107,13 +107,13 @@ public class WatchSessionService {
      * 경기가 존재하고 현재 시청 가능한 진행 상태인지 검증한다.
      *
      * @param matchId 검증할 경기 ID
-     * @throws WatchSessionException 경기가 없거나 진행 중 상태가 아닌 경우
+     * @throws WatchException 경기가 없거나 진행 중 상태가 아닌 경우
      */
     private void validateMatch(long matchId) {
         EsportsMatch esportsMatch = esportsMatchRepository.findById(matchId)
-                .orElseThrow(() -> new WatchSessionException(WatchSessionError.MATCH_NOT_FOUND));
+                .orElseThrow(() -> new WatchException(WatchError.MATCH_NOT_FOUND));
         if (!WATCHABLE_MATCH_STATUS.equalsIgnoreCase(esportsMatch.getLifecycleStatus())) {
-            throw new WatchSessionException(WatchSessionError.MATCH_NOT_WATCHABLE);
+            throw new WatchException(WatchError.MATCH_NOT_WATCHABLE);
         }
     }
 
@@ -121,12 +121,12 @@ public class WatchSessionService {
      * 사용자의 기존 활성 세션이 있으면 Redis snapshot을 조회하여 포인트를 지급한다.
      *
      * @param userId 기존 활성 세션을 조회할 사용자 ID
-     * @throws WatchSessionException active 키가 가리키는 Redis session Hash가 없는 경우
+     * @throws WatchException active 키가 가리키는 Redis session Hash가 없는 경우
      */
     private void rewardExistingSession(long userId) {
         watchSessionRedisRepository.findActiveSessionKey(userId).ifPresent(sessionKey -> {
             WatchSessionSnapshot snapshot = watchSessionRedisRepository.findSession(sessionKey)
-                    .orElseThrow(() -> new WatchSessionException(WatchSessionError.WATCH_SESSION_STATE_MISSING));
+                    .orElseThrow(() -> new WatchException(WatchError.WATCH_SESSION_STATE_MISSING));
             watchRewardService.settle(snapshot);
         });
     }

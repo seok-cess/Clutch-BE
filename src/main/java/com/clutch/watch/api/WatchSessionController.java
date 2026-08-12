@@ -1,7 +1,7 @@
 package com.clutch.watch.api;
 
-import com.clutch.watch.exception.WatchSessionError;
-import com.clutch.watch.exception.WatchSessionException;
+import com.clutch.watch.exception.WatchError;
+import com.clutch.watch.exception.WatchException;
 import com.clutch.watch.redis.HeartbeatResult;
 import com.clutch.watch.service.WatchSessionService;
 import com.clutch.watch.service.WatchSessionStartResult;
@@ -52,7 +52,7 @@ public class WatchSessionController {
      * @param sessionKey Heartbeat 대상 시청 세션 외부 식별자
      * @param request 증가한 Heartbeat 순번을 담은 요청
      * @return 정상 처리 시 body가 없는 204 응답
-     * @throws WatchSessionException Redis 검증 결과 Heartbeat를 처리할 수 없는 경우
+     * @throws WatchException Redis 검증 결과 Heartbeat를 처리할 수 없는 경우
      */
     @PostMapping("/watch-sessions/{sessionKey}/heartbeat")
     public ResponseEntity<Void> heartbeat(
@@ -62,7 +62,7 @@ public class WatchSessionController {
     ) {
         HeartbeatResult result = watchSessionService.heartbeat(userId, sessionKey, request.sequence());
         if (result != HeartbeatResult.SUCCESS) {
-            throw new WatchSessionException(toError(result));
+            throw new WatchException(toError(result));
         }
         return ResponseEntity.noContent().build();
     }
@@ -72,17 +72,17 @@ public class WatchSessionController {
      *
      * @param result 실패한 Redis Heartbeat 처리 결과
      * @return HTTP 상태와 메시지를 가진 시청 세션 오류
-     * @throws IllegalStateException 성공 결과를 오류로 변환하려는 경우
+     * @throws WatchException 성공 결과를 오류로 변환하려는 경우
      */
-    private WatchSessionError toError(HeartbeatResult result) {
+    private WatchError toError(HeartbeatResult result) {
         return switch (result) {
-            case SWITCHING -> WatchSessionError.WATCH_SESSION_SWITCHING;
-            case REPLACED -> WatchSessionError.WATCH_SESSION_REPLACED;
-            case EXPIRED -> WatchSessionError.WATCH_SESSION_EXPIRED;
-            case SESSION_NOT_FOUND -> WatchSessionError.WATCH_SESSION_NOT_FOUND;
-            case USER_MISMATCH -> WatchSessionError.WATCH_SESSION_USER_MISMATCH;
-            case INVALID_SEQUENCE -> WatchSessionError.INVALID_HEARTBEAT_SEQUENCE;
-            case SUCCESS -> throw new IllegalStateException("성공한 Heartbeat 결과는 오류로 변환할 수 없습니다.");
+            case SWITCHING -> WatchError.WATCH_SESSION_SWITCHING;
+            case REPLACED -> WatchError.WATCH_SESSION_REPLACED;
+            case EXPIRED -> WatchError.WATCH_SESSION_EXPIRED;
+            case SESSION_NOT_FOUND -> WatchError.WATCH_SESSION_NOT_FOUND;
+            case USER_MISMATCH -> WatchError.WATCH_SESSION_USER_MISMATCH;
+            case INVALID_SEQUENCE -> WatchError.INVALID_HEARTBEAT_SEQUENCE;
+            case SUCCESS -> throw new WatchException(WatchError.HEARTBEAT_SUCCESS_MAPPING);
         };
     }
 }

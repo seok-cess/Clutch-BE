@@ -1,9 +1,8 @@
 package com.clutch.watch.api;
 
-import com.clutch.watch.exception.WatchSessionError;
-import com.clutch.watch.exception.WatchSessionException;
+import com.clutch.watch.exception.WatchError;
+import com.clutch.watch.exception.WatchException;
 import jakarta.validation.ConstraintViolationException;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -13,7 +12,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
  * 시청 세션 Controller의 예외를 일관된 JSON 오류 응답으로 변환한다.
  */
 @RestControllerAdvice(assignableTypes = WatchSessionController.class)
-public class WatchSessionExceptionHandler {
+public class WatchExceptionHandler {
 
     /**
      * 시청 세션 비즈니스 예외를 정의된 HTTP 상태와 오류 응답으로 변환한다.
@@ -21,13 +20,13 @@ public class WatchSessionExceptionHandler {
      * @param exception 발생한 시청 세션 예외
      * @return 오류 코드와 한국어 메시지를 담은 응답
      */
-    @ExceptionHandler(WatchSessionException.class)
-    public ResponseEntity<WatchSessionErrorResponse> handleWatchSessionException(
-            WatchSessionException exception
+    @ExceptionHandler(WatchException.class)
+    public ResponseEntity<WatchErrorResponse> handleWatchException(
+            WatchException exception
     ) {
-        WatchSessionError error = exception.getError();
+        WatchError error = exception.getError();
         return ResponseEntity.status(error.status())
-                .body(new WatchSessionErrorResponse(error.name(), error.message()));
+                .body(new WatchErrorResponse(error.name(), error.message()));
     }
 
     /**
@@ -37,7 +36,7 @@ public class WatchSessionExceptionHandler {
      * @return INVALID_REQUEST 오류 응답
      */
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<WatchSessionErrorResponse> handleRequestValidation(
+    public ResponseEntity<WatchErrorResponse> handleRequestValidation(
             MethodArgumentNotValidException exception
     ) {
         String message = exception.getBindingResult().getFieldErrors().stream()
@@ -54,7 +53,7 @@ public class WatchSessionExceptionHandler {
      * @return INVALID_REQUEST 오류 응답
      */
     @ExceptionHandler(ConstraintViolationException.class)
-    public ResponseEntity<WatchSessionErrorResponse> handlePathValidation(
+    public ResponseEntity<WatchErrorResponse> handlePathValidation(
             ConstraintViolationException exception
     ) {
         String message = exception.getConstraintViolations().stream()
@@ -70,8 +69,9 @@ public class WatchSessionExceptionHandler {
      * @param message 구체적인 입력값 검증 실패 메시지
      * @return HTTP 400 오류 응답
      */
-    private ResponseEntity<WatchSessionErrorResponse> invalidRequest(String message) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(new WatchSessionErrorResponse("INVALID_REQUEST", message));
+    private ResponseEntity<WatchErrorResponse> invalidRequest(String message) {
+        WatchError error = WatchError.INVALID_REQUEST;
+        return ResponseEntity.status(error.status())
+                .body(new WatchErrorResponse(error.name(), message));
     }
 }

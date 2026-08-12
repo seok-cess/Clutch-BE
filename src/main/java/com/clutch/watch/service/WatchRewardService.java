@@ -6,6 +6,8 @@ import com.clutch.watch.config.WatchRewardProperties;
 import com.clutch.watch.domain.WatchPointTransaction;
 import com.clutch.watch.domain.WatchSession;
 import com.clutch.watch.domain.WatchSessionStatus;
+import com.clutch.watch.exception.WatchError;
+import com.clutch.watch.exception.WatchException;
 import com.clutch.watch.redis.WatchSessionSnapshot;
 import com.clutch.watch.repository.WatchPointTransactionRepository;
 import com.clutch.watch.repository.WatchSessionRepository;
@@ -13,10 +15,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.DateTimeException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
-import java.util.Objects;
 
 /**
  * Redis에서 확정한 시청시간을 DB 포인트와 거래 내역으로 정산한다.
@@ -38,22 +40,21 @@ public class WatchRewardService {
      *
      * @param snapshot Redis에서 조회한 최종 시청 세션 상태
      * @return 신규 정산 여부와 시청시간 및 지급 포인트를 담은 결과
-     * @throws NullPointerException snapshot이 null인 경우
-     * @throws IllegalArgumentException 유효 시청시간이 음수이거나, DB 세션이 없거나,
-     *                                  snapshot 식별자가 DB 세션과 다른 경우
-     * @throws IllegalStateException 완료 세션의 기존 거래를 찾을 수 없는 경우
-     * @throws ArithmeticException 지급 포인트 계산 중 long 범위를 초과하는 경우
+     * @throws WatchException snapshot 또는 시청 세션이 없거나, Redis와 DB 상태가 다르거나,
+     *                        포인트 계산 범위를 초과하는 경우
      */
     @Transactional
     public WatchRewardResult settle(WatchSessionSnapshot snapshot) {
-        Objects.requireNonNull(snapshot, "정산할 Redis 시청 세션은 필수입니다.");
+        if (snapshot == null) {
+            throw new WatchException(WatchError.REWARD_SNAPSHOT_REQUIRED);
+        }
         if (snapshot.eligibleMilliseconds() < 0) {
-            throw new IllegalArgumentException("유효 시청시간은 음수일 수 없습니다.");
+            throw new WatchException(WatchError.ELIGIBLE_TIME_NEGATIVE);
         }
 
         WatchSession watchSession = watchSessionRepository
                 .findBySessionKey(snapshot.sessionKey())
-                .orElseThrow(() -> new IllegalArgumentException("시청 세션을 찾을 수 없습니다."));
+                .orElseThrow(() -> new WatchException(WatchError.WATCH_SESSION_NOT_FOUND));
 
         validateSnapshotOwner(watchSession, snapshot);
 
@@ -62,12 +63,21 @@ public class WatchRewardService {
         }
 
         long awardedMinutes = snapshot.eligibleMilliseconds() / MILLISECONDS_PER_MINUTE;
-        long awardedPoint = Math.multiplyExact(awardedMinutes, properties.pointsPerMinute());
+        long awardedPoint;
+        try {
+            awardedPoint = Math.multiplyExact(awardedMinutes, properties.pointsPerMinute());
+        } catch (ArithmeticException exception) {
+            throw new WatchException(WatchError.REWARD_POINT_OVERFLOW, exception);
+        }
 
         User user = userRepository.findById(watchSession.getUserId())
-                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+                .orElseThrow(() -> new WatchException(WatchError.USER_NOT_FOUND));
 
-        user.changePoint(awardedPoint);
+        try {
+            user.changePoint(awardedPoint);
+        } catch (ArithmeticException exception) {
+            throw new WatchException(WatchError.USER_POINT_OVERFLOW, exception);
+        }
         watchSession.complete(toUtcLocalDateTime(snapshot.lastSeen()), snapshot.eligibleMilliseconds());
 
         WatchPointTransaction transaction = WatchPointTransaction.create(
@@ -92,14 +102,14 @@ public class WatchRewardService {
      *
      * @param watchSession DB에서 조회한 시청 세션
      * @param snapshot Redis에서 조회한 시청 세션 상태
-     * @throws IllegalArgumentException 사용자 또는 경기 식별자가 일치하지 않는 경우
+     * @throws WatchException 사용자 또는 경기 식별자가 일치하지 않는 경우
      */
     private void validateSnapshotOwner(WatchSession watchSession, WatchSessionSnapshot snapshot) {
         if (!watchSession.getUserId().equals(snapshot.userId())) {
-            throw new IllegalArgumentException("Redis 세션의 사용자 ID가 DB 세션과 일치하지 않습니다.");
+            throw new WatchException(WatchError.REDIS_SESSION_USER_MISMATCH);
         }
         if (!watchSession.getEsportsMatchId().equals(snapshot.matchId())) {
-            throw new IllegalArgumentException("Redis 세션의 경기 ID가 DB 세션과 일치하지 않습니다.");
+            throw new WatchException(WatchError.REDIS_SESSION_MATCH_MISMATCH);
         }
     }
 
@@ -108,12 +118,12 @@ public class WatchRewardService {
      *
      * @param watchSession 이미 완료된 DB 시청 세션
      * @return 기존 정산 정보를 담은 결과
-     * @throws IllegalStateException 완료 세션에 연결된 포인트 거래가 없는 경우
+     * @throws WatchException 완료 세션에 연결된 포인트 거래가 없는 경우
      */
     private WatchRewardResult existingSettlement(WatchSession watchSession) {
         WatchPointTransaction transaction = watchPointTransactionRepository
                 .findByWatchSessionId(watchSession.getId())
-                .orElseThrow(() -> new IllegalStateException("완료된 시청 세션의 포인트 거래를 찾을 수 없습니다."));
+                .orElseThrow(() -> new WatchException(WatchError.POINT_TRANSACTION_NOT_FOUND));
 
         return new WatchRewardResult(
                 watchSession.getSessionKey(),
@@ -131,6 +141,10 @@ public class WatchRewardService {
      * @return UTC 기준 LocalDateTime
      */
     private LocalDateTime toUtcLocalDateTime(long epochMilliseconds) {
-        return LocalDateTime.ofInstant(Instant.ofEpochMilli(epochMilliseconds), ZoneOffset.UTC);
+        try {
+            return LocalDateTime.ofInstant(Instant.ofEpochMilli(epochMilliseconds), ZoneOffset.UTC);
+        } catch (DateTimeException exception) {
+            throw new WatchException(WatchError.REDIS_SESSION_TIME_INVALID, exception);
+        }
     }
 }
