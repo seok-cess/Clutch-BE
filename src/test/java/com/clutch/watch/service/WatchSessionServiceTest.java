@@ -1,0 +1,240 @@
+package com.clutch.watch.service;
+
+import com.clutch.lolesports.entity.EsportsMatch;
+import com.clutch.lolesports.repository.EsportsMatchRepository;
+import com.clutch.user.repository.UserRepository;
+import com.clutch.watch.config.WatchRewardProperties;
+import com.clutch.watch.domain.WatchSession;
+import com.clutch.watch.redis.WatchSessionRedisRepository;
+import com.clutch.watch.redis.WatchSessionSnapshot;
+import com.clutch.watch.repository.WatchSessionRepository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class WatchSessionServiceTest {
+
+    private static final long USER_ID = 100L;
+    private static final long MATCH_ID = 200L;
+    private static final String OLD_SESSION_KEY = "old-session-key";
+
+    @Mock
+    private UserRepository userRepository;
+
+    @Mock
+    private EsportsMatchRepository esportsMatchRepository;
+
+    @Mock
+    private WatchSessionRepository watchSessionRepository;
+
+    @Mock
+    private WatchSessionRedisRepository watchSessionRedisRepository;
+
+    @Mock
+    private WatchRewardService watchRewardService;
+
+    private WatchSessionService service;
+
+    /**
+     * 각 테스트에서 동일한 시청 보상 정책으로 시청 세션 서비스를 생성한다.
+     */
+    @BeforeEach
+    void setUp() {
+        service = new WatchSessionService(
+                userRepository,
+                esportsMatchRepository,
+                watchSessionRepository,
+                watchSessionRedisRepository,
+                watchRewardService,
+                rewardProperties()
+        );
+    }
+
+    /**
+     * 활성 세션이 없는 사용자의 DB 및 Redis 시청 세션을 새로 생성하는지 검증한다.
+     */
+    @Test
+    void startsNewWatchSession() {
+        allowSessionStart();
+        when(watchSessionRedisRepository.findActiveSessionKey(USER_ID)).thenReturn(Optional.empty());
+
+        WatchSessionStartResult result = service.start(USER_ID, MATCH_ID);
+
+        assertThat(result.sessionKey()).isNotBlank();
+        assertThat(result.matchId()).isEqualTo(MATCH_ID);
+        assertThat(result.heartbeatIntervalSeconds()).isEqualTo(30L);
+        assertThat(result.sessionTimeoutSeconds()).isEqualTo(90L);
+
+        ArgumentCaptor<WatchSession> sessionCaptor = ArgumentCaptor.forClass(WatchSession.class);
+        verify(watchSessionRepository).save(sessionCaptor.capture());
+        assertThat(sessionCaptor.getValue().getSessionKey()).isEqualTo(result.sessionKey());
+        assertThat(sessionCaptor.getValue().getUserId()).isEqualTo(USER_ID);
+        assertThat(sessionCaptor.getValue().getEsportsMatchId()).isEqualTo(MATCH_ID);
+
+        verify(watchSessionRedisRepository).initialize(
+                USER_ID,
+                MATCH_ID,
+                result.sessionKey(),
+                result.enteredAt().toEpochMilli()
+        );
+        verifyLockReleasedWithOwnerToken();
+    }
+
+    /**
+     * 기존 활성 세션을 먼저 포인트로 지급한 후 새 세션을 생성하는지 검증한다.
+     */
+    @Test
+    void rewardsExistingSessionBeforeStartingNewSession() {
+        allowSessionStart();
+        WatchSessionSnapshot snapshot = oldSnapshot();
+        when(watchSessionRedisRepository.findActiveSessionKey(USER_ID))
+                .thenReturn(Optional.of(OLD_SESSION_KEY));
+        when(watchSessionRedisRepository.findSession(OLD_SESSION_KEY))
+                .thenReturn(Optional.of(snapshot));
+
+        service.start(USER_ID, MATCH_ID);
+
+        InOrder inOrder = inOrder(watchRewardService, watchSessionRepository, watchSessionRedisRepository);
+        inOrder.verify(watchRewardService).settle(snapshot);
+        inOrder.verify(watchSessionRepository).save(any(WatchSession.class));
+        inOrder.verify(watchSessionRedisRepository)
+                .initialize(org.mockito.ArgumentMatchers.eq(USER_ID),
+                        org.mockito.ArgumentMatchers.eq(MATCH_ID), anyString(), anyLong());
+    }
+
+    /**
+     * 다른 요청이 전환 lock을 보유하면 DB 및 Redis 세션을 변경하지 않는지 검증한다.
+     */
+    @Test
+    void rejectsStartWhenAnotherRequestIsSwitchingSession() {
+        when(userRepository.existsById(USER_ID)).thenReturn(true);
+        when(esportsMatchRepository.findById(MATCH_ID)).thenReturn(Optional.of(inProgressMatch()));
+        when(watchSessionRedisRepository.tryAcquireSwitchLock(org.mockito.ArgumentMatchers.eq(USER_ID), anyString()))
+                .thenReturn(false);
+
+        assertThatThrownBy(() -> service.start(USER_ID, MATCH_ID))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("시청 세션 전환이 진행 중입니다.");
+
+        verify(watchSessionRedisRepository, never()).findActiveSessionKey(USER_ID);
+        verify(watchSessionRedisRepository, never()).releaseSwitchLock(
+                org.mockito.ArgumentMatchers.eq(USER_ID), anyString());
+        verify(watchSessionRepository, never()).save(any(WatchSession.class));
+    }
+
+    /**
+     * 기존 세션 포인트 지급 중 예외가 발생해도 자신이 획득한 전환 lock을 해제하는지 검증한다.
+     */
+    @Test
+    void releasesSwitchLockWhenRewardFails() {
+        allowSessionStart();
+        WatchSessionSnapshot snapshot = oldSnapshot();
+        when(watchSessionRedisRepository.findActiveSessionKey(USER_ID))
+                .thenReturn(Optional.of(OLD_SESSION_KEY));
+        when(watchSessionRedisRepository.findSession(OLD_SESSION_KEY))
+                .thenReturn(Optional.of(snapshot));
+        when(watchRewardService.settle(snapshot)).thenThrow(new IllegalStateException("포인트 지급 실패"));
+
+        assertThatThrownBy(() -> service.start(USER_ID, MATCH_ID))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("포인트 지급 실패");
+
+        verifyLockReleasedWithOwnerToken();
+        verify(watchSessionRepository, never()).save(any(WatchSession.class));
+    }
+
+    /**
+     * 정상적인 사용자, 진행 중 경기 및 전환 lock 획득 조건을 설정한다.
+     */
+    private void allowSessionStart() {
+        when(userRepository.existsById(USER_ID)).thenReturn(true);
+        when(esportsMatchRepository.findById(MATCH_ID)).thenReturn(Optional.of(inProgressMatch()));
+        when(watchSessionRedisRepository.tryAcquireSwitchLock(org.mockito.ArgumentMatchers.eq(USER_ID), anyString()))
+                .thenReturn(true);
+    }
+
+    /**
+     * lock 획득과 해제에 동일한 소유 token을 사용했는지 검증한다.
+     */
+    private void verifyLockReleasedWithOwnerToken() {
+        ArgumentCaptor<String> acquiredToken = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<String> releasedToken = ArgumentCaptor.forClass(String.class);
+        verify(watchSessionRedisRepository).tryAcquireSwitchLock(
+                org.mockito.ArgumentMatchers.eq(USER_ID), acquiredToken.capture());
+        verify(watchSessionRedisRepository).releaseSwitchLock(
+                org.mockito.ArgumentMatchers.eq(USER_ID), releasedToken.capture());
+        assertThat(releasedToken.getValue()).isEqualTo(acquiredToken.getValue());
+    }
+
+    /**
+     * 테스트에 사용할 진행 중 경기 엔티티를 생성한다.
+     *
+     * @return lifecycle 상태가 inProgress인 경기
+     */
+    private EsportsMatch inProgressMatch() {
+        return new EsportsMatch(
+                "external-match",
+                "league",
+                "2026",
+                "tournament",
+                "block",
+                LocalDateTime.of(2026, 8, 13, 12, 0),
+                LocalDateTime.of(2026, 8, 13, 12, 0),
+                "inProgress",
+                3
+        );
+    }
+
+    /**
+     * 테스트에 사용할 기존 Redis 시청 세션 snapshot을 생성한다.
+     *
+     * @return 기존 활성 세션의 Redis 상태
+     */
+    private WatchSessionSnapshot oldSnapshot() {
+        return new WatchSessionSnapshot(
+                USER_ID,
+                999L,
+                OLD_SESSION_KEY,
+                1_000L,
+                61_000L,
+                60_000L,
+                2L
+        );
+    }
+
+    /**
+     * 테스트에 사용할 시청 보상 설정을 생성한다.
+     *
+     * @return 기본 TTL과 분당 10P 정책을 가진 설정
+     */
+    private WatchRewardProperties rewardProperties() {
+        return new WatchRewardProperties(
+                Duration.ofSeconds(30),
+                Duration.ofSeconds(90),
+                Duration.ofSeconds(120),
+                Duration.ofHours(1),
+                Duration.ofSeconds(10),
+                Duration.ofSeconds(60),
+                10L
+        );
+    }
+}
