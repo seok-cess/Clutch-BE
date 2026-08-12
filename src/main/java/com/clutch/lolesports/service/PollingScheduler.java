@@ -39,6 +39,7 @@ public class PollingScheduler {
     private final LiveStatsClient liveStats;
     private final DataCacheService cache;
     private final PentakillDetector pentakillDetector;
+    private final GamePersistService persistService;
 
     private final Backoff liveBackoff;
     private final Backoff inGameBackoff;
@@ -46,6 +47,13 @@ public class PollingScheduler {
 
     /** 직전 폴링에서 활성이었던 게임 — 종료 감지 후 정리용 */
     private final Set<String> previousActiveGames = new HashSet<>();
+    /**
+     * gameId → 그 게임이 속한 매치 스냅샷.
+     *
+     * 종료된 게임은 getLive 응답에서 빠지므로, 적재 시점에는 매치 정보를 얻을 수 없다.
+     * 활성일 때 미리 담아두고 적재가 끝나면 지운다.
+     */
+    private final Map<String, DataCacheService.LiveMatch> lastKnownMatches = new ConcurrentHashMap<>();
     /**
      * 통계 404 를 받은 게임 → 재시도 가능 시각(epoch ms).
      *
@@ -62,11 +70,13 @@ public class PollingScheduler {
                             LiveStatsClient liveStats,
                             DataCacheService cache,
                             PentakillDetector pentakillDetector,
+                            GamePersistService persistService,
                             LolesportsProperties props) {
         this.api = api;
         this.liveStats = liveStats;
         this.cache = cache;
         this.pentakillDetector = pentakillDetector;
+        this.persistService = persistService;
         long base = props.poll().backoffBaseMs();
         long max = props.poll().backoffMaxMs();
         this.liveBackoff = new Backoff(base, max);
@@ -97,6 +107,7 @@ public class PollingScheduler {
             }
 
             cache.putLiveMatches(matches);
+            rememberActiveMatches(matches);
             cleanupFinishedGames();
             liveBackoff.success();
 
@@ -143,16 +154,77 @@ public class PollingScheduler {
         );
     }
 
-    /** 활성 목록에서 빠진 게임의 펜타킬 감지 상태 정리 */
+    /**
+     * 활성 목록에서 빠진 게임 = 종료된 게임. 순서대로 처리한다.
+     *
+     *   1) DB 적재  — 캐시의 최종값을 저장
+     *   2) 캐시 해제 — 적재가 성공했을 때만
+     *   3) 감지 상태 정리
+     *
+     * 적재보다 먼저 캐시를 지우면 저장할 값이 사라진다. 적재가 실패하면 캐시를 남겨
+     * 다음 폴링에서 다시 시도하되, 소스에서 재수집도 가능하므로 영구 손실은 아니다.
+     */
     private void cleanupFinishedGames() {
         Set<String> current = new HashSet<>(cache.getActiveGameIds());
+
         for (String gameId : previousActiveGames) {
-            if (!current.contains(gameId)) {
+            if (current.contains(gameId)) {
+                continue;
+            }
+            log.info("게임 종료 감지: {}", gameId);
+
+            boolean persisted = persistFinishedGame(gameId);
+            if (persisted) {
+                cache.evictGame(gameId);
                 pentakillDetector.clearGame(gameId);
+                statsRetryAt.remove(gameId);
+                lastKnownMatches.remove(gameId);
+                log.info("게임 {} 적재 후 캐시 해제 (남은 버퍼 {}개)", gameId, cache.bufferedGameCount());
+            } else {
+                log.warn("게임 {} 적재 실패 — 캐시를 유지하고 다음 기회에 재시도한다", gameId);
             }
         }
+
         previousActiveGames.clear();
         previousActiveGames.addAll(current);
+    }
+
+    /** 활성 게임의 매치 정보를 담아둔다 — 종료 후에는 getLive 에서 사라지기 때문 */
+    private void rememberActiveMatches(List<DataCacheService.LiveMatch> matches) {
+        for (DataCacheService.LiveMatch m : matches) {
+            if (m.activeGameId() != null && !m.activeGameId().isBlank()) {
+                lastKnownMatches.put(m.activeGameId(), m);
+            }
+        }
+    }
+
+    /** 종료된 게임을 DB 에 적재. 매치 정보는 직전 라이브 스냅샷에서 가져온다 */
+    private boolean persistFinishedGame(String gameId) {
+        if (persistService.isAlreadyPersisted(gameId)) {
+            return true;   // 이미 저장됨 — 캐시만 비우면 된다
+        }
+        DataCacheService.LiveMatch owner = lastKnownMatches.get(gameId);
+        if (owner == null) {
+            log.warn("게임 {} 의 매치 정보를 찾지 못해 적재를 건너뛴다", gameId);
+            return false;
+        }
+        return persistService.persistGame(gameId,
+                GamePersistService.MatchContext.of(owner, gameId, bestOfFromSchedule(owner.matchId())));
+    }
+
+    /** 일정 캐시에서 다전제 수를 찾는다 (라이브 응답에는 없다) */
+    private Integer bestOfFromSchedule(String matchId) {
+        ScheduleResponse schedule = cache.getSchedule();
+        if (schedule == null || schedule.data() == null || schedule.data().schedule() == null
+                || schedule.data().schedule().events() == null) {
+            return null;
+        }
+        return schedule.data().schedule().events().stream()
+                .filter(e -> e.match() != null && matchId.equals(e.match().id()))
+                .map(e -> e.match().strategy() != null ? e.match().strategy().count() : null)
+                .filter(java.util.Objects::nonNull)
+                .findFirst()
+                .orElse(null);
     }
 
     // ---- 2) 인게임 스탯 (활성 게임 있을 때만, 1초 간격) ----

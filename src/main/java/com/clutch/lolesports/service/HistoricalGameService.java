@@ -173,6 +173,10 @@ public class HistoricalGameService {
      * 라이브 활성 게임은 폴링 스케줄러가 이미 캐시를 채우므로 이 경로를 타지 않는다.
      */
     public void ensureGameLoaded(String gameId) {
+        // 열람 순서를 기록해 상한을 넘으면 오래된 것부터 밀어낸다.
+        // 진행 중인 라이브 게임은 밀려나면 안 되므로 보호 목록으로 넘긴다.
+        cache.touchOnDemand(gameId, java.util.Set.copyOf(cache.getActiveGameIds()));
+
         if (cache.hasWindow(gameId) && cache.hasDetails(gameId)) {
             return;
         }
