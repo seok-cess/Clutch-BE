@@ -33,13 +33,13 @@ public record WatchRewardProperties(
         pointsPerMinute = pointsPerMinute > 0 ? pointsPerMinute : DEFAULT_POINTS_PER_MINUTE;
 
         if (aliveTtl.compareTo(heartbeatInterval) <= 0) {
-            throw new IllegalArgumentException("alive TTL must be longer than the heartbeat interval");
+            throw new IllegalArgumentException("Alive TTL은 heartbeat 주기보다 길어야 합니다.");
         }
         if (activeTtl.compareTo(aliveTtl) <= 0) {
-            throw new IllegalArgumentException("active TTL must be longer than alive TTL");
+            throw new IllegalArgumentException("Active TTL은 Alive TTL보다 길어야 합니다.");
         }
         if (sessionTtl.compareTo(activeTtl) <= 0) {
-            throw new IllegalArgumentException("session TTL must be longer than active TTL");
+            throw new IllegalArgumentException("Session TTL은 Active TTL보다 길어야 합니다.");
         }
     }
 

@@ -45,6 +45,6 @@ class WatchRewardPropertiesTest {
                 10
         ))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("alive TTL must be longer than the heartbeat interval");
+                .hasMessage("Alive TTL은 heartbeat 주기보다 길어야 합니다.");
     }
 }
