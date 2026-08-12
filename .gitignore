@@ -46,3 +46,8 @@ k6/results/
 
 ### Local documentation ###
 /docs/
+
+### 로컬 전용 Gradle 설정 ###
+# 한글 경로 + MS949 코드페이지 환경에서만 필요한 인코딩 지정.
+# 커밋하면 UTF-8 인 CI(ubuntu)·macOS 에서 한글 주석이 깨진다.
+gradle.properties

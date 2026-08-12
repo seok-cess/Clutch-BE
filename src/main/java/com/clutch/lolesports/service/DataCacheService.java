@@ -222,6 +222,62 @@ public class DataCacheService {
         return buf != null && !buf.frames.isEmpty();
     }
 
+    // ---- 버퍼 해제 ----
+
+    /**
+     * 게임 하나의 프레임 버퍼를 통째로 비운다.
+     *
+     * pruneOld 는 "한 게임 안에서" 오래된 프레임만 자르고 그마저 새 프레임이 들어올 때만 돈다.
+     * 경기가 끝나면 폴링이 멈춰 그 정리가 영영 실행되지 않으므로, 종료 시 명시적으로 호출해야 한다.
+     * DB 적재가 성공한 뒤에 부를 것 — 캐시가 사라지면 적재도 트리거 판정도 할 수 없다.
+     */
+    public void evictGame(String gameId) {
+        windows.remove(gameId);
+        details.remove(gameId);
+        lastAccess.remove(gameId);
+    }
+
+    /**
+     * 열람용으로 올라온 게임 버퍼의 상한.
+     *
+     * 라이브 게임은 종료 시 evictGame 으로 정리되지만, 사용자가 과거 경기를 열면
+     * ensureGameLoaded 가 캐시를 채우고 아무도 지우지 않는다. 여러 경기를 열어볼수록
+     * 계속 쌓이므로(게임당 60~80MB) 오래 안 쓴 것부터 밀어낸다.
+     */
+    private static final int MAX_ON_DEMAND_GAMES = 4;
+
+    /** gameId → 마지막 접근 시각(ms). 접근 순서만 알면 되므로 프레임과 분리해 둔다 */
+    private final Map<String, Long> lastAccess = new ConcurrentHashMap<>();
+
+    /**
+     * 열람으로 올라온 게임을 등록하고, 상한을 넘으면 가장 오래 안 쓴 게임을 해제한다.
+     * 라이브 폴링 경로는 이걸 호출하지 않는다 — 진행 중인 경기가 밀려나면 안 되기 때문.
+     */
+    public void touchOnDemand(String gameId, java.util.Set<String> protectedIds) {
+        lastAccess.put(gameId, System.currentTimeMillis());
+
+        if (lastAccess.size() <= MAX_ON_DEMAND_GAMES) {
+            return;
+        }
+        lastAccess.entrySet().stream()
+                .filter(e -> !protectedIds.contains(e.getKey()))
+                .sorted(Map.Entry.comparingByValue())
+                .limit(Math.max(0, lastAccess.size() - MAX_ON_DEMAND_GAMES))
+                .map(Map.Entry::getKey)
+                .toList()
+                .forEach(this::evictGame);
+    }
+
+    /** 현재 버퍼를 들고 있는 게임 수 (모니터링용) */
+    public int bufferedGameCount() {
+        return windows.size();
+    }
+
+    /** 버퍼가 있는 게임 id 목록 */
+    public java.util.Set<String> bufferedGameIds() {
+        return java.util.Set.copyOf(windows.keySet());
+    }
+
     // ---- 내부 유틸 ----
 
     private static <V> void pruneOld(ConcurrentSkipListMap<Instant, V> frames) {

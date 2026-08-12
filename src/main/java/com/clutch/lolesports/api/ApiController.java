@@ -31,15 +31,18 @@ public class ApiController {
     private final LolesportsProperties props;
     private final com.clutch.lolesports.client.LiveStatsClient liveStats;
     private final com.clutch.lolesports.service.TeamRecordService records;
+    private final com.clutch.lolesports.service.GameQueryService gameQuery;
 
     public ApiController(DataCacheService cache, HistoricalGameService historical,
                          LolesportsProperties props, com.clutch.lolesports.client.LiveStatsClient liveStats,
-                         com.clutch.lolesports.service.TeamRecordService records) {
+                         com.clutch.lolesports.service.TeamRecordService records,
+                         com.clutch.lolesports.service.GameQueryService gameQuery) {
         this.cache = cache;
         this.historical = historical;
         this.props = props;
         this.liveStats = liveStats;
         this.records = records;
+        this.gameQuery = gameQuery;
     }
 
     /**
@@ -213,6 +216,11 @@ public class ApiController {
                                                          @org.springframework.web.bind.annotation.RequestParam(value = "lag", required = false) Long lag) {
         WindowResponse.Frame frame = pickWindowFrame(gameId, lag);
         if (frame == null) {
+            // 적재가 끝난 과거 경기는 DB 로 응답한다 — 소스 재수집(세트당 ~1.5분)을 피한다
+            var stored = gameQuery.scoreboard(gameId);
+            if (stored.isPresent()) {
+                return ResponseEntity.ok(stored.get());
+            }
             historical.ensureGameLoaded(gameId);
             frame = pickWindowFrame(gameId, lag);
         }
@@ -251,6 +259,10 @@ public class ApiController {
             @org.springframework.web.bind.annotation.RequestParam(value = "lag", required = false) Long lag,
             @org.springframework.web.bind.annotation.RequestParam(value = "step", defaultValue = "10") int step) {
         if (!cache.hasWindow(gameId)) {
+            var stored = gameQuery.history(gameId, Math.max(1, step));
+            if (stored.isPresent()) {
+                return ResponseEntity.ok(stored.get());
+            }
             historical.ensureGameLoaded(gameId);
         }
         java.time.Instant until = (lag != null && lag <= 0)
@@ -349,6 +361,10 @@ public class ApiController {
                                                        @org.springframework.web.bind.annotation.RequestParam(value = "lag", required = false) Long lag) {
         DetailsResponse.Frame frame = pickDetailsFrame(gameId, lag);
         if (frame == null) {
+            var stored = gameQuery.details(gameId);
+            if (stored.isPresent()) {
+                return ResponseEntity.ok(stored.get());
+            }
             historical.ensureGameLoaded(gameId);
             frame = pickDetailsFrame(gameId, lag);
         }
