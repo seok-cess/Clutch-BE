@@ -5,6 +5,7 @@ import com.clutch.lolesports.repository.EsportsMatchRepository;
 import com.clutch.user.repository.UserRepository;
 import com.clutch.watch.config.WatchRewardProperties;
 import com.clutch.watch.domain.WatchSession;
+import com.clutch.watch.redis.HeartbeatResult;
 import com.clutch.watch.redis.WatchSessionRedisRepository;
 import com.clutch.watch.redis.WatchSessionSnapshot;
 import com.clutch.watch.repository.WatchSessionRepository;
@@ -163,6 +164,72 @@ class WatchSessionServiceTest {
     }
 
     /**
+     * 진행 중 경기의 heartbeat에 서버 수신 시각을 사용하고 Redis 결과를 반환하는지 검증한다.
+     */
+    @Test
+    void processesHeartbeatWithServerTime() {
+        WatchSessionSnapshot snapshot = oldSnapshot();
+        when(watchSessionRedisRepository.findSession(OLD_SESSION_KEY))
+                .thenReturn(Optional.of(snapshot));
+        when(esportsMatchRepository.findById(snapshot.matchId()))
+                .thenReturn(Optional.of(inProgressMatch()));
+        when(watchSessionRedisRepository.heartbeat(
+                org.mockito.ArgumentMatchers.eq(USER_ID),
+                org.mockito.ArgumentMatchers.eq(OLD_SESSION_KEY),
+                org.mockito.ArgumentMatchers.eq(3L),
+                anyLong()
+        )).thenReturn(HeartbeatResult.SUCCESS);
+        long beforeRequest = System.currentTimeMillis();
+
+        HeartbeatResult result = service.heartbeat(USER_ID, OLD_SESSION_KEY, 3L);
+
+        long afterRequest = System.currentTimeMillis();
+        assertThat(result).isEqualTo(HeartbeatResult.SUCCESS);
+        ArgumentCaptor<Long> serverTime = ArgumentCaptor.forClass(Long.class);
+        verify(watchSessionRedisRepository).heartbeat(
+                org.mockito.ArgumentMatchers.eq(USER_ID),
+                org.mockito.ArgumentMatchers.eq(OLD_SESSION_KEY),
+                org.mockito.ArgumentMatchers.eq(3L),
+                serverTime.capture()
+        );
+        assertThat(serverTime.getValue()).isBetween(beforeRequest, afterRequest);
+    }
+
+    /**
+     * Redis session Hash가 없으면 heartbeat를 실행하지 않고 세션 없음 결과를 반환하는지 검증한다.
+     */
+    @Test
+    void returnsSessionNotFoundWhenRedisSessionIsMissing() {
+        when(watchSessionRedisRepository.findSession(OLD_SESSION_KEY)).thenReturn(Optional.empty());
+
+        HeartbeatResult result = service.heartbeat(USER_ID, OLD_SESSION_KEY, 1L);
+
+        assertThat(result).isEqualTo(HeartbeatResult.SESSION_NOT_FOUND);
+        verify(esportsMatchRepository, never()).findById(anyLong());
+        verify(watchSessionRedisRepository, never())
+                .heartbeat(anyLong(), anyString(), anyLong(), anyLong());
+    }
+
+    /**
+     * 경기 상태가 진행 중이 아니면 Redis 시청시간을 갱신하지 않는지 검증한다.
+     */
+    @Test
+    void rejectsHeartbeatWhenMatchIsNotWatchable() {
+        WatchSessionSnapshot snapshot = oldSnapshot();
+        when(watchSessionRedisRepository.findSession(OLD_SESSION_KEY))
+                .thenReturn(Optional.of(snapshot));
+        when(esportsMatchRepository.findById(snapshot.matchId()))
+                .thenReturn(Optional.of(completedMatch()));
+
+        assertThatThrownBy(() -> service.heartbeat(USER_ID, OLD_SESSION_KEY, 3L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("현재 시청 가능한 경기가 아닙니다.");
+
+        verify(watchSessionRedisRepository, never())
+                .heartbeat(anyLong(), anyString(), anyLong(), anyLong());
+    }
+
+    /**
      * 정상적인 사용자, 진행 중 경기 및 전환 lock 획득 조건을 설정한다.
      */
     private void allowSessionStart() {
@@ -191,6 +258,25 @@ class WatchSessionServiceTest {
      * @return lifecycle 상태가 inProgress인 경기
      */
     private EsportsMatch inProgressMatch() {
+        return matchWithStatus("inProgress");
+    }
+
+    /**
+     * 테스트에 사용할 종료된 경기 엔티티를 생성한다.
+     *
+     * @return lifecycle 상태가 completed인 경기
+     */
+    private EsportsMatch completedMatch() {
+        return matchWithStatus("completed");
+    }
+
+    /**
+     * 주어진 lifecycle 상태의 테스트 경기 엔티티를 생성한다.
+     *
+     * @param lifecycleStatus 생성할 경기 진행 상태
+     * @return 지정한 상태를 가진 경기
+     */
+    private EsportsMatch matchWithStatus(String lifecycleStatus) {
         return new EsportsMatch(
                 "external-match",
                 "league",
@@ -199,7 +285,7 @@ class WatchSessionServiceTest {
                 "block",
                 LocalDateTime.of(2026, 8, 13, 12, 0),
                 LocalDateTime.of(2026, 8, 13, 12, 0),
-                "inProgress",
+                lifecycleStatus,
                 3
         );
     }

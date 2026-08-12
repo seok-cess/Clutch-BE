@@ -5,6 +5,7 @@ import com.clutch.lolesports.repository.EsportsMatchRepository;
 import com.clutch.user.repository.UserRepository;
 import com.clutch.watch.config.WatchRewardProperties;
 import com.clutch.watch.domain.WatchSession;
+import com.clutch.watch.redis.HeartbeatResult;
 import com.clutch.watch.redis.WatchSessionRedisRepository;
 import com.clutch.watch.redis.WatchSessionSnapshot;
 import com.clutch.watch.repository.WatchSessionRepository;
@@ -60,6 +61,33 @@ public class WatchSessionService {
         } finally {
             watchSessionRedisRepository.releaseSwitchLock(userId, lockToken);
         }
+    }
+
+    /**
+     * 프론트엔드 heartbeat를 서버 수신 시각으로 처리한다.
+     * 사용자, 활성 세션, TTL 및 sequence 검증과 시간 누적은 Redis Lua script가 원자적으로 수행한다.
+     *
+     * @param userId heartbeat를 보낸 사용자 ID
+     * @param sessionKey heartbeat 대상 시청 세션 외부 식별자
+     * @param sequence 프론트엔드가 이전 값보다 증가시킨 heartbeat 순번
+     * @return Redis에서 처리한 heartbeat 결과
+     * @throws IllegalArgumentException Redis 세션의 경기가 없거나 현재 시청 가능한 상태가 아닌 경우
+     */
+    @Transactional(readOnly = true)
+    public HeartbeatResult heartbeat(long userId, String sessionKey, long sequence) {
+        WatchSessionSnapshot snapshot = watchSessionRedisRepository.findSession(sessionKey)
+                .orElse(null);
+        if (snapshot == null) {
+            return HeartbeatResult.SESSION_NOT_FOUND;
+        }
+
+        validateMatch(snapshot.matchId());
+        return watchSessionRedisRepository.heartbeat(
+                userId,
+                sessionKey,
+                sequence,
+                Instant.now().toEpochMilli()
+        );
     }
 
     /**
