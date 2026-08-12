@@ -1,5 +1,6 @@
 package com.clutch.coupon.claim.repository;
 
+import jakarta.persistence.EntityManager;
 import com.clutch.coupon.claim.domain.ClaimRequestStatus;
 import com.clutch.coupon.claim.domain.CouponClaimRequest;
 import org.junit.jupiter.api.Test;
@@ -25,6 +26,12 @@ class CouponClaimRequestRepositoryTest {
     private CouponClaimRequestRepository couponClaimRequestRepository;
 
     /**
+     * JPA 엔티티 관리자
+     */
+    @Autowired
+    private EntityManager entityManager;
+
+    /**
      * 쿠폰 발급 요청 저장 및 조회 검증
      */
     @Test
@@ -41,9 +48,13 @@ class CouponClaimRequestRepositoryTest {
         CouponClaimRequest savedClaimRequest =
                 couponClaimRequestRepository.saveAndFlush(claimRequest);
 
+        Long savedClaimRequestId = savedClaimRequest.getId();
+
+        entityManager.clear();
+
         CouponClaimRequest foundClaimRequest =
                 couponClaimRequestRepository
-                        .findById(savedClaimRequest.getId())
+                        .findById(savedClaimRequestId)
                         .orElseThrow();
 
         // then
