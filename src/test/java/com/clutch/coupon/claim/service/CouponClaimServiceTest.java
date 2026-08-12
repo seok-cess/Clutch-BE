@@ -1,5 +1,6 @@
 package com.clutch.coupon.claim.service;
 
+import com.clutch.coupon.claim.exception.CouponClaimException;
 import com.clutch.coupon.claim.api.dto.CouponClaimCreateRequest;
 import com.clutch.coupon.claim.api.dto.CouponClaimCreateResponse;
 import com.clutch.coupon.claim.domain.ClaimRequestStatus;
@@ -137,7 +138,7 @@ class CouponClaimServiceTest {
                         COUPON_EVENT_ID,
                         request
                 ))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(CouponClaimException.class);
 
         verify(couponClaimRequestRepository, never())
                 .save(any(CouponClaimRequest.class));
@@ -171,7 +172,7 @@ class CouponClaimServiceTest {
                         COUPON_EVENT_ID,
                         request
                 ))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(CouponClaimException.class);
 
         verify(couponClaimRequestRepository, never())
                 .save(any(CouponClaimRequest.class));
@@ -208,7 +209,7 @@ class CouponClaimServiceTest {
                         COUPON_EVENT_ID,
                         request
                 ))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(CouponClaimException.class);
 
         verify(couponClaimRequestRepository, never())
                 .save(any(CouponClaimRequest.class));
@@ -241,7 +242,7 @@ class CouponClaimServiceTest {
                         COUPON_EVENT_ID,
                         request
                 ))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(CouponClaimException.class);
 
         verify(couponEventItem, never())
                 .increaseSuccessCount();
@@ -280,7 +281,7 @@ class CouponClaimServiceTest {
                         COUPON_EVENT_ID,
                         request
                 ))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(CouponClaimException.class);
 
         verify(couponEventItem, never())
                 .increaseSuccessCount();

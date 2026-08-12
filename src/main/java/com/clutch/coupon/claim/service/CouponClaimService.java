@@ -1,5 +1,11 @@
 package com.clutch.coupon.claim.service;
+import com.clutch.coupon.claim.exception.CouponClaimException;
 
+import static com.clutch.coupon.claim.exception.CouponClaimErrorCode.COUPON_ALREADY_CLAIMED;
+import static com.clutch.coupon.claim.exception.CouponClaimErrorCode.COUPON_EVENT_ITEM_NOT_FOUND;
+import static com.clutch.coupon.claim.exception.CouponClaimErrorCode.COUPON_EVENT_NOT_FOUND;
+import static com.clutch.coupon.claim.exception.CouponClaimErrorCode.COUPON_EVENT_NOT_OPEN;
+import static com.clutch.coupon.claim.exception.CouponClaimErrorCode.COUPON_STOCK_EXHAUSTED;
 import com.clutch.coupon.claim.api.dto.CouponClaimCreateRequest;
 import com.clutch.coupon.claim.api.dto.CouponClaimCreateResponse;
 import com.clutch.coupon.claim.domain.CouponClaimRequest;
@@ -42,8 +48,8 @@ public class CouponClaimService {
         CouponEvent couponEvent = couponEventRepository
                 .findById(couponEventId)
                 .orElseThrow(() ->
-                        new IllegalArgumentException(
-                                "존재하지 않는 쿠폰 이벤트입니다."
+                        new CouponClaimException(
+                                COUPON_EVENT_NOT_FOUND
                         )
                 );
 
@@ -53,14 +59,14 @@ public class CouponClaimService {
                         request.couponEventItemId()
                 )
                 .orElseThrow(() ->
-                        new IllegalArgumentException(
-                                "존재하지 않는 쿠폰 이벤트 항목입니다."
+                        new CouponClaimException(
+                                COUPON_EVENT_ITEM_NOT_FOUND
                         )
                 );
 
         if (!couponEvent.isOpenAt(LocalDateTime.now())) {
-            throw new IllegalStateException(
-                    "진행 중인 쿠폰 이벤트가 아닙니다."
+            throw new CouponClaimException(
+                    COUPON_EVENT_NOT_OPEN
             );
         }
 
@@ -71,14 +77,14 @@ public class CouponClaimService {
                 );
 
         if (alreadyClaimed) {
-            throw new IllegalStateException(
-                    "이미 발급을 요청한 쿠폰입니다."
+            throw new CouponClaimException(
+                    COUPON_ALREADY_CLAIMED
             );
         }
 
         if (!couponEventItem.hasRemainingStock()) {
-            throw new IllegalStateException(
-                    "쿠폰 재고가 소진되었습니다."
+            throw new CouponClaimException(
+                    COUPON_STOCK_EXHAUSTED
             );
         }
 
