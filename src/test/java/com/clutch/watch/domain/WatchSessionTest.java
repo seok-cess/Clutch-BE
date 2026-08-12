@@ -1,6 +1,7 @@
 package com.clutch.watch.domain;
 
 import com.clutch.watch.exception.WatchException;
+import com.clutch.watch.exception.WatchError;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
@@ -56,5 +57,43 @@ class WatchSessionTest {
         assertThatThrownBy(() -> session.complete(enteredAt.plusMinutes(2), 120_000L))
                 .isInstanceOf(WatchException.class)
                 .hasMessage("이미 완료된 시청 세션입니다.");
+    }
+
+    /**
+     * 세션 생성에 필요한 식별자와 입장 시각이 누락되면 정의된 오류로 거부하는지 검증한다.
+     */
+    @Test
+    void rejectsMissingRequiredValues() {
+        LocalDateTime enteredAt = LocalDateTime.of(2026, 8, 12, 12, 0);
+
+        assertWatchError(() -> WatchSession.start(" ", 100L, 200L, enteredAt), WatchError.SESSION_KEY_REQUIRED);
+        assertWatchError(() -> WatchSession.start("session", null, 200L, enteredAt), WatchError.USER_ID_REQUIRED);
+        assertWatchError(() -> WatchSession.start("session", 100L, null, enteredAt), WatchError.MATCH_ID_REQUIRED);
+        assertWatchError(() -> WatchSession.start("session", 100L, 200L, null), WatchError.ENTERED_AT_REQUIRED);
+    }
+
+    /**
+     * 완료 시각과 유효 시청시간이 세션 규칙을 위반하면 정의된 오류로 거부하는지 검증한다.
+     */
+    @Test
+    void rejectsInvalidCompletionValues() {
+        LocalDateTime enteredAt = LocalDateTime.of(2026, 8, 12, 12, 0);
+        WatchSession session = WatchSession.start("session", 100L, 200L, enteredAt);
+
+        assertWatchError(() -> session.complete(null, 0L), WatchError.LAST_SEEN_AT_REQUIRED);
+        assertWatchError(() -> session.complete(enteredAt.minusNanos(1), 0L), WatchError.LAST_SEEN_BEFORE_ENTERED_AT);
+        assertWatchError(() -> session.complete(enteredAt, -1L), WatchError.ELIGIBLE_TIME_NEGATIVE);
+    }
+
+    /**
+     * 실행 결과가 기대한 Watch 오류인지 검증한다.
+     *
+     * @param runnable 예외가 발생해야 하는 실행 코드
+     * @param expectedError 기대하는 Watch 오류
+     */
+    private void assertWatchError(Runnable runnable, WatchError expectedError) {
+        assertThatThrownBy(runnable::run)
+                .isInstanceOfSatisfying(WatchException.class,
+                        exception -> assertThat(exception.getError()).isEqualTo(expectedError));
     }
 }

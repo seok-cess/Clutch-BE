@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
 /**
@@ -140,7 +141,7 @@ public class WatchSessionService {
      */
     private WatchSessionStartResult createSession(long userId, long matchId) {
         String sessionKey = UUID.randomUUID().toString();
-        Instant enteredAt = Instant.now();
+        Instant enteredAt = Instant.now().truncatedTo(ChronoUnit.MILLIS);
         WatchSession watchSession = WatchSession.start(
                 sessionKey,
                 userId,

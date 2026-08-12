@@ -8,6 +8,7 @@ import com.clutch.watch.domain.WatchPointTransaction;
 import com.clutch.watch.domain.WatchSession;
 import com.clutch.watch.domain.WatchSessionStatus;
 import com.clutch.watch.exception.WatchException;
+import com.clutch.watch.exception.WatchError;
 import com.clutch.watch.redis.WatchSessionSnapshot;
 import com.clutch.watch.repository.WatchPointTransactionRepository;
 import com.clutch.watch.repository.WatchSessionRepository;
@@ -181,6 +182,98 @@ class WatchRewardServiceTest {
     }
 
     /**
+     * 정산 snapshot이 없으면 Repository 접근 전에 거부하는지 검증한다.
+     */
+    @Test
+    void rejectsMissingSnapshot() {
+        assertWatchError(() -> service.settle(null), WatchError.REWARD_SNAPSHOT_REQUIRED);
+        verify(watchSessionRepository, never()).findBySessionKey(org.mockito.ArgumentMatchers.anyString());
+    }
+
+    /**
+     * Redis sessionKey에 대응하는 DB 시청 세션이 없으면 정산을 거부하는지 검증한다.
+     */
+    @Test
+    void rejectsMissingWatchSession() {
+        when(watchSessionRepository.findBySessionKey(SESSION_KEY)).thenReturn(Optional.empty());
+
+        assertWatchError(() -> service.settle(snapshot(60_000L)), WatchError.WATCH_SESSION_NOT_FOUND);
+    }
+
+    /**
+     * Redis snapshot의 경기 ID가 DB 세션과 다르면 정산을 거부하는지 검증한다.
+     */
+    @Test
+    void rejectsSnapshotWithDifferentMatch() {
+        WatchSession watchSession = watchSession();
+        WatchSessionSnapshot snapshot = new WatchSessionSnapshot(
+                USER_ID, 999L, SESSION_KEY, ENTERED_AT_MILLIS,
+                ENTERED_AT_MILLIS + 60_000L, 60_000L, 1L
+        );
+        when(watchSessionRepository.findBySessionKey(SESSION_KEY)).thenReturn(Optional.of(watchSession));
+
+        assertWatchError(() -> service.settle(snapshot), WatchError.REDIS_SESSION_MATCH_MISMATCH);
+    }
+
+    /**
+     * DB 세션의 사용자가 사라졌으면 포인트 거래를 생성하지 않고 정산을 거부하는지 검증한다.
+     */
+    @Test
+    void rejectsMissingUser() {
+        when(watchSessionRepository.findBySessionKey(SESSION_KEY)).thenReturn(Optional.of(watchSession()));
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
+
+        assertWatchError(() -> service.settle(snapshot(60_000L)), WatchError.USER_NOT_FOUND);
+        verify(watchPointTransactionRepository, never())
+                .save(org.mockito.ArgumentMatchers.any(WatchPointTransaction.class));
+    }
+
+    /**
+     * 완료된 세션에 포인트 거래가 없으면 성공한 정산으로 가장하지 않는지 검증한다.
+     */
+    @Test
+    void rejectsCompletedSessionWithoutTransaction() {
+        WatchSession watchSession = watchSession();
+        watchSession.complete(ENTERED_AT.plusMinutes(1), 60_000L);
+        when(watchSessionRepository.findBySessionKey(SESSION_KEY)).thenReturn(Optional.of(watchSession));
+        when(watchPointTransactionRepository.findByWatchSessionId(WATCH_SESSION_ID)).thenReturn(Optional.empty());
+
+        assertWatchError(() -> service.settle(snapshot(60_000L)), WatchError.POINT_TRANSACTION_NOT_FOUND);
+    }
+
+    /**
+     * 분당 포인트 곱셈이 long 범위를 넘으면 포인트 변경 전에 정산을 거부하는지 검증한다.
+     */
+    @Test
+    void rejectsRewardPointOverflow() {
+        service = new WatchRewardService(
+                watchSessionRepository,
+                watchPointTransactionRepository,
+                userRepository,
+                propertiesWithPoints(Long.MAX_VALUE)
+        );
+        when(watchSessionRepository.findBySessionKey(SESSION_KEY)).thenReturn(Optional.of(watchSession()));
+
+        assertWatchError(() -> service.settle(snapshot(120_000L)), WatchError.REWARD_POINT_OVERFLOW);
+        verify(userRepository, never()).findById(USER_ID);
+    }
+
+    /**
+     * 기존 사용자 포인트와 지급 포인트 합산이 long 범위를 넘으면 거래 저장을 거부하는지 검증한다.
+     */
+    @Test
+    void rejectsUserPointOverflow() {
+        User user = user();
+        ReflectionTestUtils.setField(user, "point", Long.MAX_VALUE);
+        when(watchSessionRepository.findBySessionKey(SESSION_KEY)).thenReturn(Optional.of(watchSession()));
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+
+        assertWatchError(() -> service.settle(snapshot(60_000L)), WatchError.USER_POINT_OVERFLOW);
+        verify(watchPointTransactionRepository, never())
+                .save(org.mockito.ArgumentMatchers.any(WatchPointTransaction.class));
+    }
+
+    /**
      * 테스트에 사용할 WATCHING 상태의 DB 시청 세션을 생성한다.
      *
      * @return ID가 설정된 시청 세션
@@ -226,6 +319,16 @@ class WatchRewardServiceTest {
      * @return 테스트용 시청 보상 정책
      */
     private WatchRewardProperties rewardProperties() {
+        return propertiesWithPoints(10L);
+    }
+
+    /**
+     * 지정한 분당 포인트를 가진 테스트용 설정을 생성한다.
+     *
+     * @param pointsPerMinute 분당 지급 포인트
+     * @return 테스트용 시청 보상 정책
+     */
+    private WatchRewardProperties propertiesWithPoints(long pointsPerMinute) {
         return new WatchRewardProperties(
                 Duration.ofSeconds(30),
                 Duration.ofSeconds(90),
@@ -233,7 +336,19 @@ class WatchRewardServiceTest {
                 Duration.ofHours(1),
                 Duration.ofSeconds(10),
                 Duration.ofSeconds(60),
-                10L
+                pointsPerMinute
         );
+    }
+
+    /**
+     * 실행 결과가 기대한 Watch 오류인지 검증한다.
+     *
+     * @param runnable 예외가 발생해야 하는 실행 코드
+     * @param expectedError 기대하는 Watch 오류
+     */
+    private void assertWatchError(Runnable runnable, WatchError expectedError) {
+        assertThatThrownBy(runnable::run)
+                .isInstanceOfSatisfying(WatchException.class,
+                        exception -> assertThat(exception.getError()).isEqualTo(expectedError));
     }
 }

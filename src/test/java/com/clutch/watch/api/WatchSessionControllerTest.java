@@ -138,6 +138,34 @@ class WatchSessionControllerTest {
     }
 
     /**
+     * Heartbeat 순번이 누락되면 기본값 0을 검증하여 400 오류로 거부하는지 검증한다.
+     *
+     * @throws Exception MockMvc 요청 처리에 실패한 경우
+     */
+    @Test
+    void rejectsMissingHeartbeatSequence() throws Exception {
+        mockMvc.perform(post("/api/users/{userId}/watch-sessions/{sessionKey}/heartbeat", USER_ID, SESSION_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+    }
+
+    /**
+     * JSON 형식이 깨진 Heartbeat 요청을 공통 400 오류 응답으로 변환하는지 검증한다.
+     *
+     * @throws Exception MockMvc 요청 처리에 실패한 경우
+     */
+    @Test
+    void rejectsMalformedHeartbeatJson() throws Exception {
+        mockMvc.perform(post("/api/users/{userId}/watch-sessions/{sessionKey}/heartbeat", USER_ID, SESSION_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sequence\":"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+    }
+
+    /**
      * 서비스의 입장 오류가 정의된 API 오류 응답으로 변환되는지 검증한다.
      *
      * @throws Exception MockMvc 요청 처리에 실패한 경우

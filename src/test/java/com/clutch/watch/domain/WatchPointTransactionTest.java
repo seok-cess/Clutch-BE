@@ -1,6 +1,7 @@
 package com.clutch.watch.domain;
 
 import com.clutch.watch.exception.WatchException;
+import com.clutch.watch.exception.WatchError;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -29,5 +30,27 @@ class WatchPointTransactionTest {
         assertThatThrownBy(() -> WatchPointTransaction.create(100L, 300L, 200L, -1L))
                 .isInstanceOf(WatchException.class)
                 .hasMessage("지급 포인트는 음수일 수 없습니다.");
+    }
+
+    /**
+     * 포인트 거래에 필요한 식별자가 누락되면 각각 정의된 오류로 거부하는지 검증한다.
+     */
+    @Test
+    void rejectsMissingRequiredIdentifiers() {
+        assertWatchError(() -> WatchPointTransaction.create(null, 300L, 200L, 0L), WatchError.USER_ID_REQUIRED);
+        assertWatchError(() -> WatchPointTransaction.create(100L, null, 200L, 0L), WatchError.WATCH_SESSION_ID_REQUIRED);
+        assertWatchError(() -> WatchPointTransaction.create(100L, 300L, null, 0L), WatchError.MATCH_ID_REQUIRED);
+    }
+
+    /**
+     * 실행 결과가 기대한 Watch 오류인지 검증한다.
+     *
+     * @param runnable 예외가 발생해야 하는 실행 코드
+     * @param expectedError 기대하는 Watch 오류
+     */
+    private void assertWatchError(Runnable runnable, WatchError expectedError) {
+        assertThatThrownBy(runnable::run)
+                .isInstanceOfSatisfying(WatchException.class,
+                        exception -> assertThat(exception.getError()).isEqualTo(expectedError));
     }
 }

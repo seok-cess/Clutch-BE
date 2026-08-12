@@ -4,6 +4,7 @@ import com.clutch.watch.exception.WatchError;
 import com.clutch.watch.exception.WatchException;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -61,6 +62,19 @@ public class WatchExceptionHandler {
                 .map(violation -> violation.getMessage())
                 .orElse("요청 값이 올바르지 않습니다.");
         return invalidRequest(message);
+    }
+
+    /**
+     * 요청 본문 누락이나 잘못된 JSON 형식을 공통 400 오류로 변환한다.
+     *
+     * @param exception JSON을 요청 객체로 변환하지 못한 예외
+     * @return INVALID_REQUEST 오류 응답
+     */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<WatchErrorResponse> handleUnreadableRequest(
+            HttpMessageNotReadableException exception
+    ) {
+        return invalidRequest(WatchError.INVALID_REQUEST.message());
     }
 
     /**

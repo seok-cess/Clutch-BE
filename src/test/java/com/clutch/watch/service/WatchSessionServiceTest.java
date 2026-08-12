@@ -29,6 +29,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -145,6 +146,47 @@ class WatchSessionServiceTest {
     }
 
     /**
+     * 존재하지 않는 사용자는 경기와 Redis를 조회하기 전에 입장을 거부하는지 검증한다.
+     */
+    @Test
+    void rejectsStartWhenUserIsMissing() {
+        when(userRepository.existsById(USER_ID)).thenReturn(false);
+
+        assertWatchError(() -> service.start(USER_ID, MATCH_ID), WatchError.USER_NOT_FOUND);
+        verify(esportsMatchRepository, never()).findById(MATCH_ID);
+        verify(watchSessionRedisRepository, never())
+                .tryAcquireSwitchLock(org.mockito.ArgumentMatchers.eq(USER_ID), anyString());
+    }
+
+    /**
+     * 존재하지 않는 경기는 전환 lock을 만들기 전에 입장을 거부하는지 검증한다.
+     */
+    @Test
+    void rejectsStartWhenMatchIsMissing() {
+        when(userRepository.existsById(USER_ID)).thenReturn(true);
+        when(esportsMatchRepository.findById(MATCH_ID)).thenReturn(Optional.empty());
+
+        assertWatchError(() -> service.start(USER_ID, MATCH_ID), WatchError.MATCH_NOT_FOUND);
+        verify(watchSessionRedisRepository, never())
+                .tryAcquireSwitchLock(org.mockito.ArgumentMatchers.eq(USER_ID), anyString());
+    }
+
+    /**
+     * Active 키가 가리키는 session Hash가 없으면 새 세션을 만들지 않고 lock을 해제하는지 검증한다.
+     */
+    @Test
+    void rejectsStartWhenActiveSessionStateIsMissing() {
+        allowSessionStart();
+        when(watchSessionRedisRepository.findActiveSessionKey(USER_ID))
+                .thenReturn(Optional.of(OLD_SESSION_KEY));
+        when(watchSessionRedisRepository.findSession(OLD_SESSION_KEY)).thenReturn(Optional.empty());
+
+        assertWatchError(() -> service.start(USER_ID, MATCH_ID), WatchError.WATCH_SESSION_STATE_MISSING);
+        verifyLockReleasedWithOwnerToken();
+        verify(watchSessionRepository, never()).save(any(WatchSession.class));
+    }
+
+    /**
      * 기존 세션 포인트 지급 중 예외가 발생해도 자신이 획득한 전환 lock을 해제하는지 검증한다.
      */
     @Test
@@ -164,6 +206,22 @@ class WatchSessionServiceTest {
 
         verifyLockReleasedWithOwnerToken();
         verify(watchSessionRepository, never()).save(any(WatchSession.class));
+    }
+
+    /**
+     * 신규 Redis 상태 초기화에 실패해도 자신이 획득한 전환 lock을 해제하는지 검증한다.
+     */
+    @Test
+    void releasesSwitchLockWhenRedisInitializationFails() {
+        allowSessionStart();
+        when(watchSessionRedisRepository.findActiveSessionKey(USER_ID)).thenReturn(Optional.empty());
+        doThrow(new WatchException(WatchError.HEARTBEAT_RESULT_MISSING))
+                .when(watchSessionRedisRepository)
+                .initialize(org.mockito.ArgumentMatchers.eq(USER_ID),
+                        org.mockito.ArgumentMatchers.eq(MATCH_ID), anyString(), anyLong());
+
+        assertWatchError(() -> service.start(USER_ID, MATCH_ID), WatchError.HEARTBEAT_RESULT_MISSING);
+        verifyLockReleasedWithOwnerToken();
     }
 
     /**
@@ -325,5 +383,17 @@ class WatchSessionServiceTest {
                 Duration.ofSeconds(60),
                 10L
         );
+    }
+
+    /**
+     * 실행 결과가 기대한 Watch 오류인지 검증한다.
+     *
+     * @param runnable 예외가 발생해야 하는 실행 코드
+     * @param expectedError 기대하는 Watch 오류
+     */
+    private void assertWatchError(Runnable runnable, WatchError expectedError) {
+        assertThatThrownBy(runnable::run)
+                .isInstanceOfSatisfying(WatchException.class,
+                        exception -> assertThat(exception.getError()).isEqualTo(expectedError));
     }
 }
