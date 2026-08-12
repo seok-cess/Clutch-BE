@@ -5,6 +5,7 @@ import com.clutch.lolesports.repository.EsportsMatchRepository;
 import com.clutch.user.repository.UserRepository;
 import com.clutch.watch.config.WatchRewardProperties;
 import com.clutch.watch.domain.WatchSession;
+import com.clutch.watch.exception.WatchSessionException;
 import com.clutch.watch.redis.HeartbeatResult;
 import com.clutch.watch.redis.WatchSessionRedisRepository;
 import com.clutch.watch.redis.WatchSessionSnapshot;
@@ -133,7 +134,7 @@ class WatchSessionServiceTest {
                 .thenReturn(false);
 
         assertThatThrownBy(() -> service.start(USER_ID, MATCH_ID))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(WatchSessionException.class)
                 .hasMessage("시청 세션 전환이 진행 중입니다.");
 
         verify(watchSessionRedisRepository, never()).findActiveSessionKey(USER_ID);
@@ -222,7 +223,7 @@ class WatchSessionServiceTest {
                 .thenReturn(Optional.of(completedMatch()));
 
         assertThatThrownBy(() -> service.heartbeat(USER_ID, OLD_SESSION_KEY, 3L))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(WatchSessionException.class)
                 .hasMessage("현재 시청 가능한 경기가 아닙니다.");
 
         verify(watchSessionRedisRepository, never())
