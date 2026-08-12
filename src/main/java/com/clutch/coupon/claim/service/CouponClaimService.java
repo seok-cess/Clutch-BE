@@ -17,7 +17,7 @@ import com.clutch.coupon.event.repository.CouponEventRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
+import java.time.ZoneOffset;
 import java.time.LocalDateTime;
 
 /**
@@ -64,10 +64,9 @@ public class CouponClaimService {
                         )
                 );
 
-        if (!couponEvent.isOpenAt(LocalDateTime.now())) {
-            throw new CouponClaimException(
-                    COUPON_EVENT_NOT_OPEN
-            );
+        if (!couponEvent.isOpenAt(
+                LocalDateTime.now(ZoneOffset.UTC)
+        )) {
         }
 
         boolean alreadyClaimed = couponClaimRequestRepository
