@@ -1,4 +1,4 @@
-package com.clutch.watch.service;
+package com.clutch.watch.service.dto;
 
 /**
  * 시청 세션 포인트 정산 결과.

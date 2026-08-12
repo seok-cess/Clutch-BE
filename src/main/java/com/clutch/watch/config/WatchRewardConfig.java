@@ -1,6 +1,6 @@
 package com.clutch.watch.config;
 
-import com.clutch.watch.redis.WatchAliveExpirationListener;
+import com.clutch.watch.listener.WatchAliveExpirationListener;
 import org.springframework.context.annotation.Bean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Configuration;

@@ -1,4 +1,4 @@
-package com.clutch.watch.service;
+package com.clutch.watch.service.service;
 
 import com.clutch.lolesports.entity.EsportsMatch;
 import com.clutch.lolesports.repository.EsportsMatchRepository;
@@ -11,6 +11,7 @@ import com.clutch.watch.redis.HeartbeatResult;
 import com.clutch.watch.redis.WatchSessionRedisRepository;
 import com.clutch.watch.redis.WatchSessionSnapshot;
 import com.clutch.watch.repository.WatchSessionRepository;
+import com.clutch.watch.service.dto.WatchSessionStartResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

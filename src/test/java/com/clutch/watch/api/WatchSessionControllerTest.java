@@ -1,10 +1,11 @@
 package com.clutch.watch.api;
 
+import com.clutch.watch.api.handler.WatchExceptionHandler;
 import com.clutch.watch.exception.WatchError;
 import com.clutch.watch.exception.WatchException;
 import com.clutch.watch.redis.HeartbeatResult;
-import com.clutch.watch.service.WatchSessionService;
-import com.clutch.watch.service.WatchSessionStartResult;
+import com.clutch.watch.service.service.WatchSessionService;
+import com.clutch.watch.service.dto.WatchSessionStartResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

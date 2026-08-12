@@ -12,6 +12,8 @@ import com.clutch.watch.exception.WatchError;
 import com.clutch.watch.redis.WatchSessionSnapshot;
 import com.clutch.watch.repository.WatchPointTransactionRepository;
 import com.clutch.watch.repository.WatchSessionRepository;
+import com.clutch.watch.service.dto.WatchRewardResult;
+import com.clutch.watch.service.service.WatchRewardService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

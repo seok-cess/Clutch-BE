@@ -1,8 +1,10 @@
-package com.clutch.watch.redis;
+package com.clutch.watch.listener;
 
 import com.clutch.watch.exception.WatchError;
 import com.clutch.watch.exception.WatchException;
-import com.clutch.watch.service.WatchRewardService;
+import com.clutch.watch.redis.WatchSessionRedisRepository;
+import com.clutch.watch.redis.WatchSessionSnapshot;
+import com.clutch.watch.service.service.WatchRewardService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

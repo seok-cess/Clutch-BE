@@ -1,5 +1,7 @@
-package com.clutch.watch.api;
+package com.clutch.watch.api.handler;
 
+import com.clutch.watch.api.WatchSessionController;
+import com.clutch.watch.api.dto.WatchErrorResponse;
 import com.clutch.watch.exception.WatchError;
 import com.clutch.watch.exception.WatchException;
 import jakarta.validation.ConstraintViolationException;

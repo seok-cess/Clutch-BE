@@ -1,4 +1,4 @@
-package com.clutch.watch.redis;
+package com.clutch.watch.listener;
 
 import com.clutch.lolesports.entity.EsportsMatch;
 import com.clutch.lolesports.repository.EsportsMatchRepository;
@@ -11,6 +11,8 @@ import com.clutch.watch.domain.WatchSession;
 import com.clutch.watch.domain.WatchSessionStatus;
 import com.clutch.watch.repository.WatchPointTransactionRepository;
 import com.clutch.watch.repository.WatchSessionRepository;
+import com.clutch.watch.redis.WatchSessionRedisRepository;
+import com.clutch.watch.redis.WatchSessionSnapshot;
 import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;

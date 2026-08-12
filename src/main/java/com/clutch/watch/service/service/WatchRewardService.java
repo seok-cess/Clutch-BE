@@ -1,4 +1,4 @@
-package com.clutch.watch.service;
+package com.clutch.watch.service.service;
 
 import com.clutch.user.domain.User;
 import com.clutch.user.repository.UserRepository;
@@ -11,6 +11,7 @@ import com.clutch.watch.exception.WatchException;
 import com.clutch.watch.redis.WatchSessionSnapshot;
 import com.clutch.watch.repository.WatchPointTransactionRepository;
 import com.clutch.watch.repository.WatchSessionRepository;
+import com.clutch.watch.service.dto.WatchRewardResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

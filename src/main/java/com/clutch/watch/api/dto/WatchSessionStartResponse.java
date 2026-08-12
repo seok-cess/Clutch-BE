@@ -1,6 +1,6 @@
-package com.clutch.watch.api;
+package com.clutch.watch.api.dto;
 
-import com.clutch.watch.service.WatchSessionStartResult;
+import com.clutch.watch.service.dto.WatchSessionStartResult;
 
 import java.time.Instant;
 
