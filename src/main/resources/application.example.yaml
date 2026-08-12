@@ -47,6 +47,7 @@ watch:
     alive-ttl: ${WATCH_REWARD_ALIVE_TTL:90s}
     active-ttl: ${WATCH_REWARD_ACTIVE_TTL:120s}
     session-ttl: ${WATCH_REWARD_SESSION_TTL:1h}
+    switch-lock-ttl: ${WATCH_REWARD_SWITCH_LOCK_TTL:10s}
     max-eligible-interval: ${WATCH_REWARD_MAX_ELIGIBLE_INTERVAL:60s}
     points-per-minute: ${WATCH_REWARD_POINTS_PER_MINUTE:10}
 

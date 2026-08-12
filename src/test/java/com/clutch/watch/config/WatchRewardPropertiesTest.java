@@ -20,6 +20,7 @@ class WatchRewardPropertiesTest {
                 null,
                 null,
                 null,
+                null,
                 0
         );
 
@@ -27,6 +28,7 @@ class WatchRewardPropertiesTest {
         assertThat(properties.aliveTtl()).isEqualTo(Duration.ofSeconds(90));
         assertThat(properties.activeTtl()).isEqualTo(Duration.ofSeconds(120));
         assertThat(properties.sessionTtl()).isEqualTo(Duration.ofHours(1));
+        assertThat(properties.switchLockTtl()).isEqualTo(Duration.ofSeconds(10));
         assertThat(properties.maxEligibleInterval()).isEqualTo(Duration.ofSeconds(60));
         assertThat(properties.pointsPerMinute()).isEqualTo(10L);
     }
@@ -41,6 +43,7 @@ class WatchRewardPropertiesTest {
                 Duration.ofSeconds(30),
                 Duration.ofSeconds(120),
                 Duration.ofHours(1),
+                Duration.ofSeconds(10),
                 Duration.ofSeconds(60),
                 10
         ))

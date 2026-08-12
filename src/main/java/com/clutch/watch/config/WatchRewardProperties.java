@@ -13,6 +13,7 @@ public record WatchRewardProperties(
         Duration aliveTtl,
         Duration activeTtl,
         Duration sessionTtl,
+        Duration switchLockTtl,
         Duration maxEligibleInterval,
         long pointsPerMinute
 ) {
@@ -21,6 +22,7 @@ public record WatchRewardProperties(
     private static final Duration DEFAULT_ALIVE_TTL = Duration.ofSeconds(90);
     private static final Duration DEFAULT_ACTIVE_TTL = Duration.ofSeconds(120);
     private static final Duration DEFAULT_SESSION_TTL = Duration.ofHours(1);
+    private static final Duration DEFAULT_SWITCH_LOCK_TTL = Duration.ofSeconds(10);
     private static final Duration DEFAULT_MAX_ELIGIBLE_INTERVAL = Duration.ofSeconds(60);
     private static final long DEFAULT_POINTS_PER_MINUTE = 10L;
 
@@ -29,6 +31,7 @@ public record WatchRewardProperties(
         aliveTtl = orDefault(aliveTtl, DEFAULT_ALIVE_TTL);
         activeTtl = orDefault(activeTtl, DEFAULT_ACTIVE_TTL);
         sessionTtl = orDefault(sessionTtl, DEFAULT_SESSION_TTL);
+        switchLockTtl = orDefault(switchLockTtl, DEFAULT_SWITCH_LOCK_TTL);
         maxEligibleInterval = orDefault(maxEligibleInterval, DEFAULT_MAX_ELIGIBLE_INTERVAL);
         pointsPerMinute = pointsPerMinute > 0 ? pointsPerMinute : DEFAULT_POINTS_PER_MINUTE;
 
