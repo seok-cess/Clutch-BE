@@ -1,0 +1,11 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = crlf
+
+[gradlew]
+end_of_line = lf
+
+[*.{sh,bash,zsh}]
+end_of_line = lf
