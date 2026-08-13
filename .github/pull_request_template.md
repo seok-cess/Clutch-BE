@@ -7,10 +7,10 @@
 <!-- 항목별로. "무엇을 했다"보다 "왜 그렇게 했다"가 도움이 된다 -->
 - [ ] feat
 - [ ] fix
-- [ ] debug
 - [ ] chore
 - [ ] refactor
-- [ ] docx
+- [ ] docs
+- [ ] test
 
 
 ## 체크 리스트
