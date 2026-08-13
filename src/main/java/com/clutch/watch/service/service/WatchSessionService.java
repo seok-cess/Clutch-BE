@@ -8,6 +8,7 @@ import com.clutch.watch.domain.WatchSession;
 import com.clutch.watch.exception.WatchError;
 import com.clutch.watch.exception.WatchException;
 import com.clutch.watch.redis.HeartbeatResult;
+import com.clutch.watch.redis.SessionKeyReplacementResult;
 import com.clutch.watch.redis.WatchSessionRedisRepository;
 import com.clutch.watch.redis.WatchSessionSnapshot;
 import com.clutch.watch.repository.WatchSessionRepository;
@@ -39,8 +40,8 @@ public class WatchSessionService {
     private final WatchRewardProperties properties;
 
     /**
-     * 사용자를 경기에 입장시키고 새 시청 세션을 활성 세션으로 지정한다.
-     * 기존 활성 세션이 있으면 Redis에 확정된 시청시간을 먼저 포인트로 지급한다.
+     * 사용자를 경기에 입장시킨다. 동일 경기에 재입장하면 기존 누적 상태를 유지하면서
+     * sessionKey를 교체하고, 다른 경기에 입장하면 기존 세션을 미지급 종료한다.
      *
      * @param userId 경기를 시청할 사용자 ID
      * @param matchId 시청할 경기 ID
@@ -59,8 +60,7 @@ public class WatchSessionService {
         }
 
         try {
-            rewardExistingSession(userId);
-            return createSession(userId, matchId);
+            return startOrReplaceSession(userId, matchId);
         } finally {
             watchSessionRedisRepository.releaseSwitchLock(userId, lockToken);
         }
@@ -78,6 +78,12 @@ public class WatchSessionService {
      */
     @Transactional(readOnly = true)
     public HeartbeatResult heartbeat(long userId, String sessionKey, long sequence) {
+        String activeSessionKey = watchSessionRedisRepository.findActiveSessionKey(userId)
+                .orElse(null);
+        if (activeSessionKey != null && !activeSessionKey.equals(sessionKey)) {
+            return HeartbeatResult.REPLACED;
+        }
+
         WatchSessionSnapshot snapshot = watchSessionRedisRepository.findSession(sessionKey)
                 .orElse(null);
         if (snapshot == null) {
@@ -119,18 +125,73 @@ public class WatchSessionService {
         }
     }
 
+    private WatchSessionStartResult startOrReplaceSession(long userId, long matchId) {
+        String activeSessionKey = watchSessionRedisRepository.findActiveSessionKey(userId)
+                .orElse(null);
+        if (activeSessionKey == null) {
+            return createSession(userId, matchId);
+        }
+
+        WatchSessionSnapshot snapshot = watchSessionRedisRepository.findSession(activeSessionKey)
+                .orElseThrow(() -> new WatchException(WatchError.WATCH_SESSION_STATE_MISSING));
+        if (snapshot.matchId() == matchId) {
+            return resumeSameMatch(userId, snapshot);
+        }
+
+        discardSession(snapshot);
+        return createSession(userId, matchId);
+    }
+
     /**
-     * 사용자의 기존 활성 세션이 있으면 Redis snapshot을 조회하여 포인트를 지급한다.
-     *
-     * @param userId 기존 활성 세션을 조회할 사용자 ID
-     * @throws WatchException active 키가 가리키는 Redis session Hash가 없는 경우
+     * 동일 경기 누적 상태를 새 sessionKey로 옮겨 최신 입장 화면만 활성화한다.
      */
-    private void rewardExistingSession(long userId) {
-        watchSessionRedisRepository.findActiveSessionKey(userId).ifPresent(sessionKey -> {
-            WatchSessionSnapshot snapshot = watchSessionRedisRepository.findSession(sessionKey)
-                    .orElseThrow(() -> new WatchException(WatchError.WATCH_SESSION_STATE_MISSING));
-            watchRewardService.settle(snapshot);
-        });
+    private WatchSessionStartResult resumeSameMatch(long userId, WatchSessionSnapshot snapshot) {
+        String newSessionKey = UUID.randomUUID().toString();
+        SessionKeyReplacementResult replacement = watchSessionRedisRepository.replaceSessionKey(
+                userId,
+                snapshot.sessionKey(),
+                newSessionKey
+        );
+        if (replacement == SessionKeyReplacementResult.EXPIRED) {
+            discardSession(snapshot);
+            return createSession(userId, snapshot.matchId());
+        }
+        if (replacement != SessionKeyReplacementResult.SUCCESS) {
+            throw new WatchException(WatchError.SESSION_KEY_REPLACEMENT_FAILED);
+        }
+
+        try {
+            WatchSession watchSession = watchSessionRepository
+                    .findBySessionKey(snapshot.sessionKey())
+                    .orElseThrow(() -> new WatchException(WatchError.WATCH_SESSION_NOT_FOUND));
+            watchSession.replaceSessionKey(newSessionKey);
+            watchSessionRepository.flush();
+        } catch (RuntimeException exception) {
+            watchSessionRedisRepository.replaceSessionKey(
+                    userId,
+                    newSessionKey,
+                    snapshot.sessionKey()
+            );
+            throw exception;
+        }
+
+        return startResult(
+                newSessionKey,
+                snapshot.matchId(),
+                Instant.ofEpochMilli(snapshot.enteredAt()),
+                snapshot.sequence(),
+                false
+        );
+    }
+
+    /**
+     * 기존 세션을 포인트 지급 없이 완료하고 Redis 활성 상태를 정리한다.
+     */
+    private void discardSession(WatchSessionSnapshot snapshot) {
+        watchRewardService.discard(snapshot);
+        watchSessionRedisRepository.deleteActiveIfMatches(snapshot.userId(), snapshot.sessionKey());
+        watchSessionRedisRepository.deleteAlive(snapshot.userId(), snapshot.sessionKey());
+        watchSessionRedisRepository.deleteSession(snapshot.sessionKey());
     }
 
     /**
@@ -152,12 +213,30 @@ public class WatchSessionService {
         watchSessionRepository.save(watchSession);
         watchSessionRedisRepository.initialize(userId, matchId, sessionKey, enteredAt.toEpochMilli());
 
+        return startResult(
+                sessionKey,
+                matchId,
+                enteredAt,
+                0L,
+                true
+        );
+    }
+
+    private WatchSessionStartResult startResult(
+            String sessionKey,
+            long matchId,
+            Instant enteredAt,
+            long heartbeatSequence,
+            boolean newlyCreated
+    ) {
         return new WatchSessionStartResult(
                 sessionKey,
                 matchId,
                 enteredAt,
                 properties.heartbeatInterval().toSeconds(),
-                properties.aliveTtl().toSeconds()
+                properties.aliveTtl().toSeconds(),
+                heartbeatSequence,
+                newlyCreated
         );
     }
 }

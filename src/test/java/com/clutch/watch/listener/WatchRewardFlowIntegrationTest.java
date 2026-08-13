@@ -6,7 +6,6 @@ import com.clutch.lolesports.service.PollingScheduler;
 import com.clutch.user.domain.User;
 import com.clutch.user.domain.UserRole;
 import com.clutch.user.repository.UserRepository;
-import com.clutch.watch.domain.WatchPointTransaction;
 import com.clutch.watch.domain.WatchSession;
 import com.clutch.watch.domain.WatchSessionStatus;
 import com.clutch.watch.repository.WatchPointTransactionRepository;
@@ -23,7 +22,6 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.MediaType;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
@@ -35,7 +33,6 @@ import java.util.UUID;
 import java.util.function.BooleanSupplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -114,12 +111,12 @@ class WatchRewardFlowIntegrationTest {
     }
 
     /**
-     * 입장 API부터 만료 Listener까지 연결되어 1분 시청 보상이 한 번 지급되는지 검증한다.
+     * Alive 만료 시 누적시간을 기록하되 포인트와 거래를 생성하지 않는지 검증한다.
      *
      * @throws Exception MockMvc 요청 처리에 실패한 경우
      */
     @Test
-    void rewardsOneMinuteFromEntryApiThroughExpirationListener() throws Exception {
+    void discardsUnclaimedRewardOnExpiration() throws Exception {
         User user = saveUser();
         EsportsMatch match = saveMatch("inProgress");
         String sessionKey = startSession(user.getId(), match.getId());
@@ -128,24 +125,23 @@ class WatchRewardFlowIntegrationTest {
         expirationListener.handleExpiredKey(aliveKey(user.getId(), sessionKey));
 
         WatchSession session = watchSessionRepository.findBySessionKey(sessionKey).orElseThrow();
-        WatchPointTransaction transaction = watchPointTransactionRepository
-                .findByWatchSessionIdAndRewardSequence(session.getId(), 1L).orElseThrow();
         User rewardedUser = userRepository.findById(user.getId()).orElseThrow();
-        assertThat(rewardedUser.getPoint()).isEqualTo(10L);
+        assertThat(rewardedUser.getPoint()).isZero();
         assertThat(session.getStatus()).isEqualTo(WatchSessionStatus.COMPLETED);
         assertThat(session.getEligibleMilliseconds()).isEqualTo(60_000L);
-        assertThat(transaction.getAwardedPoint()).isEqualTo(10L);
+        assertThat(watchPointTransactionRepository
+                .findByWatchSessionIdAndRewardSequence(session.getId(), 1L)).isEmpty();
         assertThat(watchSessionRedisRepository.findActiveSessionKey(user.getId())).isEmpty();
         assertThat(watchSessionRedisRepository.findSession(sessionKey)).isEmpty();
     }
 
     /**
-     * 1분 미만 세션도 Alive 만료 후 0P 거래와 완료 상태로 기록되는지 검증한다.
+     * 부분 누적시간도 Alive 만료 후 거래 없이 완료 상태로 기록되는지 검증한다.
      *
      * @throws Exception MockMvc 요청 처리에 실패한 경우
      */
     @Test
-    void completesShortSessionWithZeroPoint() throws Exception {
+    void completesShortSessionWithoutPointTransaction() throws Exception {
         User user = saveUser();
         EsportsMatch match = saveMatch("inProgress");
         String sessionKey = startSession(user.getId(), match.getId());
@@ -154,20 +150,19 @@ class WatchRewardFlowIntegrationTest {
         expirationListener.handleExpiredKey(aliveKey(user.getId(), sessionKey));
 
         WatchSession session = watchSessionRepository.findBySessionKey(sessionKey).orElseThrow();
-        WatchPointTransaction transaction = watchPointTransactionRepository
-                .findByWatchSessionIdAndRewardSequence(session.getId(), 1L).orElseThrow();
         assertThat(userRepository.findById(user.getId()).orElseThrow().getPoint()).isZero();
         assertThat(session.getStatus()).isEqualTo(WatchSessionStatus.COMPLETED);
-        assertThat(transaction.getAwardedPoint()).isZero();
+        assertThat(watchPointTransactionRepository
+                .findByWatchSessionIdAndRewardSequence(session.getId(), 1L)).isEmpty();
     }
 
     /**
-     * 새 경기 입장 시 기존 세션만 지급하고 새 세션이 active로 유지되는지 검증한다.
+     * 다른 경기 입장 시 기존 세션을 미지급 종료하고 새 세션이 active로 유지되는지 검증한다.
      *
      * @throws Exception MockMvc 요청 처리에 실패한 경우
      */
     @Test
-    void switchesSessionWithoutDeletingNewActiveSession() throws Exception {
+    void switchesMatchWithoutRewardingPreviousSession() throws Exception {
         User user = saveUser();
         EsportsMatch firstMatch = saveMatch("inProgress");
         EsportsMatch secondMatch = saveMatch("inProgress");
@@ -175,27 +170,48 @@ class WatchRewardFlowIntegrationTest {
         setEligibleMilliseconds(firstSessionKey, 60_000L);
 
         String secondSessionKey = startSession(user.getId(), secondMatch.getId());
-        expirationListener.handleExpiredKey(aliveKey(user.getId(), firstSessionKey));
-
         WatchSession firstSession = watchSessionRepository.findBySessionKey(firstSessionKey).orElseThrow();
         WatchSession secondSession = watchSessionRepository.findBySessionKey(secondSessionKey).orElseThrow();
         assertThat(firstSession.getStatus()).isEqualTo(WatchSessionStatus.COMPLETED);
         assertThat(secondSession.getStatus()).isEqualTo(WatchSessionStatus.WATCHING);
-        assertThat(userRepository.findById(user.getId()).orElseThrow().getPoint()).isEqualTo(10L);
+        assertThat(userRepository.findById(user.getId()).orElseThrow().getPoint()).isZero();
         assertThat(watchSessionRedisRepository.findActiveSessionKey(user.getId())).contains(secondSessionKey);
         assertThat(watchPointTransactionRepository
-                .findByWatchSessionIdAndRewardSequence(firstSession.getId(), 1L)).isPresent();
+                .findByWatchSessionIdAndRewardSequence(firstSession.getId(), 1L)).isEmpty();
         assertThat(watchPointTransactionRepository
                 .findByWatchSessionIdAndRewardSequence(secondSession.getId(), 1L)).isEmpty();
     }
 
     /**
-     * 동일 만료 처리가 반복되어도 사용자 포인트와 거래가 중복 생성되지 않는지 검증한다.
+     * 같은 경기 재입장 시 DB 세션과 누적시간은 유지하고 이전 sessionKey만 무효화하는지 검증한다.
+     */
+    @Test
+    void resumesSameMatchWithLatestSessionKey() throws Exception {
+        User user = saveUser();
+        EsportsMatch match = saveMatch("inProgress");
+        String firstSessionKey = startSession(user.getId(), match.getId());
+        setEligibleMilliseconds(firstSessionKey, 60_000L);
+        WatchSession firstSession = watchSessionRepository.findBySessionKey(firstSessionKey).orElseThrow();
+        Long watchSessionId = firstSession.getId();
+
+        String secondSessionKey = startSession(user.getId(), match.getId());
+
+        WatchSession resumedSession = watchSessionRepository.findBySessionKey(secondSessionKey).orElseThrow();
+        WatchSessionSnapshot snapshot = watchSessionRedisRepository.findSession(secondSessionKey).orElseThrow();
+        assertThat(resumedSession.getId()).isEqualTo(watchSessionId);
+        assertThat(snapshot.eligibleMilliseconds()).isEqualTo(60_000L);
+        assertThat(watchSessionRedisRepository.findSession(firstSessionKey)).isEmpty();
+        heartbeat(user.getId(), firstSessionKey, 1L, 409, "WATCH_SESSION_REPLACED");
+        heartbeat(user.getId(), secondSessionKey, 1L, 204, null);
+    }
+
+    /**
+     * 동일 만료 처리가 반복되어도 사용자 포인트와 거래를 생성하지 않는지 검증한다.
      *
      * @throws Exception MockMvc 요청 처리에 실패한 경우
      */
     @Test
-    void doesNotDuplicateRewardForRepeatedExpiration() throws Exception {
+    void doesNotRewardRepeatedExpiration() throws Exception {
         User user = saveUser();
         EsportsMatch match = saveMatch("inProgress");
         String sessionKey = startSession(user.getId(), match.getId());
@@ -207,18 +223,18 @@ class WatchRewardFlowIntegrationTest {
         expirationListener.handleExpiredKey(aliveKey(user.getId(), sessionKey));
 
         WatchSession session = watchSessionRepository.findBySessionKey(sessionKey).orElseThrow();
-        assertThat(userRepository.findById(user.getId()).orElseThrow().getPoint()).isEqualTo(10L);
+        assertThat(userRepository.findById(user.getId()).orElseThrow().getPoint()).isZero();
         assertThat(watchPointTransactionRepository
-                .findByWatchSessionIdAndRewardSequence(session.getId(), 1L)).isPresent();
+                .findByWatchSessionIdAndRewardSequence(session.getId(), 1L)).isEmpty();
     }
 
     /**
-     * 실제 Redis Alive TTL 만료 이벤트가 Spring Listener를 실행하여 자동 지급하는지 검증한다.
+     * 실제 Redis Alive TTL 만료 이벤트가 세션을 미지급 종료하는지 검증한다.
      *
      * @throws Exception MockMvc 요청 처리에 실패한 경우
      */
     @Test
-    void rewardsAutomaticallyWhenAliveKeyExpires() throws Exception {
+    void discardsRewardWhenAliveKeyExpires() throws Exception {
         User user = saveUser();
         EsportsMatch match = saveMatch("inProgress");
         String sessionKey = startSession(user.getId(), match.getId());
@@ -230,9 +246,9 @@ class WatchRewardFlowIntegrationTest {
                 .orElse(false));
 
         WatchSession session = watchSessionRepository.findBySessionKey(sessionKey).orElseThrow();
-        assertThat(userRepository.findById(user.getId()).orElseThrow().getPoint()).isEqualTo(10L);
+        assertThat(userRepository.findById(user.getId()).orElseThrow().getPoint()).isZero();
         assertThat(watchPointTransactionRepository
-                .findByWatchSessionIdAndRewardSequence(session.getId(), 1L)).isPresent();
+                .findByWatchSessionIdAndRewardSequence(session.getId(), 1L)).isEmpty();
         assertThat(watchSessionRedisRepository.findSession(sessionKey)).isEmpty();
     }
 
@@ -290,7 +306,7 @@ class WatchRewardFlowIntegrationTest {
         watchSessionRedisRepository.deleteAlive(user.getId(), sessionKey);
         heartbeat(user.getId(), sessionKey, 2L, 410, "WATCH_SESSION_EXPIRED");
 
-        heartbeat(user.getId(), "missing-session", 1L, 404, "WATCH_SESSION_NOT_FOUND");
+        heartbeat(user.getId(), "missing-session", 1L, 409, "WATCH_SESSION_REPLACED");
     }
 
     /**
@@ -328,32 +344,6 @@ class WatchRewardFlowIntegrationTest {
     }
 
     /**
-     * DB의 세션당 거래 유일성 제약으로 지급이 실패하면 DB 변경을 롤백하고 Redis 정산 상태를 보존하는지 검증한다.
-     *
-     * @throws Exception MockMvc 요청 처리에 실패한 경우
-     */
-    @Test
-    void rollsBackDatabaseAndPreservesRedisWhenRewardTransactionFails() throws Exception {
-        User user = saveUser();
-        EsportsMatch match = saveMatch("inProgress");
-        String sessionKey = startSession(user.getId(), match.getId());
-        setEligibleMilliseconds(sessionKey, 60_000L);
-        WatchSession session = watchSessionRepository.findBySessionKey(sessionKey).orElseThrow();
-        watchPointTransactionRepository.saveAndFlush(WatchPointTransaction.create(
-                user.getId(), session.getId(), 1L, match.getId(), 0L
-        ));
-
-        assertThatThrownBy(() -> expirationListener.handleExpiredKey(aliveKey(user.getId(), sessionKey)))
-                .isInstanceOf(DataIntegrityViolationException.class);
-
-        WatchSession unchangedSession = watchSessionRepository.findBySessionKey(sessionKey).orElseThrow();
-        assertThat(userRepository.findById(user.getId()).orElseThrow().getPoint()).isZero();
-        assertThat(unchangedSession.getStatus()).isEqualTo(WatchSessionStatus.WATCHING);
-        assertThat(watchSessionRedisRepository.findSession(sessionKey)).isPresent();
-        assertThat(watchSessionRedisRepository.findActiveSessionKey(user.getId())).contains(sessionKey);
-    }
-
-    /**
      * 입장 API를 호출하고 응답에서 생성된 sessionKey를 반환한다.
      *
      * @param userId 입장 사용자 ID
@@ -364,7 +354,7 @@ class WatchRewardFlowIntegrationTest {
     private String startSession(long userId, long matchId) throws Exception {
         String response = mockMvc.perform(post(
                         "/api/users/{userId}/matches/{matchId}/watch-sessions", userId, matchId))
-                .andExpect(status().isCreated())
+                .andExpect(status().is2xxSuccessful())
                 .andReturn().getResponse().getContentAsString();
         String sessionKey = JsonPath.read(response, "$.sessionKey");
         sessionKeys.add(sessionKey);

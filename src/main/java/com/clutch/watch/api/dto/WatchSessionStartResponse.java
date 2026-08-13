@@ -12,13 +12,15 @@ import java.time.Instant;
  * @param enteredAt 서버가 확정한 입장 시각
  * @param heartbeatIntervalSeconds Heartbeat 전송 주기(초)
  * @param sessionTimeoutSeconds Heartbeat 중단을 판단하는 시간(초)
+ * @param heartbeatSequence 마지막으로 처리한 Heartbeat 순번
  */
 public record WatchSessionStartResponse(
         String sessionKey,
         long matchId,
         Instant enteredAt,
         long heartbeatIntervalSeconds,
-        long sessionTimeoutSeconds
+        long sessionTimeoutSeconds,
+        long heartbeatSequence
 ) {
 
     /**
@@ -33,7 +35,8 @@ public record WatchSessionStartResponse(
                 result.matchId(),
                 result.enteredAt(),
                 result.heartbeatIntervalSeconds(),
-                result.sessionTimeoutSeconds()
+                result.sessionTimeoutSeconds(),
+                result.heartbeatSequence()
         );
     }
 }

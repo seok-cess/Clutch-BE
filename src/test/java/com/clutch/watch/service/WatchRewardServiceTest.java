@@ -115,6 +115,23 @@ class WatchRewardServiceTest {
     }
 
     /**
+     * 미수령 세션 종료 시 누적 상태만 완료 처리하고 포인트와 거래를 생성하지 않는지 검증한다.
+     */
+    @Test
+    void discardsSessionWithoutAwardingPoint() {
+        WatchSession watchSession = watchSession();
+        when(watchSessionRepository.findBySessionKey(SESSION_KEY)).thenReturn(Optional.of(watchSession));
+
+        service.discard(snapshot(300_000L));
+
+        assertThat(watchSession.getStatus()).isEqualTo(WatchSessionStatus.COMPLETED);
+        assertThat(watchSession.getEligibleMilliseconds()).isEqualTo(300_000L);
+        verify(userRepository, never()).findById(USER_ID);
+        verify(watchPointTransactionRepository, never())
+                .save(org.mockito.ArgumentMatchers.any(WatchPointTransaction.class));
+    }
+
+    /**
      * 이미 완료된 세션은 기존 거래 결과를 반환하고 사용자 포인트를 다시 변경하지 않는지 검증한다.
      */
     @Test

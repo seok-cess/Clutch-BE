@@ -43,7 +43,8 @@ public class WatchSessionController {
             @PathVariable @Positive(message = "경기 ID는 1 이상이어야 합니다.") long matchId
     ) {
         WatchSessionStartResult result = watchSessionService.start(userId, matchId);
-        return ResponseEntity.status(HttpStatus.CREATED)
+        HttpStatus status = result.newlyCreated() ? HttpStatus.CREATED : HttpStatus.OK;
+        return ResponseEntity.status(status)
                 .body(WatchSessionStartResponse.from(result));
     }
 

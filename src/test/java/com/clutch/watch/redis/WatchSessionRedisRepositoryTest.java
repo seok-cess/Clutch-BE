@@ -107,6 +107,32 @@ class WatchSessionRedisRepositoryTest {
     }
 
     /**
+     * 동일 경기 재입장 시 누적 상태와 heartbeat 순번을 유지하면서 sessionKey를 교체하는지 검증한다.
+     */
+    @Test
+    void replacesSessionKeyWhilePreservingWatchState() {
+        repository.initialize(100L, 200L, "session-1", 1_000_000L);
+        repository.heartbeat(100L, "session-1", 1L, 1_030_000L);
+
+        SessionKeyReplacementResult result = repository.replaceSessionKey(
+                100L,
+                "session-1",
+                "session-2"
+        );
+
+        assertThat(result).isEqualTo(SessionKeyReplacementResult.SUCCESS);
+        assertThat(repository.findActiveSessionKey(100L)).contains("session-2");
+        assertThat(repository.findSession("session-1")).isEmpty();
+        WatchSessionSnapshot snapshot = repository.findSession("session-2").orElseThrow();
+        assertThat(snapshot.eligibleMilliseconds()).isEqualTo(30_000L);
+        assertThat(snapshot.sequence()).isEqualTo(1L);
+        assertThat(redisTemplate.hasKey("watch:alive:100:session-1")).isFalse();
+        assertThat(redisTemplate.hasKey("watch:alive:100:session-2")).isTrue();
+        assertThat(repository.heartbeat(100L, "session-1", 2L, 1_060_000L))
+                .isEqualTo(HeartbeatResult.REPLACED);
+    }
+
+    /**
      * 이미 처리한 sequence 이하의 heartbeat가 시간과 상태를 다시 변경하지 않는지 검증한다.
      */
     @Test

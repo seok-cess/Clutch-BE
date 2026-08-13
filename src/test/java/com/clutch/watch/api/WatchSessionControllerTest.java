@@ -64,7 +64,9 @@ class WatchSessionControllerTest {
                 MATCH_ID,
                 enteredAt,
                 30L,
-                90L
+                90L,
+                0L,
+                true
         ));
 
         mockMvc.perform(post("/api/users/{userId}/matches/{matchId}/watch-sessions", USER_ID, MATCH_ID))
@@ -74,9 +76,32 @@ class WatchSessionControllerTest {
                 .andExpect(jsonPath("$.matchId").value(MATCH_ID))
                 .andExpect(jsonPath("$.enteredAt").value("2026-08-13T03:00:00Z"))
                 .andExpect(jsonPath("$.heartbeatIntervalSeconds").value(30))
-                .andExpect(jsonPath("$.sessionTimeoutSeconds").value(90));
+                .andExpect(jsonPath("$.sessionTimeoutSeconds").value(90))
+                .andExpect(jsonPath("$.heartbeatSequence").value(0));
 
         verify(watchSessionService).start(USER_ID, MATCH_ID);
+    }
+
+    /**
+     * 동일 경기 재입장은 기존 세션 상태를 이어받았음을 200 응답으로 반환하는지 검증한다.
+     */
+    @Test
+    void resumesSameMatchSession() throws Exception {
+        Instant enteredAt = Instant.parse("2026-08-13T03:00:00Z");
+        when(watchSessionService.start(USER_ID, MATCH_ID)).thenReturn(new WatchSessionStartResult(
+                SESSION_KEY,
+                MATCH_ID,
+                enteredAt,
+                30L,
+                90L,
+                7L,
+                false
+        ));
+
+        mockMvc.perform(post("/api/users/{userId}/matches/{matchId}/watch-sessions", USER_ID, MATCH_ID))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sessionKey").value(SESSION_KEY))
+                .andExpect(jsonPath("$.heartbeatSequence").value(7));
     }
 
     /**

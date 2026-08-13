@@ -101,6 +101,34 @@ public class WatchRewardService {
     }
 
     /**
+     * Redis의 마지막 시청 상태만 DB 세션에 반영하고 포인트는 지급하지 않는다.
+     * 미수령 보상과 부분 누적시간이 세션 종료 시 자동 지급되지 않도록 사용한다.
+     *
+     * @param snapshot 종료할 Redis 시청 세션 상태
+     */
+    @Transactional
+    public void discard(WatchSessionSnapshot snapshot) {
+        if (snapshot == null) {
+            throw new WatchException(WatchError.REWARD_SNAPSHOT_REQUIRED);
+        }
+        if (snapshot.eligibleMilliseconds() < 0) {
+            throw new WatchException(WatchError.ELIGIBLE_TIME_NEGATIVE);
+        }
+
+        WatchSession watchSession = watchSessionRepository
+                .findBySessionKey(snapshot.sessionKey())
+                .orElseThrow(() -> new WatchException(WatchError.WATCH_SESSION_NOT_FOUND));
+        validateSnapshotOwner(watchSession, snapshot);
+
+        if (watchSession.getStatus() == WatchSessionStatus.WATCHING) {
+            watchSession.complete(
+                    toUtcLocalDateTime(snapshot.lastSeen()),
+                    snapshot.eligibleMilliseconds()
+            );
+        }
+    }
+
+    /**
      * Redis snapshot이 DB 세션과 같은 사용자 및 경기를 가리키는지 검증한다.
      *
      * @param watchSession DB에서 조회한 시청 세션

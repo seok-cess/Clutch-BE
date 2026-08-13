@@ -8,6 +8,39 @@ import org.springframework.data.redis.core.script.DefaultRedisScript;
 final class WatchRedisScripts {
 
     /**
+     * 동일 경기 재입장 시 누적 상태를 유지하면서 최신 sessionKey로 Redis 키를 교체한다.
+     */
+    static final DefaultRedisScript<String> REPLACE_SESSION_KEY = new DefaultRedisScript<>("""
+            local activeSessionKey = redis.call('GET', KEYS[1])
+            if not activeSessionKey or activeSessionKey ~= ARGV[1] then
+                return 'REPLACED'
+            end
+
+            if redis.call('EXISTS', KEYS[2]) == 0 then
+                return 'SESSION_NOT_FOUND'
+            end
+
+            if redis.call('EXISTS', KEYS[3]) == 0 then
+                return 'EXPIRED'
+            end
+
+            if redis.call('HGET', KEYS[2], 'userId') ~= ARGV[3] then
+                return 'USER_MISMATCH'
+            end
+
+            if redis.call('EXISTS', KEYS[4]) == 1 then
+                return 'SESSION_KEY_CONFLICT'
+            end
+
+            redis.call('RENAME', KEYS[2], KEYS[4])
+            redis.call('DEL', KEYS[3])
+            redis.call('SET', KEYS[5], ARGV[4], 'PX', ARGV[5])
+            redis.call('SET', KEYS[1], ARGV[2], 'PX', ARGV[6])
+            redis.call('PEXPIRE', KEYS[4], ARGV[7])
+            return 'SUCCESS'
+            """, String.class);
+
+    /**
      * Heartbeat의 유효성 검증, 시청시간 누적, 세 Redis 키의 TTL 갱신을 원자적으로 처리한다.
      *
      * <p>Redis 키 입력:</p>

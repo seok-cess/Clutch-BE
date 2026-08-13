@@ -119,6 +119,42 @@ public class WatchSessionRedisRepository {
     }
 
     /**
+     * 동일 경기의 Redis 누적 상태를 유지하면서 최신 화면용 sessionKey로 원자적으로 교체한다.
+     *
+     * @param userId 시청 사용자 ID
+     * @param oldSessionKey 이전 화면의 세션 키
+     * @param newSessionKey 최신 화면에 발급할 세션 키
+     * @return Redis 세션 키 교체 결과
+     */
+    public SessionKeyReplacementResult replaceSessionKey(
+            long userId,
+            String oldSessionKey,
+            String newSessionKey
+    ) {
+        String result = redisTemplate.execute(
+                WatchRedisScripts.REPLACE_SESSION_KEY,
+                List.of(
+                        activeKey(userId),
+                        redisSessionKey(oldSessionKey),
+                        aliveKey(userId, oldSessionKey),
+                        redisSessionKey(newSessionKey),
+                        aliveKey(userId, newSessionKey)
+                ),
+                oldSessionKey,
+                newSessionKey,
+                Long.toString(userId),
+                ALIVE_VALUE,
+                Long.toString(properties.aliveTtl().toMillis()),
+                Long.toString(properties.activeTtl().toMillis()),
+                Long.toString(properties.sessionTtl().toMillis())
+        );
+        if (result == null) {
+            throw new WatchException(WatchError.SESSION_KEY_REPLACEMENT_RESULT_MISSING);
+        }
+        return SessionKeyReplacementResult.from(result);
+    }
+
+    /**
      * 사용자별 세션 전환 lock이 없을 때 token과 TTL을 가진 lock을 생성한다.
      *
      * @param userId 세션을 전환할 사용자 ID
