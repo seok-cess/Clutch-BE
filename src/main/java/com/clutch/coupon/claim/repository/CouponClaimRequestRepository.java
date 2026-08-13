@@ -10,14 +10,14 @@ public interface CouponClaimRequestRepository
         extends JpaRepository<CouponClaimRequest, Long> {
 
     /**
-     * 사용자별 쿠폰 이벤트 항목 발급 요청 존재 여부
+     * 사용자별 쿠폰 이벤트 회차 발급 요청 존재 여부
      *
      * @param userId            사용자 식별자
-     * @param couponEventItemId 쿠폰 이벤트 항목 식별자
+     * @param couponEventOccurrenceId 쿠폰 이벤트 회차 식별자
      * @return 발급 요청 존재 여부
      */
-    boolean existsByUserIdAndCouponEventItemId(
+    boolean existsByUserIdAndCouponEventOccurrenceId(
             Long userId,
-            Long couponEventItemId
+            Long couponEventOccurrenceId
     );
 }

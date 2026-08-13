@@ -29,16 +29,23 @@ public class CouponClaimController {
      *
      * @param userId 사용자 식별자
      * @param couponEventId 쿠폰 이벤트 식별자
+     * @param couponEventOccurrenceId 쿠폰 이벤트 회차 식별자
      * @param request 쿠폰 발급 요청 DTO
      * @return 쿠폰 발급 요청 생성 응답
      */
-    @PostMapping("/{couponEventId}/claims")
+    @PostMapping(
+            "/{couponEventId}/occurrences/"
+                    + "{couponEventOccurrenceId}/claims"
+    )
     public ResponseEntity<CouponClaimCreateResponse> claim(
             @RequestHeader("X-User-Id")
             Long userId,
 
             @PathVariable
             Long couponEventId,
+
+            @PathVariable
+            Long couponEventOccurrenceId,
 
             @Valid
             @RequestBody
@@ -48,6 +55,7 @@ public class CouponClaimController {
                 couponClaimService.claim(
                         userId,
                         couponEventId,
+                        couponEventOccurrenceId,
                         request
                 );
 

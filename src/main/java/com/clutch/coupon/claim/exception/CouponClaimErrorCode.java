@@ -17,6 +17,11 @@ public enum CouponClaimErrorCode {
             "존재하지 않는 쿠폰 이벤트 항목입니다."
     ),
 
+    COUPON_EVENT_OCCURRENCE_NOT_FOUND(
+            HttpStatus.NOT_FOUND,
+            "존재하지 않는 쿠폰 이벤트 회차입니다."
+    ),
+
     COUPON_EVENT_NOT_OPEN(
             HttpStatus.CONFLICT,
             "진행 중인 쿠폰 이벤트가 아닙니다."

@@ -8,7 +8,9 @@ import com.clutch.coupon.claim.domain.CouponClaimRequest;
 import com.clutch.coupon.claim.repository.CouponClaimRequestRepository;
 import com.clutch.coupon.event.domain.CouponEvent;
 import com.clutch.coupon.event.domain.CouponEventItem;
+import com.clutch.coupon.event.domain.CouponEventOccurrence;
 import com.clutch.coupon.event.repository.CouponEventItemRepository;
+import com.clutch.coupon.event.repository.CouponEventOccurrenceRepository;
 import com.clutch.coupon.event.repository.CouponEventRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -35,10 +37,14 @@ class CouponClaimServiceTest {
 
     private static final Long USER_ID = 1L;
     private static final Long COUPON_EVENT_ID = 10L;
+    private static final Long COUPON_EVENT_OCCURRENCE_ID = 15L;
     private static final Long COUPON_EVENT_ITEM_ID = 20L;
 
     @Mock
     private CouponEventRepository couponEventRepository;
+
+    @Mock
+    private CouponEventOccurrenceRepository couponEventOccurrenceRepository;
 
     @Mock
     private CouponEventItemRepository couponEventItemRepository;
@@ -48,6 +54,9 @@ class CouponClaimServiceTest {
 
     @Mock
     private CouponEvent couponEvent;
+
+    @Mock
+    private CouponEventOccurrence couponEventOccurrence;
 
     @Mock
     private CouponEventItem couponEventItem;
@@ -64,9 +73,9 @@ class CouponClaimServiceTest {
         givenOpenEventAndItem();
 
         when(couponClaimRequestRepository
-                .existsByUserIdAndCouponEventItemId(
+                .existsByUserIdAndCouponEventOccurrenceId(
                         USER_ID,
-                        COUPON_EVENT_ITEM_ID
+                        COUPON_EVENT_OCCURRENCE_ID
                 ))
                 .thenReturn(false);
 
@@ -87,12 +96,15 @@ class CouponClaimServiceTest {
                 couponClaimService.claim(
                         USER_ID,
                         COUPON_EVENT_ID,
+                        COUPON_EVENT_OCCURRENCE_ID,
                         request
                 );
 
         // then
         assertThat(response.couponEventId())
                 .isEqualTo(COUPON_EVENT_ID);
+        assertThat(response.couponEventOccurrenceId())
+                .isEqualTo(COUPON_EVENT_OCCURRENCE_ID);
         assertThat(response.couponEventItemId())
                 .isEqualTo(COUPON_EVENT_ITEM_ID);
         assertThat(response.requestStatus())
@@ -111,6 +123,8 @@ class CouponClaimServiceTest {
 
         assertThat(savedClaimRequest.getUserId())
                 .isEqualTo(USER_ID);
+        assertThat(savedClaimRequest.getCouponEventOccurrenceId())
+                .isEqualTo(COUPON_EVENT_OCCURRENCE_ID);
         assertThat(savedClaimRequest.getRequestStatus())
                 .isEqualTo(ClaimRequestStatus.SUCCEEDED);
 
@@ -136,6 +150,42 @@ class CouponClaimServiceTest {
                 couponClaimService.claim(
                         USER_ID,
                         COUPON_EVENT_ID,
+                        COUPON_EVENT_OCCURRENCE_ID,
+                        request
+                ))
+                .isInstanceOf(CouponClaimException.class);
+
+        verify(couponClaimRequestRepository, never())
+                .save(any(CouponClaimRequest.class));
+    }
+
+    /**
+     * 미존재 쿠폰 이벤트 회차 실패 검증
+     */
+    @Test
+    void claimFailsWhenEventOccurrenceDoesNotExist() {
+        // given
+        when(couponEventRepository.findById(COUPON_EVENT_ID))
+                .thenReturn(Optional.of(couponEvent));
+
+        when(couponEventOccurrenceRepository
+                .findByCouponEventIdAndId(
+                        COUPON_EVENT_ID,
+                        COUPON_EVENT_OCCURRENCE_ID
+                ))
+                .thenReturn(Optional.empty());
+
+        CouponClaimCreateRequest request =
+                new CouponClaimCreateRequest(
+                        COUPON_EVENT_ITEM_ID
+                );
+
+        // when, then
+        assertThatThrownBy(() ->
+                couponClaimService.claim(
+                        USER_ID,
+                        COUPON_EVENT_ID,
+                        COUPON_EVENT_OCCURRENCE_ID,
                         request
                 ))
                 .isInstanceOf(CouponClaimException.class);
@@ -152,6 +202,13 @@ class CouponClaimServiceTest {
         // given
         when(couponEventRepository.findById(COUPON_EVENT_ID))
                 .thenReturn(Optional.of(couponEvent));
+
+        when(couponEventOccurrenceRepository
+                .findByCouponEventIdAndId(
+                        COUPON_EVENT_ID,
+                        COUPON_EVENT_OCCURRENCE_ID
+                ))
+                .thenReturn(Optional.of(couponEventOccurrence));
 
         when(couponEventItemRepository
                 .findByCouponEventIdAndId(
@@ -170,6 +227,7 @@ class CouponClaimServiceTest {
                 couponClaimService.claim(
                         USER_ID,
                         COUPON_EVENT_ID,
+                        COUPON_EVENT_OCCURRENCE_ID,
                         request
                 ))
                 .isInstanceOf(CouponClaimException.class);
@@ -187,6 +245,13 @@ class CouponClaimServiceTest {
         when(couponEventRepository.findById(COUPON_EVENT_ID))
                 .thenReturn(Optional.of(couponEvent));
 
+        when(couponEventOccurrenceRepository
+                .findByCouponEventIdAndId(
+                        COUPON_EVENT_ID,
+                        COUPON_EVENT_OCCURRENCE_ID
+                ))
+                .thenReturn(Optional.of(couponEventOccurrence));
+
         when(couponEventItemRepository
                 .findByCouponEventIdAndId(
                         COUPON_EVENT_ID,
@@ -194,7 +259,7 @@ class CouponClaimServiceTest {
                 ))
                 .thenReturn(Optional.of(couponEventItem));
 
-        when(couponEvent.isOpenAt(any(LocalDateTime.class)))
+        when(couponEventOccurrence.isOpenAt(any(LocalDateTime.class)))
                 .thenReturn(false);
 
         CouponClaimCreateRequest request =
@@ -207,6 +272,7 @@ class CouponClaimServiceTest {
                 couponClaimService.claim(
                         USER_ID,
                         COUPON_EVENT_ID,
+                        COUPON_EVENT_OCCURRENCE_ID,
                         request
                 ))
                 .isInstanceOf(CouponClaimException.class);
@@ -224,9 +290,9 @@ class CouponClaimServiceTest {
         givenOpenEventAndItem();
 
         when(couponClaimRequestRepository
-                .existsByUserIdAndCouponEventItemId(
+                .existsByUserIdAndCouponEventOccurrenceId(
                         USER_ID,
-                        COUPON_EVENT_ITEM_ID
+                        COUPON_EVENT_OCCURRENCE_ID
                 ))
                 .thenReturn(true);
 
@@ -240,6 +306,7 @@ class CouponClaimServiceTest {
                 couponClaimService.claim(
                         USER_ID,
                         COUPON_EVENT_ID,
+                        COUPON_EVENT_OCCURRENCE_ID,
                         request
                 ))
                 .isInstanceOf(CouponClaimException.class);
@@ -260,9 +327,9 @@ class CouponClaimServiceTest {
         givenOpenEventAndItem();
 
         when(couponClaimRequestRepository
-                .existsByUserIdAndCouponEventItemId(
+                .existsByUserIdAndCouponEventOccurrenceId(
                         USER_ID,
-                        COUPON_EVENT_ITEM_ID
+                        COUPON_EVENT_OCCURRENCE_ID
                 ))
                 .thenReturn(false);
 
@@ -279,6 +346,7 @@ class CouponClaimServiceTest {
                 couponClaimService.claim(
                         USER_ID,
                         COUPON_EVENT_ID,
+                        COUPON_EVENT_OCCURRENCE_ID,
                         request
                 ))
                 .isInstanceOf(CouponClaimException.class);
@@ -297,6 +365,13 @@ class CouponClaimServiceTest {
         when(couponEventRepository.findById(COUPON_EVENT_ID))
                 .thenReturn(Optional.of(couponEvent));
 
+        when(couponEventOccurrenceRepository
+                .findByCouponEventIdAndId(
+                        COUPON_EVENT_ID,
+                        COUPON_EVENT_OCCURRENCE_ID
+                ))
+                .thenReturn(Optional.of(couponEventOccurrence));
+
         when(couponEventItemRepository
                 .findByCouponEventIdAndId(
                         COUPON_EVENT_ID,
@@ -304,7 +379,7 @@ class CouponClaimServiceTest {
                 ))
                 .thenReturn(Optional.of(couponEventItem));
 
-        when(couponEvent.isOpenAt(any(LocalDateTime.class)))
+        when(couponEventOccurrence.isOpenAt(any(LocalDateTime.class)))
                 .thenReturn(true);
     }
 }
