@@ -31,6 +31,8 @@ Notion에서 논의한 내용이 실제 구현을 제약하는 기술 결정으�
 
 - 패키지 구조: `architecture/package-structure.md`
 - 쿠폰 발급 규칙: `domain/coupon.md`
+- 시청 포인트 지급 규칙: `domain/viewing-point.md`
+- 승패 배팅 규칙: `domain/betting.md`
 - Git, 커밋과 Pull Request: `conventions/git-convention.md`
 - Jira–GitHub 자동화: `conventions/jira-github-workflow.md`
 - 데이터베이스: `conventions/database-convention.md`
