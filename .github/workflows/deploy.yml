@@ -1,0 +1,30 @@
+name: Deploy Dev
+
+on:
+  push:
+    branches:
+      - dev
+
+jobs:
+  deploy:
+    runs-on:
+      - self-hosted
+      - windows
+      - x64
+
+    steps:
+      - name: Checkout dev
+        uses: actions/checkout@v6
+        with:
+          ref: dev
+
+      - name: Prepare application config
+        shell: powershell
+        run: |
+          Copy-Item -LiteralPath src/main/resources/application.example.yaml -Destination src/main/resources/application.yaml -Force
+
+      - name: Deploy
+        shell: powershell
+        run: |
+          docker compose --profile app up -d --build --remove-orphans --wait
+          docker compose --profile app ps
