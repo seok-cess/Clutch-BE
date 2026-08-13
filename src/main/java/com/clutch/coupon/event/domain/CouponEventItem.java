@@ -69,6 +69,34 @@ public class CouponEventItem {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
+    private CouponEventItem(
+            Long couponEventId,
+            Long couponTypeId,
+            int quantity
+    ) {
+        if (couponEventId == null || couponEventId <= 0) {
+            throw new IllegalArgumentException("쿠폰 이벤트 ID는 필수입니다.");
+        }
+        if (couponTypeId == null || couponTypeId <= 0) {
+            throw new IllegalArgumentException("쿠폰 종류 ID는 필수입니다.");
+        }
+        if (quantity <= 0) {
+            throw new IllegalArgumentException("쿠폰 수량은 1장 이상이어야 합니다.");
+        }
+        this.couponEventId = couponEventId;
+        this.couponTypeId = couponTypeId;
+        this.quantity = quantity;
+        this.successCount = 0;
+    }
+
+    public static CouponEventItem create(
+            Long couponEventId,
+            Long couponTypeId,
+            int quantity
+    ) {
+        return new CouponEventItem(couponEventId, couponTypeId, quantity);
+    }
+
     /**
      * 잔여 수량 존재 여부
      *
