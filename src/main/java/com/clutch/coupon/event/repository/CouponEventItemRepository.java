@@ -25,4 +25,8 @@ public interface CouponEventItemRepository
     );
 
     List<CouponEventItem> findAllByCouponEventId(Long couponEventId);
+
+    List<CouponEventItem> findAllByCouponEventIdIn(
+            List<Long> couponEventIds
+    );
 }

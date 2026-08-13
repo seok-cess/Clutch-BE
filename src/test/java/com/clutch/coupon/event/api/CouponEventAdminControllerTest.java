@@ -4,9 +4,12 @@ import com.clutch.coupon.event.api.dto.CouponEventCreateRequest;
 import com.clutch.coupon.event.api.dto.CouponEventCreateResponse;
 import com.clutch.coupon.event.api.dto.CouponEventItemCreateRequest;
 import com.clutch.coupon.event.api.dto.CouponEventItemCreateResponse;
+import com.clutch.coupon.event.api.dto.CouponEventListResponse;
 import com.clutch.coupon.event.domain.CouponEventOpenMode;
 import com.clutch.coupon.event.domain.CouponEventStatus;
 import com.clutch.coupon.event.domain.CouponIssueMode;
+import com.clutch.coupon.event.exception.CouponEventErrorCode;
+import com.clutch.coupon.event.exception.CouponEventException;
 import com.clutch.coupon.event.service.CouponEventService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,6 +23,7 @@ import java.util.List;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -31,6 +35,44 @@ class CouponEventAdminControllerTest {
 
     @MockitoBean
     private CouponEventService couponEventService;
+
+    @Test
+    void 이벤트_목록을_상태와_커서로_조회한다() throws Exception {
+        when(couponEventService.findAll(CouponEventStatus.READY, 100L, 10))
+                .thenReturn(new CouponEventListResponse(
+                        List.of(),
+                        null,
+                        false
+                ));
+
+        mockMvc.perform(get("/api/v1/admin/coupon-events")
+                        .param("status", "READY")
+                        .param("cursor", "100")
+                        .param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.events").isArray())
+                .andExpect(jsonPath("$.hasNext").value(false));
+
+        verify(couponEventService).findAll(
+                CouponEventStatus.READY,
+                100L,
+                10
+        );
+    }
+
+    @Test
+    void 존재하지_않는_이벤트_상세는_404를_응답한다() throws Exception {
+        when(couponEventService.findById(999L)).thenThrow(
+                new CouponEventException(
+                        CouponEventErrorCode.COUPON_EVENT_NOT_FOUND
+                )
+        );
+
+        mockMvc.perform(get("/api/v1/admin/coupon-events/{eventId}", 999L))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code")
+                        .value("COUPON_EVENT_NOT_FOUND"));
+    }
 
     @Test
     void 쿠폰_이벤트를_등록하면_201을_응답한다() throws Exception {

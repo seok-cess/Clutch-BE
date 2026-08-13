@@ -2,26 +2,41 @@ package com.clutch.coupon.event.service;
 
 import com.clutch.coupon.event.api.dto.CouponEventCreateRequest;
 import com.clutch.coupon.event.api.dto.CouponEventCreateResponse;
+import com.clutch.coupon.event.api.dto.CouponEventDetailResponse;
 import com.clutch.coupon.event.api.dto.CouponEventItemCreateRequest;
 import com.clutch.coupon.event.api.dto.CouponEventItemCreateResponse;
+import com.clutch.coupon.event.api.dto.CouponEventItemDetailResponse;
+import com.clutch.coupon.event.api.dto.CouponEventListResponse;
+import com.clutch.coupon.event.api.dto.CouponEventOccurrenceResponse;
+import com.clutch.coupon.event.api.dto.CouponEventSummaryResponse;
 import com.clutch.coupon.event.domain.CouponEvent;
 import com.clutch.coupon.event.domain.CouponEventItem;
+import com.clutch.coupon.event.domain.CouponEventOccurrence;
 import com.clutch.coupon.event.domain.CouponEventOpenMode;
 import com.clutch.coupon.event.domain.CouponEventPhase;
+import com.clutch.coupon.event.domain.CouponEventStatus;
 import com.clutch.coupon.event.domain.CouponIssueMode;
 import com.clutch.coupon.event.exception.CouponEventErrorCode;
 import com.clutch.coupon.event.exception.CouponEventException;
 import com.clutch.coupon.event.repository.CouponEventItemRepository;
+import com.clutch.coupon.event.repository.CouponEventOccurrenceRepository;
 import com.clutch.coupon.event.repository.CouponEventPhaseRepository;
 import com.clutch.coupon.event.repository.CouponEventRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -30,6 +45,7 @@ public class CouponEventService {
     private final CouponEventRepository couponEventRepository;
     private final CouponEventItemRepository couponEventItemRepository;
     private final CouponEventPhaseRepository couponEventPhaseRepository;
+    private final CouponEventOccurrenceRepository couponEventOccurrenceRepository;
 
     @Transactional
     public CouponEventCreateResponse create(CouponEventCreateRequest request) {
@@ -63,6 +79,225 @@ public class CouponEventService {
                 savedEvent.getCreatedAt(),
                 itemResponses
         );
+    }
+
+    @Transactional(readOnly = true)
+    public CouponEventListResponse findAll(
+            CouponEventStatus status,
+            Long cursor,
+            int size
+    ) {
+        validateListCondition(cursor, size);
+
+        Slice<CouponEvent> eventSlice = findEventSlice(
+                status,
+                cursor,
+                PageRequest.of(0, size)
+        );
+        List<CouponEvent> events = eventSlice.getContent();
+        Map<Long, List<CouponEventItem>> itemsByEventId =
+                findItemsByEventId(events);
+
+        List<CouponEventSummaryResponse> responses = events.stream()
+                .map(event -> toSummaryResponse(
+                        event,
+                        itemsByEventId.getOrDefault(event.getId(), List.of())
+                ))
+                .toList();
+        Long nextCursor = eventSlice.hasNext() && !events.isEmpty()
+                ? events.getLast().getId()
+                : null;
+
+        return new CouponEventListResponse(
+                responses,
+                nextCursor,
+                eventSlice.hasNext()
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public CouponEventDetailResponse findById(Long couponEventId) {
+        CouponEvent event = couponEventRepository.findById(couponEventId)
+                .orElseThrow(() -> new CouponEventException(
+                        CouponEventErrorCode.COUPON_EVENT_NOT_FOUND
+                ));
+        List<CouponEventItem> items =
+                couponEventItemRepository.findAllByCouponEventId(couponEventId);
+        Map<Long, CouponEventPhase> phaseByItemId =
+                couponEventPhaseRepository
+                        .findAllByCouponEventIdOrderByOpenOffsetSecondsAsc(
+                                couponEventId
+                        )
+                        .stream()
+                        .collect(Collectors.toMap(
+                                CouponEventPhase::getCouponEventItemId,
+                                Function.identity()
+                        ));
+
+        List<CouponEventItemDetailResponse> itemResponses = items.stream()
+                .sorted(Comparator.comparingInt(item -> {
+                    CouponEventPhase phase = phaseByItemId.get(item.getId());
+                    return phase == null
+                            ? Integer.MAX_VALUE
+                            : phase.getPhaseSequence();
+                }))
+                .map(item -> toItemDetailResponse(
+                        item,
+                        phaseByItemId.get(item.getId())
+                ))
+                .toList();
+        long totalQuantity = totalQuantity(items);
+        long issuedQuantity = issuedQuantity(items);
+        CouponEventOccurrenceResponse latestOccurrence =
+                couponEventOccurrenceRepository
+                        .findFirstByCouponEventIdOrderByIdDesc(couponEventId)
+                        .map(this::toOccurrenceResponse)
+                        .orElse(null);
+
+        return new CouponEventDetailResponse(
+                event.getId(),
+                event.getEsportsMatchId(),
+                event.getEventName(),
+                event.getOpenMode(),
+                event.getIssueMode(),
+                event.getTriggerType(),
+                event.getEventStatus(),
+                event.getClaimWindowSeconds(),
+                event.getScheduledOpenAt(),
+                totalQuantity,
+                issuedQuantity,
+                totalQuantity - issuedQuantity,
+                event.getCreatedAt(),
+                event.getUpdatedAt(),
+                itemResponses,
+                latestOccurrence
+        );
+    }
+
+    private Slice<CouponEvent> findEventSlice(
+            CouponEventStatus status,
+            Long cursor,
+            PageRequest pageable
+    ) {
+        if (status == null && cursor == null) {
+            return couponEventRepository.findAllByOrderByIdDesc(pageable);
+        }
+        if (status == null) {
+            return couponEventRepository.findByIdLessThanOrderByIdDesc(
+                    cursor,
+                    pageable
+            );
+        }
+        if (cursor == null) {
+            return couponEventRepository.findByEventStatusOrderByIdDesc(
+                    status,
+                    pageable
+            );
+        }
+        return couponEventRepository
+                .findByEventStatusAndIdLessThanOrderByIdDesc(
+                        status,
+                        cursor,
+                        pageable
+                );
+    }
+
+    private Map<Long, List<CouponEventItem>> findItemsByEventId(
+            List<CouponEvent> events
+    ) {
+        if (events.isEmpty()) {
+            return Map.of();
+        }
+        List<Long> eventIds = events.stream()
+                .map(CouponEvent::getId)
+                .toList();
+        Map<Long, List<CouponEventItem>> result = new HashMap<>();
+        couponEventItemRepository.findAllByCouponEventIdIn(eventIds)
+                .forEach(item -> result
+                        .computeIfAbsent(
+                                item.getCouponEventId(),
+                                ignored -> new ArrayList<>()
+                        )
+                        .add(item));
+        return result;
+    }
+
+    private CouponEventSummaryResponse toSummaryResponse(
+            CouponEvent event,
+            List<CouponEventItem> items
+    ) {
+        long totalQuantity = totalQuantity(items);
+        long issuedQuantity = issuedQuantity(items);
+        return new CouponEventSummaryResponse(
+                event.getId(),
+                event.getEventName(),
+                event.getEsportsMatchId(),
+                event.getTriggerType(),
+                event.getOpenMode(),
+                event.getIssueMode(),
+                event.getEventStatus(),
+                event.getClaimWindowSeconds(),
+                event.getScheduledOpenAt(),
+                totalQuantity,
+                issuedQuantity,
+                totalQuantity - issuedQuantity,
+                event.getCreatedAt()
+        );
+    }
+
+    private CouponEventItemDetailResponse toItemDetailResponse(
+            CouponEventItem item,
+            CouponEventPhase phase
+    ) {
+        return new CouponEventItemDetailResponse(
+                item.getId(),
+                item.getCouponTypeId(),
+                item.getQuantity(),
+                item.getSuccessCount(),
+                item.getQuantity() - item.getSuccessCount(),
+                phase == null ? null : phase.getId(),
+                phase == null ? null : phase.getPhaseSequence(),
+                phase == null ? null : phase.getOpenOffsetSeconds()
+        );
+    }
+
+    private CouponEventOccurrenceResponse toOccurrenceResponse(
+            CouponEventOccurrence occurrence
+    ) {
+        return new CouponEventOccurrenceResponse(
+                occurrence.getId(),
+                occurrence.getMatchEventId(),
+                occurrence.getSourceEventKey(),
+                occurrence.getGameTimeSeconds(),
+                occurrence.getSourceOccurredAt(),
+                occurrence.getDetectedAt(),
+                occurrence.getOpenedAt(),
+                occurrence.getExpiresAt(),
+                occurrence.getClosedAt(),
+                occurrence.getOccurrenceStatus(),
+                occurrence.getCloseReason()
+        );
+    }
+
+    private long totalQuantity(List<CouponEventItem> items) {
+        return items.stream()
+                .mapToLong(CouponEventItem::getQuantity)
+                .sum();
+    }
+
+    private long issuedQuantity(List<CouponEventItem> items) {
+        return items.stream()
+                .mapToLong(CouponEventItem::getSuccessCount)
+                .sum();
+    }
+
+    private void validateListCondition(Long cursor, int size) {
+        if (cursor != null && cursor <= 0) {
+            invalid("커서는 양수여야 합니다.");
+        }
+        if (size < 1 || size > 100) {
+            invalid("목록 크기는 1개 이상 100개 이하여야 합니다.");
+        }
     }
 
     private List<CouponEventItemCreateResponse> saveItemsAndPhases(

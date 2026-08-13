@@ -22,4 +22,8 @@ public interface CouponEventOccurrenceRepository
             Long couponEventId,
             Long couponEventOccurrenceId
     );
+
+    Optional<CouponEventOccurrence> findFirstByCouponEventIdOrderByIdDesc(
+            Long couponEventId
+    );
 }

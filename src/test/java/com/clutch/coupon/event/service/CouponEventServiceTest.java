@@ -2,15 +2,19 @@ package com.clutch.coupon.event.service;
 
 import com.clutch.coupon.event.api.dto.CouponEventCreateRequest;
 import com.clutch.coupon.event.api.dto.CouponEventCreateResponse;
+import com.clutch.coupon.event.api.dto.CouponEventDetailResponse;
 import com.clutch.coupon.event.api.dto.CouponEventItemCreateRequest;
+import com.clutch.coupon.event.api.dto.CouponEventListResponse;
 import com.clutch.coupon.event.domain.CouponEvent;
 import com.clutch.coupon.event.domain.CouponEventItem;
 import com.clutch.coupon.event.domain.CouponEventOpenMode;
 import com.clutch.coupon.event.domain.CouponEventPhase;
+import com.clutch.coupon.event.domain.CouponEventStatus;
 import com.clutch.coupon.event.domain.CouponIssueMode;
 import com.clutch.coupon.event.exception.CouponEventErrorCode;
 import com.clutch.coupon.event.exception.CouponEventException;
 import com.clutch.coupon.event.repository.CouponEventItemRepository;
+import com.clutch.coupon.event.repository.CouponEventOccurrenceRepository;
 import com.clutch.coupon.event.repository.CouponEventPhaseRepository;
 import com.clutch.coupon.event.repository.CouponEventRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,8 +23,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.SliceImpl;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -43,6 +50,9 @@ class CouponEventServiceTest {
     @Mock
     private CouponEventPhaseRepository couponEventPhaseRepository;
 
+    @Mock
+    private CouponEventOccurrenceRepository couponEventOccurrenceRepository;
+
     private CouponEventService couponEventService;
 
     @BeforeEach
@@ -50,8 +60,92 @@ class CouponEventServiceTest {
         couponEventService = new CouponEventService(
                 couponEventRepository,
                 couponEventItemRepository,
-                couponEventPhaseRepository
+                couponEventPhaseRepository,
+                couponEventOccurrenceRepository
         );
+    }
+
+    @Test
+    void 이벤트_목록을_커서와_수량_정보로_조회한다() {
+        CouponEvent first = withId(gameTriggeredEvent("첫 이벤트"), 3L);
+        CouponEvent second = withId(gameTriggeredEvent("두 번째 이벤트"), 2L);
+        CouponEventItem firstItem = withId(
+                CouponEventItem.create(3L, 1L, 5_000),
+                30L
+        );
+        ReflectionTestUtils.setField(firstItem, "successCount", 1_200);
+
+        when(couponEventRepository.findByEventStatusOrderByIdDesc(
+                CouponEventStatus.READY,
+                PageRequest.of(0, 2)
+        )).thenReturn(new SliceImpl<>(
+                List.of(first, second),
+                PageRequest.of(0, 2),
+                true
+        ));
+        when(couponEventItemRepository.findAllByCouponEventIdIn(
+                List.of(3L, 2L)
+        )).thenReturn(List.of(firstItem));
+
+        CouponEventListResponse response = couponEventService.findAll(
+                CouponEventStatus.READY,
+                null,
+                2
+        );
+
+        assertThat(response.events()).hasSize(2);
+        assertThat(response.nextCursor()).isEqualTo(2L);
+        assertThat(response.hasNext()).isTrue();
+        assertThat(response.events().getFirst().totalQuantity())
+                .isEqualTo(5_000);
+        assertThat(response.events().getFirst().remainingQuantity())
+                .isEqualTo(3_800);
+    }
+
+    @Test
+    void 이벤트_상세에서_단계별_발급과_잔여_수량을_조회한다() {
+        CouponEvent event = withId(gameTriggeredEvent("펜타킬 이벤트"), 1L);
+        CouponEventItem item = withId(
+                CouponEventItem.create(1L, 10L, 5_000),
+                20L
+        );
+        ReflectionTestUtils.setField(item, "successCount", 1_500);
+        CouponEventPhase phase = withId(
+                CouponEventPhase.create(1L, 20L, 1, 0),
+                30L
+        );
+
+        when(couponEventRepository.findById(1L))
+                .thenReturn(Optional.of(event));
+        when(couponEventItemRepository.findAllByCouponEventId(1L))
+                .thenReturn(List.of(item));
+        when(couponEventPhaseRepository
+                .findAllByCouponEventIdOrderByOpenOffsetSecondsAsc(1L))
+                .thenReturn(List.of(phase));
+        when(couponEventOccurrenceRepository
+                .findFirstByCouponEventIdOrderByIdDesc(1L))
+                .thenReturn(Optional.empty());
+
+        CouponEventDetailResponse response = couponEventService.findById(1L);
+
+        assertThat(response.totalQuantity()).isEqualTo(5_000);
+        assertThat(response.issuedQuantity()).isEqualTo(1_500);
+        assertThat(response.remainingQuantity()).isEqualTo(3_500);
+        assertThat(response.items().getFirst().phaseSequence()).isEqualTo(1);
+        assertThat(response.latestOccurrence()).isNull();
+    }
+
+    @Test
+    void 존재하지_않는_이벤트_상세는_조회할_수_없다() {
+        when(couponEventRepository.findById(999L))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> couponEventService.findById(999L))
+                .isInstanceOfSatisfying(
+                        CouponEventException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(CouponEventErrorCode.COUPON_EVENT_NOT_FOUND)
+                );
     }
 
     @Test
@@ -138,6 +232,18 @@ class CouponEventServiceTest {
                         new CouponEventItemCreateRequest(2L, 2_500, 30),
                         new CouponEventItemCreateRequest(3L, 1_000, 60)
                 )
+        );
+    }
+
+    private CouponEvent gameTriggeredEvent(String eventName) {
+        return CouponEvent.create(
+                1L,
+                eventName,
+                CouponEventOpenMode.GAME_TRIGGERED,
+                CouponIssueMode.PHASED_FIRST_COME,
+                "PENTA_KILL",
+                90,
+                null
         );
     }
 
