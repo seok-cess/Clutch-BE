@@ -2,6 +2,12 @@
 
 Java 21과 Spring Boot 기반 프로젝트입니다. 팀원 모두가 같은 MySQL, Redis, Kafka 환경을 사용할 수 있도록 Docker Compose로 로컬 개발환경을 관리합니다.
 
+## 개발 문서
+
+- AI 공통 개발 규칙: [`AGENTS.md`](AGENTS.md)
+- 확정된 기술 문서: [`docs/README.md`](docs/README.md)
+- Claude Code 연결 파일: [`CLAUDE.md`](CLAUDE.md)
+
 ## Docker 구성
 
 이 프로젝트에서 사용하는 컨테이너는 다음과 같습니다.

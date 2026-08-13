@@ -1,3 +1,15 @@
+* text=auto eol=crlf
+
+# Linux/macOS에서 직접 실행되는 스크립트는 LF를 유지한다.
 /gradlew text eol=lf
+*.sh text eol=lf
+*.bash text eol=lf
+*.zsh text eol=lf
+
+# Windows 실행 파일은 CRLF를 사용한다.
 *.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# 바이너리 파일은 줄바꿈 변환 대상에서 제외한다.
 *.jar binary
