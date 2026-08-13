@@ -3,8 +3,9 @@ package com.clutch.watch.api;
 import com.clutch.watch.api.handler.WatchExceptionHandler;
 import com.clutch.watch.exception.WatchError;
 import com.clutch.watch.exception.WatchException;
-import com.clutch.watch.redis.HeartbeatResult;
 import com.clutch.watch.service.service.WatchSessionService;
+import com.clutch.watch.service.dto.WatchHeartbeatResult;
+import com.clutch.watch.service.dto.WatchRewardState;
 import com.clutch.watch.service.dto.WatchSessionStartResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -105,20 +106,30 @@ class WatchSessionControllerTest {
     }
 
     /**
-     * 정상 Heartbeat가 body 없는 204 응답을 반환하는지 검증한다.
+     * 정상 Heartbeat가 현재 포인트 수령 상태를 반환하는지 검증한다.
      *
      * @throws Exception MockMvc 요청 처리에 실패한 경우
      */
     @Test
     void acceptsHeartbeat() throws Exception {
         when(watchSessionService.heartbeat(USER_ID, SESSION_KEY, 1L))
-                .thenReturn(HeartbeatResult.SUCCESS);
+                .thenReturn(new WatchHeartbeatResult(
+                        WatchRewardState.CLAIMABLE,
+                        1L,
+                        300L,
+                        0L,
+                        100L
+                ));
 
         mockMvc.perform(post("/api/users/{userId}/watch-sessions/{sessionKey}/heartbeat", USER_ID, SESSION_KEY)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"sequence\":1}"))
-                .andExpect(status().isNoContent())
-                .andExpect(content().string(""));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.rewardState").value("CLAIMABLE"))
+                .andExpect(jsonPath("$.rewardSequence").value(1))
+                .andExpect(jsonPath("$.accumulatedSeconds").value(300))
+                .andExpect(jsonPath("$.remainingSeconds").value(0))
+                .andExpect(jsonPath("$.rewardPoint").value(100));
 
         verify(watchSessionService).heartbeat(USER_ID, SESSION_KEY, 1L);
     }
@@ -134,11 +145,12 @@ class WatchSessionControllerTest {
     @ParameterizedTest
     @MethodSource("heartbeatErrors")
     void convertsHeartbeatFailureToApiError(
-            HeartbeatResult result,
+            WatchError error,
             int expectedStatus,
             String expectedCode
     ) throws Exception {
-        when(watchSessionService.heartbeat(USER_ID, SESSION_KEY, 1L)).thenReturn(result);
+        when(watchSessionService.heartbeat(USER_ID, SESSION_KEY, 1L))
+                .thenThrow(new WatchException(error));
 
         mockMvc.perform(post("/api/users/{userId}/watch-sessions/{sessionKey}/heartbeat", USER_ID, SESSION_KEY)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -214,12 +226,12 @@ class WatchSessionControllerTest {
      */
     private static Stream<Arguments> heartbeatErrors() {
         return Stream.of(
-                Arguments.of(HeartbeatResult.SWITCHING, 409, "WATCH_SESSION_SWITCHING"),
-                Arguments.of(HeartbeatResult.REPLACED, 409, "WATCH_SESSION_REPLACED"),
-                Arguments.of(HeartbeatResult.EXPIRED, 410, "WATCH_SESSION_EXPIRED"),
-                Arguments.of(HeartbeatResult.SESSION_NOT_FOUND, 404, "WATCH_SESSION_NOT_FOUND"),
-                Arguments.of(HeartbeatResult.USER_MISMATCH, 403, "WATCH_SESSION_USER_MISMATCH"),
-                Arguments.of(HeartbeatResult.INVALID_SEQUENCE, 409, "INVALID_HEARTBEAT_SEQUENCE")
+                Arguments.of(WatchError.WATCH_SESSION_SWITCHING, 409, "WATCH_SESSION_SWITCHING"),
+                Arguments.of(WatchError.WATCH_SESSION_REPLACED, 409, "WATCH_SESSION_REPLACED"),
+                Arguments.of(WatchError.WATCH_SESSION_EXPIRED, 410, "WATCH_SESSION_EXPIRED"),
+                Arguments.of(WatchError.WATCH_SESSION_NOT_FOUND, 404, "WATCH_SESSION_NOT_FOUND"),
+                Arguments.of(WatchError.WATCH_SESSION_USER_MISMATCH, 403, "WATCH_SESSION_USER_MISMATCH"),
+                Arguments.of(WatchError.INVALID_HEARTBEAT_SEQUENCE, 409, "INVALID_HEARTBEAT_SEQUENCE")
         );
     }
 }

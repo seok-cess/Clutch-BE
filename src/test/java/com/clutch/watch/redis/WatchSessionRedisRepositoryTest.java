@@ -82,6 +82,7 @@ class WatchSessionRedisRepositoryTest {
         assertThat(snapshot.lastSeen()).isEqualTo(1_000_000L);
         assertThat(snapshot.eligibleMilliseconds()).isZero();
         assertThat(snapshot.sequence()).isZero();
+        assertThat(snapshot.rewardSequence()).isEqualTo(1L);
         assertThat(ttlMillis("watch:alive:100:session-1")).isPositive();
         assertThat(ttlMillis("watch:active:100")).isPositive();
         assertThat(ttlMillis("watch:session:session-1")).isPositive();
@@ -94,16 +95,94 @@ class WatchSessionRedisRepositoryTest {
     void accumulatesEligibleMillisecondsOnHeartbeat() {
         repository.initialize(100L, 200L, "session-1", 1_000_000L);
 
-        HeartbeatResult result = repository.heartbeat(100L, "session-1", 1L, 1_030_000L);
+        HeartbeatProcessingResult result = repository.heartbeat(
+                100L, "session-1", 1L, 1_030_000L);
         WatchSessionSnapshot snapshot = repository.findSession("session-1").orElseThrow();
 
-        assertThat(result).isEqualTo(HeartbeatResult.SUCCESS);
+        assertThat(result.status()).isEqualTo(HeartbeatResult.SUCCESS);
+        assertThat(result.eligibleMilliseconds()).isEqualTo(30_000L);
+        assertThat(result.rewardSequence()).isEqualTo(1L);
         assertThat(snapshot.lastSeen()).isEqualTo(1_030_000L);
         assertThat(snapshot.eligibleMilliseconds()).isEqualTo(30_000L);
         assertThat(snapshot.sequence()).isEqualTo(1L);
+        assertThat(snapshot.rewardSequence()).isEqualTo(1L);
         assertThat(ttlMillis("watch:alive:100:session-1"))
                 .isLessThanOrEqualTo(90_000L)
                 .isGreaterThan(85_000L);
+    }
+
+    @Test
+    void capsAccumulationAtClaimInterval() {
+        repository.initialize(100L, 200L, "session-1", 1_000_000L);
+        for (long sequence = 1L; sequence <= 4L; sequence++) {
+            repository.heartbeat(
+                    100L,
+                    "session-1",
+                    sequence,
+                    1_000_000L + (sequence * 60_000L)
+            );
+        }
+
+        HeartbeatProcessingResult result = repository.heartbeat(
+                100L,
+                "session-1",
+                5L,
+                1_300_000L
+        );
+
+        assertThat(result.status()).isEqualTo(HeartbeatResult.SUCCESS);
+        assertThat(result.eligibleMilliseconds()).isEqualTo(300_000L);
+        assertThat(repository.findSession("session-1").orElseThrow().eligibleMilliseconds())
+                .isEqualTo(300_000L);
+    }
+
+    @Test
+    void capsHeartbeatThatOvershootsClaimInterval() {
+        repository.initialize(100L, 200L, "session-1", 1_000_000L);
+        redisTemplate.opsForHash().put(
+                "watch:session:session-1",
+                "eligibleMilliseconds",
+                "299000"
+        );
+
+        HeartbeatProcessingResult result = repository.heartbeat(
+                100L,
+                "session-1",
+                1L,
+                1_030_000L
+        );
+
+        assertThat(result.eligibleMilliseconds()).isEqualTo(300_000L);
+        assertThat(repository.findSession("session-1").orElseThrow().eligibleMilliseconds())
+                .isEqualTo(300_000L);
+    }
+
+    @Test
+    void keepsHeartbeatAliveWithoutAccumulatingWhileRewardIsClaimable() {
+        repository.initialize(100L, 200L, "session-1", 1_000_000L);
+        for (long sequence = 1L; sequence <= 5L; sequence++) {
+            repository.heartbeat(
+                    100L,
+                    "session-1",
+                    sequence,
+                    1_000_000L + (sequence * 60_000L)
+            );
+        }
+
+        HeartbeatProcessingResult result = repository.heartbeat(
+                100L,
+                "session-1",
+                6L,
+                1_360_000L
+        );
+        WatchSessionSnapshot snapshot = repository.findSession("session-1").orElseThrow();
+
+        assertThat(result.eligibleMilliseconds()).isEqualTo(300_000L);
+        assertThat(result.rewardSequence()).isEqualTo(1L);
+        assertThat(snapshot.lastSeen()).isEqualTo(1_360_000L);
+        assertThat(snapshot.sequence()).isEqualTo(6L);
+        assertThat(snapshot.eligibleMilliseconds()).isEqualTo(300_000L);
+        assertThat(ttlMillis("watch:alive:100:session-1")).isPositive();
     }
 
     /**
@@ -129,6 +208,7 @@ class WatchSessionRedisRepositoryTest {
         assertThat(redisTemplate.hasKey("watch:alive:100:session-1")).isFalse();
         assertThat(redisTemplate.hasKey("watch:alive:100:session-2")).isTrue();
         assertThat(repository.heartbeat(100L, "session-1", 2L, 1_060_000L))
+                .extracting(HeartbeatProcessingResult::status)
                 .isEqualTo(HeartbeatResult.REPLACED);
     }
 
@@ -140,10 +220,11 @@ class WatchSessionRedisRepositoryTest {
         repository.initialize(100L, 200L, "session-1", 1_000_000L);
         repository.heartbeat(100L, "session-1", 1L, 1_030_000L);
 
-        HeartbeatResult result = repository.heartbeat(100L, "session-1", 1L, 1_060_000L);
+        HeartbeatProcessingResult result = repository.heartbeat(
+                100L, "session-1", 1L, 1_060_000L);
         WatchSessionSnapshot snapshot = repository.findSession("session-1").orElseThrow();
 
-        assertThat(result).isEqualTo(HeartbeatResult.INVALID_SEQUENCE);
+        assertThat(result.status()).isEqualTo(HeartbeatResult.INVALID_SEQUENCE);
         assertThat(snapshot.lastSeen()).isEqualTo(1_030_000L);
         assertThat(snapshot.eligibleMilliseconds()).isEqualTo(30_000L);
         assertThat(snapshot.sequence()).isEqualTo(1L);
@@ -156,10 +237,11 @@ class WatchSessionRedisRepositoryTest {
     void doesNotAccumulateIntervalOverMaximum() {
         repository.initialize(100L, 200L, "session-1", 1_000_000L);
 
-        HeartbeatResult result = repository.heartbeat(100L, "session-1", 1L, 1_060_001L);
+        HeartbeatProcessingResult result = repository.heartbeat(
+                100L, "session-1", 1L, 1_060_001L);
         WatchSessionSnapshot snapshot = repository.findSession("session-1").orElseThrow();
 
-        assertThat(result).isEqualTo(HeartbeatResult.SUCCESS);
+        assertThat(result.status()).isEqualTo(HeartbeatResult.SUCCESS);
         assertThat(snapshot.lastSeen()).isEqualTo(1_060_001L);
         assertThat(snapshot.eligibleMilliseconds()).isZero();
         assertThat(snapshot.sequence()).isEqualTo(1L);
@@ -173,9 +255,10 @@ class WatchSessionRedisRepositoryTest {
         repository.initialize(100L, 200L, "session-1", 1_000_000L);
         repository.initialize(100L, 201L, "session-2", 1_010_000L);
 
-        HeartbeatResult result = repository.heartbeat(100L, "session-1", 1L, 1_030_000L);
+        HeartbeatProcessingResult result = repository.heartbeat(
+                100L, "session-1", 1L, 1_030_000L);
 
-        assertThat(result).isEqualTo(HeartbeatResult.REPLACED);
+        assertThat(result.status()).isEqualTo(HeartbeatResult.REPLACED);
         assertThat(repository.findSession("session-1").orElseThrow().eligibleMilliseconds()).isZero();
     }
 
@@ -187,9 +270,10 @@ class WatchSessionRedisRepositoryTest {
         repository.initialize(100L, 200L, "session-1", 1_000_000L);
         repository.deleteAlive(100L, "session-1");
 
-        HeartbeatResult result = repository.heartbeat(100L, "session-1", 1L, 1_030_000L);
+        HeartbeatProcessingResult result = repository.heartbeat(
+                100L, "session-1", 1L, 1_030_000L);
 
-        assertThat(result).isEqualTo(HeartbeatResult.EXPIRED);
+        assertThat(result.status()).isEqualTo(HeartbeatResult.EXPIRED);
         assertThat(redisTemplate.hasKey("watch:alive:100:session-1")).isFalse();
         assertThat(repository.findSession("session-1").orElseThrow().sequence()).isZero();
     }
@@ -204,6 +288,7 @@ class WatchSessionRedisRepositoryTest {
         assertThat(repository.tryAcquireSwitchLock(100L, "token-a")).isTrue();
         assertThat(repository.tryAcquireSwitchLock(100L, "token-b")).isFalse();
         assertThat(repository.heartbeat(100L, "session-1", 1L, 1_030_000L))
+                .extracting(HeartbeatProcessingResult::status)
                 .isEqualTo(HeartbeatResult.SWITCHING);
         assertThat(repository.releaseSwitchLock(100L, "token-b")).isFalse();
         assertThat(repository.releaseSwitchLock(100L, "token-a")).isTrue();
@@ -245,7 +330,8 @@ class WatchSessionRedisRepositoryTest {
                 Duration.ofHours(1),
                 Duration.ofSeconds(10),
                 Duration.ofSeconds(60),
-                10L
+                Duration.ofMinutes(5),
+                100L
         );
     }
 }

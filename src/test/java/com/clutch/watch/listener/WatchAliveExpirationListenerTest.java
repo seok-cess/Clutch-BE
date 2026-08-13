@@ -132,7 +132,8 @@ class WatchAliveExpirationListenerTest {
                 1_000L,
                 61_000L,
                 60_000L,
-                2L
+                2L,
+                1L
         );
     }
 }

@@ -49,7 +49,8 @@ watch:
     session-ttl: ${WATCH_REWARD_SESSION_TTL:1h}
     switch-lock-ttl: ${WATCH_REWARD_SWITCH_LOCK_TTL:10s}
     max-eligible-interval: ${WATCH_REWARD_MAX_ELIGIBLE_INTERVAL:60s}
-    points-per-minute: ${WATCH_REWARD_POINTS_PER_MINUTE:10}
+    claim-interval: ${WATCH_REWARD_CLAIM_INTERVAL:5m}
+    points-per-claim: ${WATCH_REWARD_POINTS_PER_CLAIM:100}
 
 # ---- lolesports 비공식 피드 연동 ----
 lolesports:

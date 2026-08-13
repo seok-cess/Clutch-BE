@@ -7,11 +7,14 @@ import com.clutch.watch.config.WatchRewardProperties;
 import com.clutch.watch.domain.WatchSession;
 import com.clutch.watch.exception.WatchError;
 import com.clutch.watch.exception.WatchException;
+import com.clutch.watch.redis.HeartbeatProcessingResult;
 import com.clutch.watch.redis.HeartbeatResult;
 import com.clutch.watch.redis.SessionKeyReplacementResult;
 import com.clutch.watch.redis.WatchSessionRedisRepository;
 import com.clutch.watch.redis.WatchSessionSnapshot;
 import com.clutch.watch.repository.WatchSessionRepository;
+import com.clutch.watch.service.dto.WatchHeartbeatResult;
+import com.clutch.watch.service.dto.WatchRewardState;
 import com.clutch.watch.service.dto.WatchSessionStartResult;
 import com.clutch.watch.service.service.WatchRewardService;
 import com.clutch.watch.service.service.WatchSessionService;
@@ -286,13 +289,21 @@ class WatchSessionServiceTest {
                 org.mockito.ArgumentMatchers.eq(OLD_SESSION_KEY),
                 org.mockito.ArgumentMatchers.eq(3L),
                 anyLong()
-        )).thenReturn(HeartbeatResult.SUCCESS);
+        )).thenReturn(new HeartbeatProcessingResult(
+                HeartbeatResult.SUCCESS,
+                300_000L,
+                1L
+        ));
         long beforeRequest = System.currentTimeMillis();
 
-        HeartbeatResult result = service.heartbeat(USER_ID, OLD_SESSION_KEY, 3L);
+        WatchHeartbeatResult result = service.heartbeat(USER_ID, OLD_SESSION_KEY, 3L);
 
         long afterRequest = System.currentTimeMillis();
-        assertThat(result).isEqualTo(HeartbeatResult.SUCCESS);
+        assertThat(result.rewardState()).isEqualTo(WatchRewardState.CLAIMABLE);
+        assertThat(result.rewardSequence()).isEqualTo(1L);
+        assertThat(result.accumulatedSeconds()).isEqualTo(300L);
+        assertThat(result.remainingSeconds()).isZero();
+        assertThat(result.rewardPoint()).isEqualTo(100L);
         ArgumentCaptor<Long> serverTime = ArgumentCaptor.forClass(Long.class);
         verify(watchSessionRedisRepository).heartbeat(
                 org.mockito.ArgumentMatchers.eq(USER_ID),
@@ -303,17 +314,46 @@ class WatchSessionServiceTest {
         assertThat(serverTime.getValue()).isBetween(beforeRequest, afterRequest);
     }
 
+    @Test
+    void returnsAccumulatingStateBeforeFiveMinutes() {
+        WatchSessionSnapshot snapshot = oldSnapshot();
+        when(watchSessionRedisRepository.findSession(OLD_SESSION_KEY))
+                .thenReturn(Optional.of(snapshot));
+        when(watchSessionRedisRepository.findActiveSessionKey(USER_ID))
+                .thenReturn(Optional.of(OLD_SESSION_KEY));
+        when(esportsMatchRepository.findById(snapshot.matchId()))
+                .thenReturn(Optional.of(inProgressMatch()));
+        when(watchSessionRedisRepository.heartbeat(
+                org.mockito.ArgumentMatchers.eq(USER_ID),
+                org.mockito.ArgumentMatchers.eq(OLD_SESSION_KEY),
+                org.mockito.ArgumentMatchers.eq(3L),
+                anyLong()
+        )).thenReturn(new HeartbeatProcessingResult(
+                HeartbeatResult.SUCCESS,
+                299_000L,
+                1L
+        ));
+
+        WatchHeartbeatResult result = service.heartbeat(USER_ID, OLD_SESSION_KEY, 3L);
+
+        assertThat(result.rewardState()).isEqualTo(WatchRewardState.ACCUMULATING);
+        assertThat(result.accumulatedSeconds()).isEqualTo(299L);
+        assertThat(result.remainingSeconds()).isEqualTo(1L);
+        assertThat(result.rewardPoint()).isEqualTo(100L);
+    }
+
     /**
      * Redis session Hash가 없으면 heartbeat를 실행하지 않고 세션 없음 결과를 반환하는지 검증한다.
      */
     @Test
-    void returnsSessionNotFoundWhenRedisSessionIsMissing() {
+    void rejectsHeartbeatWhenRedisSessionIsMissing() {
         when(watchSessionRedisRepository.findActiveSessionKey(USER_ID)).thenReturn(Optional.empty());
         when(watchSessionRedisRepository.findSession(OLD_SESSION_KEY)).thenReturn(Optional.empty());
 
-        HeartbeatResult result = service.heartbeat(USER_ID, OLD_SESSION_KEY, 1L);
-
-        assertThat(result).isEqualTo(HeartbeatResult.SESSION_NOT_FOUND);
+        assertWatchError(
+                () -> service.heartbeat(USER_ID, OLD_SESSION_KEY, 1L),
+                WatchError.WATCH_SESSION_NOT_FOUND
+        );
         verify(esportsMatchRepository, never()).findById(anyLong());
         verify(watchSessionRedisRepository, never())
                 .heartbeat(anyLong(), anyString(), anyLong(), anyLong());
@@ -414,7 +454,8 @@ class WatchSessionServiceTest {
                 1_000L,
                 61_000L,
                 60_000L,
-                2L
+                2L,
+                1L
         );
     }
 
@@ -426,7 +467,8 @@ class WatchSessionServiceTest {
                 1_000L,
                 61_000L,
                 60_000L,
-                2L
+                2L,
+                1L
         );
     }
 
@@ -443,7 +485,8 @@ class WatchSessionServiceTest {
                 Duration.ofHours(1),
                 Duration.ofSeconds(10),
                 Duration.ofSeconds(60),
-                10L
+                Duration.ofMinutes(5),
+                100L
         );
     }
 

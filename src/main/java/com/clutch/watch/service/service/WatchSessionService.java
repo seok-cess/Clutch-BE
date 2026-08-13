@@ -7,11 +7,14 @@ import com.clutch.watch.config.WatchRewardProperties;
 import com.clutch.watch.domain.WatchSession;
 import com.clutch.watch.exception.WatchError;
 import com.clutch.watch.exception.WatchException;
+import com.clutch.watch.redis.HeartbeatProcessingResult;
 import com.clutch.watch.redis.HeartbeatResult;
 import com.clutch.watch.redis.SessionKeyReplacementResult;
 import com.clutch.watch.redis.WatchSessionRedisRepository;
 import com.clutch.watch.redis.WatchSessionSnapshot;
 import com.clutch.watch.repository.WatchSessionRepository;
+import com.clutch.watch.service.dto.WatchHeartbeatResult;
+import com.clutch.watch.service.dto.WatchRewardState;
 import com.clutch.watch.service.dto.WatchSessionStartResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -73,30 +76,67 @@ public class WatchSessionService {
      * @param userId heartbeat를 보낸 사용자 ID
      * @param sessionKey heartbeat 대상 시청 세션 외부 식별자
      * @param sequence 프론트엔드가 이전 값보다 증가시킨 heartbeat 순번
-     * @return Redis에서 처리한 heartbeat 결과
+     * @return heartbeat 처리 후 현재 회차의 포인트 수령 상태
      * @throws WatchException Redis 세션의 경기가 없거나 현재 시청 가능한 상태가 아닌 경우
      */
     @Transactional(readOnly = true)
-    public HeartbeatResult heartbeat(long userId, String sessionKey, long sequence) {
+    public WatchHeartbeatResult heartbeat(long userId, String sessionKey, long sequence) {
         String activeSessionKey = watchSessionRedisRepository.findActiveSessionKey(userId)
                 .orElse(null);
         if (activeSessionKey != null && !activeSessionKey.equals(sessionKey)) {
-            return HeartbeatResult.REPLACED;
+            throw new WatchException(WatchError.WATCH_SESSION_REPLACED);
         }
 
         WatchSessionSnapshot snapshot = watchSessionRedisRepository.findSession(sessionKey)
-                .orElse(null);
-        if (snapshot == null) {
-            return HeartbeatResult.SESSION_NOT_FOUND;
-        }
+                .orElseThrow(() -> new WatchException(WatchError.WATCH_SESSION_NOT_FOUND));
 
         validateMatch(snapshot.matchId());
-        return watchSessionRedisRepository.heartbeat(
+        HeartbeatProcessingResult result = watchSessionRedisRepository.heartbeat(
                 userId,
                 sessionKey,
                 sequence,
                 Instant.now().toEpochMilli()
         );
+        if (result.status() != HeartbeatResult.SUCCESS) {
+            throw new WatchException(toError(result.status()));
+        }
+        return toHeartbeatResult(result);
+    }
+
+    private WatchHeartbeatResult toHeartbeatResult(HeartbeatProcessingResult result) {
+        long claimIntervalMillis = properties.claimInterval().toMillis();
+        long eligibleMilliseconds = Math.min(
+                result.eligibleMilliseconds(),
+                claimIntervalMillis
+        );
+        long remainingMilliseconds = claimIntervalMillis - eligibleMilliseconds;
+        WatchRewardState rewardState = remainingMilliseconds == 0L
+                ? WatchRewardState.CLAIMABLE
+                : WatchRewardState.ACCUMULATING;
+
+        return new WatchHeartbeatResult(
+                rewardState,
+                result.rewardSequence(),
+                eligibleMilliseconds / 1_000L,
+                ceilSeconds(remainingMilliseconds),
+                properties.pointsPerClaim()
+        );
+    }
+
+    private long ceilSeconds(long milliseconds) {
+        return milliseconds == 0L ? 0L : ((milliseconds - 1L) / 1_000L) + 1L;
+    }
+
+    private WatchError toError(HeartbeatResult result) {
+        return switch (result) {
+            case SWITCHING -> WatchError.WATCH_SESSION_SWITCHING;
+            case REPLACED -> WatchError.WATCH_SESSION_REPLACED;
+            case EXPIRED -> WatchError.WATCH_SESSION_EXPIRED;
+            case SESSION_NOT_FOUND -> WatchError.WATCH_SESSION_NOT_FOUND;
+            case USER_MISMATCH -> WatchError.WATCH_SESSION_USER_MISMATCH;
+            case INVALID_SEQUENCE -> WatchError.INVALID_HEARTBEAT_SEQUENCE;
+            case SUCCESS -> throw new WatchException(WatchError.HEARTBEAT_SUCCESS_MAPPING);
+        };
     }
 
     /**

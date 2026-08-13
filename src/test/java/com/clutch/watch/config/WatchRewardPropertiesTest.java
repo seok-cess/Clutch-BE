@@ -23,6 +23,7 @@ class WatchRewardPropertiesTest {
                 null,
                 null,
                 null,
+                null,
                 0
         );
 
@@ -32,7 +33,8 @@ class WatchRewardPropertiesTest {
         assertThat(properties.sessionTtl()).isEqualTo(Duration.ofHours(1));
         assertThat(properties.switchLockTtl()).isEqualTo(Duration.ofSeconds(10));
         assertThat(properties.maxEligibleInterval()).isEqualTo(Duration.ofSeconds(60));
-        assertThat(properties.pointsPerMinute()).isEqualTo(10L);
+        assertThat(properties.claimInterval()).isEqualTo(Duration.ofMinutes(5));
+        assertThat(properties.pointsPerClaim()).isEqualTo(100L);
     }
 
     /**
@@ -47,7 +49,8 @@ class WatchRewardPropertiesTest {
                 Duration.ofHours(1),
                 Duration.ofSeconds(10),
                 Duration.ofSeconds(60),
-                10
+                Duration.ofMinutes(5),
+                100
         ))
                 .isInstanceOf(WatchException.class)
                 .hasMessage("Alive TTL은 heartbeat 주기보다 길어야 합니다.");
@@ -88,7 +91,8 @@ class WatchRewardPropertiesTest {
     ) {
         return new WatchRewardProperties(
                 heartbeat, alive, active, session,
-                Duration.ofSeconds(10), Duration.ofSeconds(60), 10L
+                Duration.ofSeconds(10), Duration.ofSeconds(60),
+                Duration.ofMinutes(5), 100L
         );
     }
 

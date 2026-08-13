@@ -58,12 +58,14 @@ final class WatchRedisScripts {
      *     <li>{@code ARGV[3]}: 요청 heartbeat sequence</li>
      *     <li>{@code ARGV[4]}: 서버 heartbeat 수신 시각(epoch milliseconds)</li>
      *     <li>{@code ARGV[5]}: 한 번에 적립할 최대 heartbeat 간격(milliseconds)</li>
-     *     <li>{@code ARGV[6]}: Alive TTL(milliseconds)</li>
-     *     <li>{@code ARGV[7]}: Active TTL(milliseconds)</li>
-     *     <li>{@code ARGV[8]}: Session TTL(milliseconds)</li>
+     *     <li>{@code ARGV[6]}: 수령 가능 상태가 되는 누적시간(milliseconds)</li>
+     *     <li>{@code ARGV[7]}: Alive TTL(milliseconds)</li>
+     *     <li>{@code ARGV[8]}: Active TTL(milliseconds)</li>
+     *     <li>{@code ARGV[9]}: Session TTL(milliseconds)</li>
      * </ul>
      *
-     * <p>반환값은 {@link HeartbeatResult} enum 이름과 일치한다.</p>
+     * <p>성공 시 {@code SUCCESS:eligibleMilliseconds:rewardSequence}, 실패 시
+     * {@link HeartbeatResult} enum 이름을 반환한다.</p>
      * <ul>
      *     <li>{@code SUCCESS}: 시간 및 TTL 갱신 성공</li>
      *     <li>{@code SWITCHING}: 세션 전환 lock이 존재함</li>
@@ -114,20 +116,27 @@ final class WatchRedisScripts {
             local eligibleMilliseconds = tonumber(redis.call('HGET', KEYS[4], 'eligibleMilliseconds')) or 0
             local deltaMillis = nowMillis - previousLastSeen
 
-            if deltaMillis > 0 and deltaMillis <= tonumber(ARGV[5]) then
-                eligibleMilliseconds = eligibleMilliseconds + deltaMillis
+            local claimIntervalMillis = tonumber(ARGV[6])
+            if eligibleMilliseconds < claimIntervalMillis
+                    and deltaMillis > 0 and deltaMillis <= tonumber(ARGV[5]) then
+                eligibleMilliseconds = math.min(
+                        eligibleMilliseconds + deltaMillis,
+                        claimIntervalMillis)
             end
+
+            local rewardSequence = tonumber(redis.call('HGET', KEYS[4], 'rewardSequence')) or 1
 
             -- 정상 heartbeat 상태와 세 Redis 키의 TTL을 함께 갱신한다.
             redis.call('HSET', KEYS[4],
                     'lastSeen', ARGV[4],
                     'eligibleMilliseconds', tostring(eligibleMilliseconds),
                     'sequence', ARGV[3])
-            redis.call('PEXPIRE', KEYS[3], ARGV[6])
-            redis.call('PEXPIRE', KEYS[2], ARGV[7])
-            redis.call('PEXPIRE', KEYS[4], ARGV[8])
+            redis.call('PEXPIRE', KEYS[3], ARGV[7])
+            redis.call('PEXPIRE', KEYS[2], ARGV[8])
+            redis.call('PEXPIRE', KEYS[4], ARGV[9])
 
-            return 'SUCCESS'
+            return 'SUCCESS:' .. tostring(eligibleMilliseconds)
+                    .. ':' .. tostring(rewardSequence)
             """, String.class);
 
     /**

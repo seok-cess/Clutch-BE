@@ -90,6 +90,7 @@ class WatchRedisErrorTest {
         fields.put("lastSeen", "31000");
         fields.put("eligibleMilliseconds", "30000");
         fields.put("sequence", "1");
+        fields.put("rewardSequence", "1");
         return fields;
     }
 
@@ -101,7 +102,8 @@ class WatchRedisErrorTest {
     private WatchRewardProperties properties() {
         return new WatchRewardProperties(
                 Duration.ofSeconds(30), Duration.ofSeconds(90), Duration.ofSeconds(120),
-                Duration.ofHours(1), Duration.ofSeconds(10), Duration.ofSeconds(60), 10L
+                Duration.ofHours(1), Duration.ofSeconds(10), Duration.ofSeconds(60),
+                Duration.ofMinutes(5), 100L
         );
     }
 

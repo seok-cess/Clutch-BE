@@ -39,7 +39,8 @@ public class WatchSessionRedisRepository {
                 "enteredAt", Long.toString(enteredAt),
                 "lastSeen", Long.toString(enteredAt),
                 "eligibleMilliseconds", "0",
-                "sequence", "0"
+                "sequence", "0",
+                "rewardSequence", "1"
         ));
         redisTemplate.expire(sessionRedisKey, properties.sessionTtl());
         redisTemplate.opsForValue().set(
@@ -89,7 +90,7 @@ public class WatchSessionRedisRepository {
      * @return heartbeat 처리 결과
      * @throws WatchException Lua 스크립트 결과가 없거나 정의되지 않은 경우
      */
-    public HeartbeatResult heartbeat(
+    public HeartbeatProcessingResult heartbeat(
             long userId,
             String sessionKey,
             long sequence,
@@ -108,6 +109,7 @@ public class WatchSessionRedisRepository {
                 Long.toString(sequence),
                 Long.toString(nowMillis),
                 Long.toString(properties.maxEligibleInterval().toMillis()),
+                Long.toString(properties.claimInterval().toMillis()),
                 Long.toString(properties.aliveTtl().toMillis()),
                 Long.toString(properties.activeTtl().toMillis()),
                 Long.toString(properties.sessionTtl().toMillis())
@@ -115,7 +117,7 @@ public class WatchSessionRedisRepository {
         if (result == null) {
             throw new WatchException(WatchError.HEARTBEAT_RESULT_MISSING);
         }
-        return HeartbeatResult.from(result);
+        return HeartbeatProcessingResult.from(result);
     }
 
     /**

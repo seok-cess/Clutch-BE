@@ -202,7 +202,7 @@ class WatchRewardFlowIntegrationTest {
         assertThat(snapshot.eligibleMilliseconds()).isEqualTo(60_000L);
         assertThat(watchSessionRedisRepository.findSession(firstSessionKey)).isEmpty();
         heartbeat(user.getId(), firstSessionKey, 1L, 409, "WATCH_SESSION_REPLACED");
-        heartbeat(user.getId(), secondSessionKey, 1L, 204, null);
+        heartbeat(user.getId(), secondSessionKey, 1L, 200, null);
     }
 
     /**
@@ -296,7 +296,7 @@ class WatchRewardFlowIntegrationTest {
         EsportsMatch match = saveMatch("inProgress");
         String sessionKey = startSession(user.getId(), match.getId());
 
-        heartbeat(user.getId(), sessionKey, 1L, 204, null);
+        heartbeat(user.getId(), sessionKey, 1L, 200, null);
         heartbeat(user.getId(), sessionKey, 1L, 409, "INVALID_HEARTBEAT_SEQUENCE");
 
         assertThat(watchSessionRedisRepository.tryAcquireSwitchLock(user.getId(), "integration-lock")).isTrue();
@@ -452,7 +452,8 @@ class WatchRewardFlowIntegrationTest {
                 "enteredAt", Long.toString(snapshot.enteredAt()),
                 "lastSeen", Long.toString(snapshot.lastSeen()),
                 "eligibleMilliseconds", Long.toString(snapshot.eligibleMilliseconds()),
-                "sequence", Long.toString(snapshot.sequence())
+                "sequence", Long.toString(snapshot.sequence()),
+                "rewardSequence", Long.toString(snapshot.rewardSequence())
         );
     }
 
