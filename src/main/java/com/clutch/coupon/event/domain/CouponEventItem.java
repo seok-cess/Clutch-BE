@@ -56,6 +56,18 @@ public class CouponEventItem {
     private int successCount;
 
     /**
+     * 활성 시작 초
+     */
+    @Column(name = "available_from_seconds", nullable = false)
+    private int availableFromSeconds;
+
+    /**
+     * 활성 종료 초
+     */
+    @Column(name = "available_until_seconds", nullable = false)
+    private int availableUntilSeconds;
+
+    /**
      * 생성 시각
      */
     @CreationTimestamp
@@ -68,6 +80,17 @@ public class CouponEventItem {
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
+
+    /**
+     * 활성 시간 포함 여부
+     *
+     * @param elapsedSeconds 회차 시작 후 경과 초
+     * @return 활성 시간 포함 여부
+     */
+    public boolean isAvailableAt(long elapsedSeconds) {
+        return availableFromSeconds <= elapsedSeconds
+                && elapsedSeconds < availableUntilSeconds;
+    }
 
     /**
      * 잔여 수량 존재 여부
@@ -87,5 +110,6 @@ public class CouponEventItem {
         }
 
         successCount++;
+
     }
 }

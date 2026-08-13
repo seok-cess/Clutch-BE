@@ -64,6 +64,14 @@ public class CouponEvent {
     @Column(name = "claim_window_seconds", nullable = false)
     private int claimWindowSeconds;
 
+
+    /**
+     * 쿠폰 발급 방식
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "issuance_mode", nullable = false, length = 20)
+    private CouponIssuanceMode issuanceMode;
+
     /**
      * 생성 시각
      */
