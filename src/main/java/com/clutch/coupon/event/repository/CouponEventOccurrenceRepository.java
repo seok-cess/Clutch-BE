@@ -26,4 +26,6 @@ public interface CouponEventOccurrenceRepository
     Optional<CouponEventOccurrence> findFirstByCouponEventIdOrderByIdDesc(
             Long couponEventId
     );
+
+    boolean existsByCouponEventId(Long couponEventId);
 }

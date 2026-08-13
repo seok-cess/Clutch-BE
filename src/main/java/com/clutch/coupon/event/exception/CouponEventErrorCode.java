@@ -18,6 +18,10 @@ public enum CouponEventErrorCode {
     COUPON_EVENT_NOT_EDITABLE(
             HttpStatus.CONFLICT,
             "대기 상태의 쿠폰 이벤트만 수정할 수 있습니다."
+    ),
+    COUPON_EVENT_NOT_DELETABLE(
+            HttpStatus.CONFLICT,
+            "발생 또는 발급 이력이 없는 대기 상태의 쿠폰 이벤트만 삭제할 수 있습니다."
     );
 
     private final HttpStatus httpStatus;

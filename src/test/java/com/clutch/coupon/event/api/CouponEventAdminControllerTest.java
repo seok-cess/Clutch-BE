@@ -27,6 +27,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -38,6 +39,32 @@ class CouponEventAdminControllerTest {
 
     @MockitoBean
     private CouponEventService couponEventService;
+
+    @Test
+    void 쿠폰_이벤트를_물리_삭제하면_204를_응답한다() throws Exception {
+        mockMvc.perform(delete(
+                        "/api/v1/admin/coupon-events/{eventId}",
+                        1L
+                ))
+                .andExpect(status().isNoContent());
+
+        verify(couponEventService).delete(1L);
+    }
+
+    @Test
+    void 삭제할_수_없는_이벤트는_409를_응답한다() throws Exception {
+        org.mockito.Mockito.doThrow(new CouponEventException(
+                CouponEventErrorCode.COUPON_EVENT_NOT_DELETABLE
+        )).when(couponEventService).delete(1L);
+
+        mockMvc.perform(delete(
+                        "/api/v1/admin/coupon-events/{eventId}",
+                        1L
+                ))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code")
+                        .value("COUPON_EVENT_NOT_DELETABLE"));
+    }
 
     @Test
     void 쿠폰_이벤트_설정을_수정한다() throws Exception {

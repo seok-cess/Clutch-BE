@@ -19,6 +19,8 @@ import com.clutch.coupon.event.repository.CouponEventItemRepository;
 import com.clutch.coupon.event.repository.CouponEventOccurrenceRepository;
 import com.clutch.coupon.event.repository.CouponEventPhaseRepository;
 import com.clutch.coupon.event.repository.CouponEventRepository;
+import com.clutch.coupon.claim.repository.CouponClaimRequestRepository;
+import com.clutch.wallet.repository.UserCouponRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -57,6 +59,12 @@ class CouponEventServiceTest {
     @Mock
     private CouponEventOccurrenceRepository couponEventOccurrenceRepository;
 
+    @Mock
+    private CouponClaimRequestRepository couponClaimRequestRepository;
+
+    @Mock
+    private UserCouponRepository userCouponRepository;
+
     private CouponEventService couponEventService;
 
     @BeforeEach
@@ -65,8 +73,80 @@ class CouponEventServiceTest {
                 couponEventRepository,
                 couponEventItemRepository,
                 couponEventPhaseRepository,
-                couponEventOccurrenceRepository
+                couponEventOccurrenceRepository,
+                couponClaimRequestRepository,
+                userCouponRepository
         );
+    }
+
+    @Test
+    void 이력이_없는_대기_상태_쿠폰_이벤트를_물리_삭제한다() {
+        CouponEvent event = withId(gameTriggeredEvent("삭제 이벤트"), 1L);
+        when(couponEventRepository.findById(1L))
+                .thenReturn(Optional.of(event));
+        when(couponEventOccurrenceRepository.existsByCouponEventId(1L))
+                .thenReturn(false);
+        when(couponClaimRequestRepository.existsByCouponEventId(1L))
+                .thenReturn(false);
+        when(userCouponRepository.existsByCouponEventId(1L))
+                .thenReturn(false);
+
+        couponEventService.delete(1L);
+
+        InOrder deleteOrder = inOrder(
+                couponEventPhaseRepository,
+                couponEventItemRepository,
+                couponEventRepository
+        );
+        deleteOrder.verify(couponEventPhaseRepository)
+                .deleteAllByCouponEventId(1L);
+        deleteOrder.verify(couponEventPhaseRepository).flush();
+        deleteOrder.verify(couponEventItemRepository)
+                .deleteAllByCouponEventId(1L);
+        deleteOrder.verify(couponEventItemRepository).flush();
+        deleteOrder.verify(couponEventRepository).delete(event);
+        deleteOrder.verify(couponEventRepository).flush();
+    }
+
+    @Test
+    void 발생_이력이_있는_쿠폰_이벤트는_물리_삭제할_수_없다() {
+        CouponEvent event = withId(gameTriggeredEvent("발생 이벤트"), 1L);
+        when(couponEventRepository.findById(1L))
+                .thenReturn(Optional.of(event));
+        when(couponEventOccurrenceRepository.existsByCouponEventId(1L))
+                .thenReturn(true);
+
+        assertThatThrownBy(() -> couponEventService.delete(1L))
+                .isInstanceOfSatisfying(
+                        CouponEventException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(CouponEventErrorCode.COUPON_EVENT_NOT_DELETABLE)
+                );
+
+        verify(couponEventRepository, never()).delete(any());
+    }
+
+    @Test
+    void 진행_중인_쿠폰_이벤트는_물리_삭제할_수_없다() {
+        CouponEvent event = withId(gameTriggeredEvent("진행 이벤트"), 1L);
+        ReflectionTestUtils.setField(
+                event,
+                "eventStatus",
+                CouponEventStatus.OPEN
+        );
+        when(couponEventRepository.findById(1L))
+                .thenReturn(Optional.of(event));
+
+        assertThatThrownBy(() -> couponEventService.delete(1L))
+                .isInstanceOfSatisfying(
+                        CouponEventException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(CouponEventErrorCode.COUPON_EVENT_NOT_DELETABLE)
+                );
+
+        verify(couponEventOccurrenceRepository, never())
+                .existsByCouponEventId(any());
+        verify(couponEventRepository, never()).delete(any());
     }
 
     @Test

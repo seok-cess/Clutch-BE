@@ -24,6 +24,8 @@ import com.clutch.coupon.event.repository.CouponEventItemRepository;
 import com.clutch.coupon.event.repository.CouponEventOccurrenceRepository;
 import com.clutch.coupon.event.repository.CouponEventPhaseRepository;
 import com.clutch.coupon.event.repository.CouponEventRepository;
+import com.clutch.coupon.claim.repository.CouponClaimRequestRepository;
+import com.clutch.wallet.repository.UserCouponRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Slice;
@@ -48,6 +50,8 @@ public class CouponEventService {
     private final CouponEventItemRepository couponEventItemRepository;
     private final CouponEventPhaseRepository couponEventPhaseRepository;
     private final CouponEventOccurrenceRepository couponEventOccurrenceRepository;
+    private final CouponClaimRequestRepository couponClaimRequestRepository;
+    private final UserCouponRepository userCouponRepository;
 
     @Transactional
     public CouponEventCreateResponse create(CouponEventCreateRequest request) {
@@ -130,6 +134,36 @@ public class CouponEventService {
                 savedEvent.getUpdatedAt(),
                 itemResponses
         );
+    }
+
+    @Transactional
+    public void delete(Long couponEventId) {
+        CouponEvent event = couponEventRepository.findById(couponEventId)
+                .orElseThrow(() -> new CouponEventException(
+                        CouponEventErrorCode.COUPON_EVENT_NOT_FOUND
+                ));
+
+        if (event.getEventStatus() != CouponEventStatus.READY
+                || hasEventHistory(couponEventId)) {
+            throw new CouponEventException(
+                    CouponEventErrorCode.COUPON_EVENT_NOT_DELETABLE
+            );
+        }
+
+        couponEventPhaseRepository.deleteAllByCouponEventId(couponEventId);
+        couponEventPhaseRepository.flush();
+        couponEventItemRepository.deleteAllByCouponEventId(couponEventId);
+        couponEventItemRepository.flush();
+        couponEventRepository.delete(event);
+        couponEventRepository.flush();
+    }
+
+    private boolean hasEventHistory(Long couponEventId) {
+        return couponEventOccurrenceRepository.existsByCouponEventId(
+                couponEventId
+        ) || couponClaimRequestRepository.existsByCouponEventId(
+                couponEventId
+        ) || userCouponRepository.existsByCouponEventId(couponEventId);
     }
 
     private void replaceItemsAndPhases(Long couponEventId) {
