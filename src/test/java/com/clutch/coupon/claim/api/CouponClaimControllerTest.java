@@ -30,6 +30,7 @@ class CouponClaimControllerTest {
 
     private static final Long USER_ID = 1L;
     private static final Long COUPON_EVENT_ID = 10L;
+    private static final Long COUPON_EVENT_OCCURRENCE_ID = 15L;
     private static final Long COUPON_EVENT_ITEM_ID = 20L;
 
     /**
@@ -59,6 +60,7 @@ class CouponClaimControllerTest {
                 new CouponClaimCreateResponse(
                         100L,
                         COUPON_EVENT_ID,
+                        COUPON_EVENT_OCCURRENCE_ID,
                         COUPON_EVENT_ITEM_ID,
                         ClaimRequestStatus.SUCCEEDED,
                         LocalDateTime.of(
@@ -73,14 +75,17 @@ class CouponClaimControllerTest {
         when(couponClaimService.claim(
                 USER_ID,
                 COUPON_EVENT_ID,
+                COUPON_EVENT_OCCURRENCE_ID,
                 request
         )).thenReturn(response);
 
         // when, then
         mockMvc.perform(
                         post(
-                                "/api/v1/coupon-events/{couponEventId}/claims",
-                                COUPON_EVENT_ID
+                                "/api/v1/coupon-events/{couponEventId}"
+                                        + "/occurrences/{occurrenceId}/claims",
+                                COUPON_EVENT_ID,
+                                COUPON_EVENT_OCCURRENCE_ID
                         )
                                 .header("X-User-Id", USER_ID)
                                 .contentType(MediaType.APPLICATION_JSON)
@@ -93,6 +98,10 @@ class CouponClaimControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.claimId").value(100))
                 .andExpect(jsonPath("$.couponEventId").value(10))
+                .andExpect(
+                        jsonPath("$.couponEventOccurrenceId")
+                                .value(15)
+                )
                 .andExpect(jsonPath("$.couponEventItemId").value(20))
                 .andExpect(
                         jsonPath("$.requestStatus")
@@ -102,6 +111,7 @@ class CouponClaimControllerTest {
         verify(couponClaimService).claim(
                 USER_ID,
                 COUPON_EVENT_ID,
+                COUPON_EVENT_OCCURRENCE_ID,
                 request
         );
     }
@@ -113,8 +123,10 @@ class CouponClaimControllerTest {
     void claimFailsWhenEventItemIdIsMissing() throws Exception {
         mockMvc.perform(
                         post(
-                                "/api/v1/coupon-events/{couponEventId}/claims",
-                                COUPON_EVENT_ID
+                                "/api/v1/coupon-events/{couponEventId}"
+                                        + "/occurrences/{occurrenceId}/claims",
+                                COUPON_EVENT_ID,
+                                COUPON_EVENT_OCCURRENCE_ID
                         )
                                 .header("X-User-Id", USER_ID)
                                 .contentType(MediaType.APPLICATION_JSON)
@@ -134,8 +146,10 @@ class CouponClaimControllerTest {
     void claimFailsWhenUserIdHeaderIsMissing() throws Exception {
         mockMvc.perform(
                         post(
-                                "/api/v1/coupon-events/{couponEventId}/claims",
-                                COUPON_EVENT_ID
+                                "/api/v1/coupon-events/{couponEventId}"
+                                        + "/occurrences/{occurrenceId}/claims",
+                                COUPON_EVENT_ID,
+                                COUPON_EVENT_OCCURRENCE_ID
                         )
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("""
@@ -164,6 +178,7 @@ class CouponClaimControllerTest {
         when(couponClaimService.claim(
                 USER_ID,
                 COUPON_EVENT_ID,
+                COUPON_EVENT_OCCURRENCE_ID,
                 request
         )).thenThrow(
                 new CouponClaimException(
@@ -173,8 +188,10 @@ class CouponClaimControllerTest {
 
         mockMvc.perform(
                         post(
-                                "/api/v1/coupon-events/{couponEventId}/claims",
-                                COUPON_EVENT_ID
+                                "/api/v1/coupon-events/{couponEventId}"
+                                        + "/occurrences/{occurrenceId}/claims",
+                                COUPON_EVENT_ID,
+                                COUPON_EVENT_OCCURRENCE_ID
                         )
                                 .header("X-User-Id", USER_ID)
                                 .contentType(MediaType.APPLICATION_JSON)
@@ -204,6 +221,7 @@ class CouponClaimControllerTest {
         when(couponClaimService.claim(
                 USER_ID,
                 COUPON_EVENT_ID,
+                COUPON_EVENT_OCCURRENCE_ID,
                 request
         )).thenThrow(
                 new CouponClaimException(
@@ -213,8 +231,10 @@ class CouponClaimControllerTest {
 
         mockMvc.perform(
                         post(
-                                "/api/v1/coupon-events/{couponEventId}/claims",
-                                COUPON_EVENT_ID
+                                "/api/v1/coupon-events/{couponEventId}"
+                                        + "/occurrences/{occurrenceId}/claims",
+                                COUPON_EVENT_ID,
+                                COUPON_EVENT_OCCURRENCE_ID
                         )
                                 .header("X-User-Id", USER_ID)
                                 .contentType(MediaType.APPLICATION_JSON)

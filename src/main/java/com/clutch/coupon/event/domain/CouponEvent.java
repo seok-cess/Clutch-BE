@@ -2,6 +2,8 @@ package com.clutch.coupon.event.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -38,28 +40,29 @@ public class CouponEvent {
     private Long esportsMatchId;
 
     /**
-     * 쿠폰 이벤트 유형
+     * 쿠폰 이벤트 이름
      */
-    @Column(name = "event_type", nullable = false, length = 50)
-    private String eventType;
+    @Column(name = "event_name", nullable = false, length = 200)
+    private String eventName;
 
     /**
-     * 쿠폰 이벤트 설명
+     * 쿠폰 이벤트 발동 조건
      */
-    @Column(name = "description", nullable = false, length = 500)
-    private String description;
+    @Column(name = "trigger_type", nullable = false, length = 50)
+    private String triggerType;
 
     /**
-     * 쿠폰 이벤트 시작 시각
+     * 쿠폰 이벤트 상태
      */
-    @Column(name = "started_at", nullable = false)
-    private LocalDateTime startedAt;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "event_status", nullable = false, length = 20)
+    private CouponEventStatus eventStatus;
 
     /**
-     * 쿠폰 이벤트 종료 시각
+     * 쿠폰 발급 요청 가능 시간
      */
-    @Column(name = "closed_at", nullable = false)
-    private LocalDateTime closedAt;
+    @Column(name = "claim_window_seconds", nullable = false)
+    private int claimWindowSeconds;
 
     /**
      * 생성 시각
@@ -75,14 +78,4 @@ public class CouponEvent {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    /**
-     * 쿠폰 이벤트 진행 여부
-     *
-     * @param currentTime 현재 시각
-     * @return 쿠폰 이벤트 진행 여부
-     */
-    public boolean isOpenAt(LocalDateTime currentTime) {
-        return !currentTime.isBefore(startedAt)
-                && currentTime.isBefore(closedAt);
-    }
 }

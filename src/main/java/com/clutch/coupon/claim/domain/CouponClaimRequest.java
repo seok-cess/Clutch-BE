@@ -40,6 +40,12 @@ public class CouponClaimRequest {
     private Long couponEventId;
 
     /**
+     * 쿠폰 이벤트 회차 식별자
+     */
+    @Column(name = "coupon_event_occurrence_id")
+    private Long couponEventOccurrenceId;
+
+    /**
      * 쿠폰 이벤트 항목 식별자
      */
     @Column(name = "coupon_event_item_id", nullable = false)
@@ -76,15 +82,18 @@ public class CouponClaimRequest {
      * 쿠폰 발급 요청 생성자
      *
      * @param couponEventId     쿠폰 이벤트 식별자
-     * @param couponEventItemId 쿠폰 이벤트 항목 식별자
-     * @param userId            사용자 식별자
+     * @param couponEventOccurrenceId 쿠폰 이벤트 회차 식별자
+     * @param couponEventItemId       쿠폰 이벤트 항목 식별자
+     * @param userId                  사용자 식별자
      */
     private CouponClaimRequest(
             Long couponEventId,
+            Long couponEventOccurrenceId,
             Long couponEventItemId,
             Long userId
     ) {
         this.couponEventId = couponEventId;
+        this.couponEventOccurrenceId = couponEventOccurrenceId;
         this.couponEventItemId = couponEventItemId;
         this.userId = userId;
         this.requestStatus = ClaimRequestStatus.PENDING;
@@ -94,17 +103,20 @@ public class CouponClaimRequest {
      * 쿠폰 발급 요청 생성 팩토리
      *
      * @param couponEventId     쿠폰 이벤트 식별자
-     * @param couponEventItemId 쿠폰 이벤트 항목 식별자
-     * @param userId            사용자 식별자
+     * @param couponEventOccurrenceId 쿠폰 이벤트 회차 식별자
+     * @param couponEventItemId       쿠폰 이벤트 항목 식별자
+     * @param userId                  사용자 식별자
      * @return 쿠폰 발급 요청
      */
     public static CouponClaimRequest create(
             Long couponEventId,
+            Long couponEventOccurrenceId,
             Long couponEventItemId,
             Long userId
     ) {
         return new CouponClaimRequest(
                 couponEventId,
+                couponEventOccurrenceId,
                 couponEventItemId,
                 userId
         );

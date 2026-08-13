@@ -10,6 +10,7 @@ import java.time.LocalDateTime;
  *
  * @param claimId 쿠폰 발급 요청 식별자
  * @param couponEventId 쿠폰 이벤트 식별자
+ * @param couponEventOccurrenceId 쿠폰 이벤트 회차 식별자
  * @param couponEventItemId 쿠폰 이벤트 항목 식별자
  * @param requestStatus 쿠폰 발급 요청 상태
  * @param createdAt 요청 생성 일시
@@ -17,6 +18,7 @@ import java.time.LocalDateTime;
 public record CouponClaimCreateResponse(
         Long claimId,
         Long couponEventId,
+        Long couponEventOccurrenceId,
         Long couponEventItemId,
         ClaimRequestStatus requestStatus,
         LocalDateTime createdAt
@@ -34,6 +36,7 @@ public record CouponClaimCreateResponse(
         return new CouponClaimCreateResponse(
                 claimRequest.getId(),
                 claimRequest.getCouponEventId(),
+                claimRequest.getCouponEventOccurrenceId(),
                 claimRequest.getCouponEventItemId(),
                 claimRequest.getRequestStatus(),
                 claimRequest.getCreatedAt()

@@ -1,6 +1,9 @@
 package com.clutch.coupon.claim.api;
 
 import com.clutch.lolesports.service.PollingScheduler;
+import com.clutch.coupon.event.domain.CouponEventOccurrence;
+import com.clutch.coupon.event.domain.CouponEventOccurrenceStatus;
+import com.clutch.coupon.event.repository.CouponEventOccurrenceRepository;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,6 +34,7 @@ class CouponClaimApiIntegrationTest {
     private static final Long USER_ID = 9_100_001L;
     private static final Long ESPORTS_MATCH_ID = 9_100_001L;
     private static final Long COUPON_EVENT_ID = 9_100_001L;
+    private static final Long COUPON_EVENT_OCCURRENCE_ID = 9_100_001L;
     private static final Long COUPON_TYPE_ID = 9_100_001L;
     private static final Long COUPON_EVENT_ITEM_ID = 9_100_001L;
 
@@ -45,6 +49,12 @@ class CouponClaimApiIntegrationTest {
      */
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    /**
+     * 쿠폰 이벤트 회차 저장소
+     */
+    @Autowired
+    private CouponEventOccurrenceRepository couponEventOccurrenceRepository;
 
     /**
      * JPA 엔티티 관리자
@@ -91,19 +101,41 @@ class CouponClaimApiIntegrationTest {
                 INSERT INTO coupon_event (
                     coupon_event_id,
                     esports_match_id,
-                    event_type,
-                    description,
-                    started_at,
-                    closed_at
+                    event_name,
+                    trigger_type,
+                    event_status,
+                    claim_window_seconds
                 )
                 VALUES (?, ?, ?, ?, ?, ?)
                 """,
                 COUPON_EVENT_ID,
                 ESPORTS_MATCH_ID,
-                "FIRST_COME",
                 "통합 테스트 쿠폰 이벤트",
+                "FIRST_BLOOD",
+                "OPEN",
+                600
+        );
+
+        jdbcTemplate.update(
+                """
+                INSERT INTO coupon_event_occurrence (
+                    coupon_event_occurrence_id,
+                    coupon_event_id,
+                    source_event_key,
+                    detected_at,
+                    opened_at,
+                    expires_at,
+                    occurrence_status
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                COUPON_EVENT_OCCURRENCE_ID,
+                COUPON_EVENT_ID,
+                "claim-integration-occurrence",
                 currentTime.minusMinutes(1),
-                currentTime.plusMinutes(10)
+                currentTime.minusMinutes(1),
+                currentTime.plusMinutes(10),
+                "OPEN"
         );
 
         jdbcTemplate.update(
@@ -147,11 +179,30 @@ class CouponClaimApiIntegrationTest {
     @Test
     void claimPersistsRequestAndIncreasesSuccessCount()
             throws Exception {
+        // given
+        LocalDateTime currentTime =
+                LocalDateTime.now();
+
+        CouponEventOccurrence occurrence =
+                couponEventOccurrenceRepository
+                        .findById(COUPON_EVENT_OCCURRENCE_ID)
+                        .orElseThrow();
+
+        assertThat(occurrence.getOccurrenceStatus())
+                .isEqualTo(CouponEventOccurrenceStatus.OPEN);
+        assertThat(occurrence.getClosedAt()).isNull();
+        assertThat(occurrence.getOpenedAt())
+                .isBeforeOrEqualTo(currentTime);
+        assertThat(occurrence.getExpiresAt())
+                .isAfter(currentTime);
+
         // when, then
         mockMvc.perform(
                         post(
-                                "/api/v1/coupon-events/{couponEventId}/claims",
-                                COUPON_EVENT_ID
+                                "/api/v1/coupon-events/{couponEventId}"
+                                        + "/occurrences/{occurrenceId}/claims",
+                                COUPON_EVENT_ID,
+                                COUPON_EVENT_OCCURRENCE_ID
                         )
                                 .header("X-User-Id", USER_ID)
                                 .contentType(MediaType.APPLICATION_JSON)
@@ -173,6 +224,10 @@ class CouponClaimApiIntegrationTest {
                                 .value(COUPON_EVENT_ITEM_ID)
                 )
                 .andExpect(
+                        jsonPath("$.couponEventOccurrenceId")
+                                .value(COUPON_EVENT_OCCURRENCE_ID)
+                )
+                .andExpect(
                         jsonPath("$.requestStatus")
                                 .value("SUCCEEDED")
                 );
@@ -186,10 +241,12 @@ class CouponClaimApiIntegrationTest {
                 FROM coupon_claim_request
                 WHERE user_id = ?
                   AND coupon_event_item_id = ?
+                  AND coupon_event_occurrence_id = ?
                 """,
                 Integer.class,
                 USER_ID,
-                COUPON_EVENT_ITEM_ID
+                COUPON_EVENT_ITEM_ID,
+                COUPON_EVENT_OCCURRENCE_ID
         );
 
         String requestStatus = jdbcTemplate.queryForObject(
@@ -198,10 +255,12 @@ class CouponClaimApiIntegrationTest {
                 FROM coupon_claim_request
                 WHERE user_id = ?
                   AND coupon_event_item_id = ?
+                  AND coupon_event_occurrence_id = ?
                 """,
                 String.class,
                 USER_ID,
-                COUPON_EVENT_ITEM_ID
+                COUPON_EVENT_ITEM_ID,
+                COUPON_EVENT_OCCURRENCE_ID
         );
 
         Integer successCount = jdbcTemplate.queryForObject(
@@ -226,8 +285,10 @@ class CouponClaimApiIntegrationTest {
         // given
         mockMvc.perform(
                         post(
-                                "/api/v1/coupon-events/{couponEventId}/claims",
-                                COUPON_EVENT_ID
+                            "/api/v1/coupon-events/{couponEventId}"
+                                    + "/occurrences/{occurrenceId}/claims",
+                            COUPON_EVENT_ID,
+                            COUPON_EVENT_OCCURRENCE_ID
                         )
                                 .header("X-User-Id", USER_ID)
                                 .contentType(MediaType.APPLICATION_JSON)
@@ -247,8 +308,10 @@ class CouponClaimApiIntegrationTest {
         // when, then
         mockMvc.perform(
                         post(
-                                "/api/v1/coupon-events/{couponEventId}/claims",
-                                COUPON_EVENT_ID
+                            "/api/v1/coupon-events/{couponEventId}"
+                                    + "/occurrences/{occurrenceId}/claims",
+                            COUPON_EVENT_ID,
+                            COUPON_EVENT_OCCURRENCE_ID
                         )
                                 .header("X-User-Id", USER_ID)
                                 .contentType(MediaType.APPLICATION_JSON)
@@ -284,8 +347,10 @@ class CouponClaimApiIntegrationTest {
         // when, then
         mockMvc.perform(
                         post(
-                                "/api/v1/coupon-events/{couponEventId}/claims",
-                                COUPON_EVENT_ID
+                            "/api/v1/coupon-events/{couponEventId}"
+                                    + "/occurrences/{occurrenceId}/claims",
+                            COUPON_EVENT_ID,
+                            COUPON_EVENT_OCCURRENCE_ID
                         )
                                 .header("X-User-Id", USER_ID)
                                 .contentType(MediaType.APPLICATION_JSON)
@@ -309,10 +374,12 @@ class CouponClaimApiIntegrationTest {
                 FROM coupon_claim_request
                 WHERE user_id = ?
                   AND coupon_event_item_id = ?
+                  AND coupon_event_occurrence_id = ?
                 """,
                 Integer.class,
                 USER_ID,
-                COUPON_EVENT_ITEM_ID
+                COUPON_EVENT_ITEM_ID,
+                COUPON_EVENT_OCCURRENCE_ID
         );
 
         assertThat(claimCount).isZero();
