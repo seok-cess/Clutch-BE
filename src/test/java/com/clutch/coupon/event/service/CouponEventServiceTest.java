@@ -5,6 +5,8 @@ import com.clutch.coupon.event.api.dto.CouponEventCreateResponse;
 import com.clutch.coupon.event.api.dto.CouponEventDetailResponse;
 import com.clutch.coupon.event.api.dto.CouponEventItemCreateRequest;
 import com.clutch.coupon.event.api.dto.CouponEventListResponse;
+import com.clutch.coupon.event.api.dto.CouponEventUpdateRequest;
+import com.clutch.coupon.event.api.dto.CouponEventUpdateResponse;
 import com.clutch.coupon.event.domain.CouponEvent;
 import com.clutch.coupon.event.domain.CouponEventItem;
 import com.clutch.coupon.event.domain.CouponEventOpenMode;
@@ -21,6 +23,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.mockito.InOrder;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.data.domain.PageRequest;
@@ -34,6 +37,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -63,6 +67,82 @@ class CouponEventServiceTest {
                 couponEventPhaseRepository,
                 couponEventOccurrenceRepository
         );
+    }
+
+    @Test
+    void 대기_상태의_쿠폰_이벤트를_수정한다() {
+        CouponEvent event = withId(gameTriggeredEvent("기존 이벤트"), 1L);
+        CouponEventUpdateRequest request = updateRequest();
+        AtomicLong itemId = new AtomicLong(50L);
+        AtomicLong phaseId = new AtomicLong(60L);
+
+        when(couponEventRepository.findById(1L))
+                .thenReturn(Optional.of(event));
+        when(couponEventRepository
+                .existsByEsportsMatchIdAndTriggerTypeAndIdNot(
+                        2L,
+                        "FIRST_BLOOD",
+                        1L
+                )).thenReturn(false);
+        when(couponEventRepository.saveAndFlush(event)).thenReturn(event);
+        when(couponEventItemRepository.save(any(CouponEventItem.class)))
+                .thenAnswer(invocation -> withId(
+                        invocation.getArgument(0),
+                        itemId.getAndIncrement()
+                ));
+        when(couponEventPhaseRepository.save(any(CouponEventPhase.class)))
+                .thenAnswer(invocation -> withId(
+                        invocation.getArgument(0),
+                        phaseId.getAndIncrement()
+                ));
+
+        CouponEventUpdateResponse response = couponEventService.update(
+                1L,
+                request
+        );
+
+        assertThat(response.eventName()).isEqualTo("퍼블 이벤트");
+        assertThat(response.esportsMatchId()).isEqualTo(2L);
+        assertThat(response.triggerType()).isEqualTo("FIRST_BLOOD");
+        assertThat(response.items()).hasSize(2);
+        assertThat(response.items())
+                .extracting(item -> item.openOffsetSeconds())
+                .containsExactly(0, 30);
+
+        InOrder deleteOrder = inOrder(
+                couponEventPhaseRepository,
+                couponEventItemRepository
+        );
+        deleteOrder.verify(couponEventPhaseRepository)
+                .deleteAllByCouponEventId(1L);
+        deleteOrder.verify(couponEventPhaseRepository).flush();
+        deleteOrder.verify(couponEventItemRepository)
+                .deleteAllByCouponEventId(1L);
+        deleteOrder.verify(couponEventItemRepository).flush();
+    }
+
+    @Test
+    void 진행_중인_쿠폰_이벤트는_수정할_수_없다() {
+        CouponEvent event = withId(gameTriggeredEvent("진행 이벤트"), 1L);
+        ReflectionTestUtils.setField(
+                event,
+                "eventStatus",
+                CouponEventStatus.OPEN
+        );
+        when(couponEventRepository.findById(1L))
+                .thenReturn(Optional.of(event));
+
+        assertThatThrownBy(() -> couponEventService.update(
+                1L,
+                updateRequest()
+        )).isInstanceOfSatisfying(
+                CouponEventException.class,
+                exception -> assertThat(exception.getErrorCode())
+                        .isEqualTo(CouponEventErrorCode.COUPON_EVENT_NOT_EDITABLE)
+        );
+
+        verify(couponEventPhaseRepository, never())
+                .deleteAllByCouponEventId(any());
     }
 
     @Test
@@ -244,6 +324,22 @@ class CouponEventServiceTest {
                 "PENTA_KILL",
                 90,
                 null
+        );
+    }
+
+    private CouponEventUpdateRequest updateRequest() {
+        return new CouponEventUpdateRequest(
+                2L,
+                "퍼블 이벤트",
+                CouponEventOpenMode.GAME_TRIGGERED,
+                CouponIssueMode.PHASED_FIRST_COME,
+                "FIRST_BLOOD",
+                60,
+                null,
+                List.of(
+                        new CouponEventItemCreateRequest(10L, 5_000, 0),
+                        new CouponEventItemCreateRequest(20L, 1_000, 30)
+                )
         );
     }
 

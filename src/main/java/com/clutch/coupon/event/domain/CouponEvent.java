@@ -137,6 +137,33 @@ public class CouponEvent {
         );
     }
 
+    public void updateConfiguration(
+            Long esportsMatchId,
+            String eventName,
+            CouponEventOpenMode openMode,
+            CouponIssueMode issueMode,
+            String triggerType,
+            int claimWindowSeconds,
+            LocalDateTime scheduledOpenAt
+    ) {
+        validateConfiguration(
+                esportsMatchId,
+                eventName,
+                openMode,
+                issueMode,
+                triggerType,
+                claimWindowSeconds,
+                scheduledOpenAt
+        );
+        this.esportsMatchId = esportsMatchId;
+        this.eventName = eventName;
+        this.openMode = openMode;
+        this.issueMode = issueMode;
+        this.triggerType = triggerType;
+        this.claimWindowSeconds = claimWindowSeconds;
+        this.scheduledOpenAt = scheduledOpenAt;
+    }
+
     private static void validateConfiguration(
             Long esportsMatchId,
             String eventName,

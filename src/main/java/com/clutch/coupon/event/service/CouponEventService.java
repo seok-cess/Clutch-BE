@@ -9,6 +9,8 @@ import com.clutch.coupon.event.api.dto.CouponEventItemDetailResponse;
 import com.clutch.coupon.event.api.dto.CouponEventListResponse;
 import com.clutch.coupon.event.api.dto.CouponEventOccurrenceResponse;
 import com.clutch.coupon.event.api.dto.CouponEventSummaryResponse;
+import com.clutch.coupon.event.api.dto.CouponEventUpdateRequest;
+import com.clutch.coupon.event.api.dto.CouponEventUpdateResponse;
 import com.clutch.coupon.event.domain.CouponEvent;
 import com.clutch.coupon.event.domain.CouponEventItem;
 import com.clutch.coupon.event.domain.CouponEventOccurrence;
@@ -79,6 +81,62 @@ public class CouponEventService {
                 savedEvent.getCreatedAt(),
                 itemResponses
         );
+    }
+
+    @Transactional
+    public CouponEventUpdateResponse update(
+            Long couponEventId,
+            CouponEventUpdateRequest updateRequest
+    ) {
+        CouponEvent event = couponEventRepository.findById(couponEventId)
+                .orElseThrow(() -> new CouponEventException(
+                        CouponEventErrorCode.COUPON_EVENT_NOT_FOUND
+                ));
+        if (event.getEventStatus() != CouponEventStatus.READY) {
+            throw new CouponEventException(
+                    CouponEventErrorCode.COUPON_EVENT_NOT_EDITABLE
+            );
+        }
+
+        CouponEventCreateRequest request = updateRequest.toCreateRequest();
+        validateRequest(request);
+        validateDuplicateTriggerEventForUpdate(couponEventId, request);
+
+        event.updateConfiguration(
+                request.esportsMatchId(),
+                request.eventName(),
+                request.openMode(),
+                request.issueMode(),
+                normalizeTriggerType(request.triggerType()),
+                request.claimWindowSeconds(),
+                request.scheduledOpenAt()
+        );
+        CouponEvent savedEvent = couponEventRepository.saveAndFlush(event);
+
+        replaceItemsAndPhases(couponEventId);
+        List<CouponEventItemCreateResponse> itemResponses =
+                saveItemsAndPhases(couponEventId, request.items());
+
+        return new CouponEventUpdateResponse(
+                savedEvent.getId(),
+                savedEvent.getEsportsMatchId(),
+                savedEvent.getEventName(),
+                savedEvent.getOpenMode(),
+                savedEvent.getIssueMode(),
+                savedEvent.getTriggerType(),
+                savedEvent.getEventStatus(),
+                savedEvent.getClaimWindowSeconds(),
+                savedEvent.getScheduledOpenAt(),
+                savedEvent.getUpdatedAt(),
+                itemResponses
+        );
+    }
+
+    private void replaceItemsAndPhases(Long couponEventId) {
+        couponEventPhaseRepository.deleteAllByCouponEventId(couponEventId);
+        couponEventPhaseRepository.flush();
+        couponEventItemRepository.deleteAllByCouponEventId(couponEventId);
+        couponEventItemRepository.flush();
     }
 
     @Transactional(readOnly = true)
@@ -418,6 +476,25 @@ public class CouponEventService {
                 request.esportsMatchId(),
                 request.triggerType().trim()
         )) {
+            throw new CouponEventException(
+                    CouponEventErrorCode.COUPON_EVENT_DUPLICATED
+            );
+        }
+    }
+
+    private void validateDuplicateTriggerEventForUpdate(
+            Long couponEventId,
+            CouponEventCreateRequest request
+    ) {
+        if (request.openMode() != CouponEventOpenMode.GAME_TRIGGERED) {
+            return;
+        }
+        if (couponEventRepository
+                .existsByEsportsMatchIdAndTriggerTypeAndIdNot(
+                        request.esportsMatchId(),
+                        request.triggerType().trim(),
+                        couponEventId
+                )) {
             throw new CouponEventException(
                     CouponEventErrorCode.COUPON_EVENT_DUPLICATED
             );

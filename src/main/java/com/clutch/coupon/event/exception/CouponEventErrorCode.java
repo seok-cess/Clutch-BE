@@ -14,6 +14,10 @@ public enum CouponEventErrorCode {
     COUPON_EVENT_DUPLICATED(
             HttpStatus.CONFLICT,
             "같은 경기와 트리거로 등록된 쿠폰 이벤트가 이미 존재합니다."
+    ),
+    COUPON_EVENT_NOT_EDITABLE(
+            HttpStatus.CONFLICT,
+            "대기 상태의 쿠폰 이벤트만 수정할 수 있습니다."
     );
 
     private final HttpStatus httpStatus;

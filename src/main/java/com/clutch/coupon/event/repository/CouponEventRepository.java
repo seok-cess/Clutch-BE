@@ -17,6 +17,12 @@ public interface CouponEventRepository
             String triggerType
     );
 
+    boolean existsByEsportsMatchIdAndTriggerTypeAndIdNot(
+            Long esportsMatchId,
+            String triggerType,
+            Long couponEventId
+    );
+
     Slice<CouponEvent> findAllByOrderByIdDesc(Pageable pageable);
 
     Slice<CouponEvent> findByIdLessThanOrderByIdDesc(

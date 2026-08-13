@@ -18,4 +18,6 @@ public interface CouponEventPhaseRepository
             Long couponEventId,
             int elapsedSeconds
     );
+
+    void deleteAllByCouponEventId(Long couponEventId);
 }

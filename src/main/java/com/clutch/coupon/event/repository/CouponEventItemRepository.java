@@ -29,4 +29,6 @@ public interface CouponEventItemRepository
     List<CouponEventItem> findAllByCouponEventIdIn(
             List<Long> couponEventIds
     );
+
+    void deleteAllByCouponEventId(Long couponEventId);
 }

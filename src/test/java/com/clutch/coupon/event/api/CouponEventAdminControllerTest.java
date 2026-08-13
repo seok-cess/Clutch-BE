@@ -5,6 +5,8 @@ import com.clutch.coupon.event.api.dto.CouponEventCreateResponse;
 import com.clutch.coupon.event.api.dto.CouponEventItemCreateRequest;
 import com.clutch.coupon.event.api.dto.CouponEventItemCreateResponse;
 import com.clutch.coupon.event.api.dto.CouponEventListResponse;
+import com.clutch.coupon.event.api.dto.CouponEventUpdateRequest;
+import com.clutch.coupon.event.api.dto.CouponEventUpdateResponse;
 import com.clutch.coupon.event.domain.CouponEventOpenMode;
 import com.clutch.coupon.event.domain.CouponEventStatus;
 import com.clutch.coupon.event.domain.CouponIssueMode;
@@ -24,6 +26,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -35,6 +38,68 @@ class CouponEventAdminControllerTest {
 
     @MockitoBean
     private CouponEventService couponEventService;
+
+    @Test
+    void 쿠폰_이벤트_설정을_수정한다() throws Exception {
+        CouponEventUpdateRequest request = new CouponEventUpdateRequest(
+                2L,
+                "퍼블 이벤트",
+                CouponEventOpenMode.GAME_TRIGGERED,
+                CouponIssueMode.PHASED_FIRST_COME,
+                "FIRST_BLOOD",
+                60,
+                null,
+                List.of(
+                        new CouponEventItemCreateRequest(10L, 5_000, 0),
+                        new CouponEventItemCreateRequest(20L, 1_000, 30)
+                )
+        );
+        CouponEventUpdateResponse response = new CouponEventUpdateResponse(
+                1L,
+                2L,
+                "퍼블 이벤트",
+                CouponEventOpenMode.GAME_TRIGGERED,
+                CouponIssueMode.PHASED_FIRST_COME,
+                "FIRST_BLOOD",
+                CouponEventStatus.READY,
+                60,
+                null,
+                null,
+                List.of()
+        );
+        when(couponEventService.update(1L, request)).thenReturn(response);
+
+        mockMvc.perform(patch("/api/v1/admin/coupon-events/{eventId}", 1L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "esportsMatchId": 2,
+                                  "eventName": "퍼블 이벤트",
+                                  "openMode": "GAME_TRIGGERED",
+                                  "issueMode": "PHASED_FIRST_COME",
+                                  "triggerType": "FIRST_BLOOD",
+                                  "claimWindowSeconds": 60,
+                                  "items": [
+                                    {
+                                      "couponTypeId": 10,
+                                      "quantity": 5000,
+                                      "openOffsetSeconds": 0
+                                    },
+                                    {
+                                      "couponTypeId": 20,
+                                      "quantity": 1000,
+                                      "openOffsetSeconds": 30
+                                    }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.couponEventId").value(1))
+                .andExpect(jsonPath("$.eventName").value("퍼블 이벤트"))
+                .andExpect(jsonPath("$.triggerType").value("FIRST_BLOOD"));
+
+        verify(couponEventService).update(1L, request);
+    }
 
     @Test
     void 이벤트_목록을_상태와_커서로_조회한다() throws Exception {
