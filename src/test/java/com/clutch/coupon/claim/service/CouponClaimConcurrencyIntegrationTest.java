@@ -1,5 +1,7 @@
 package com.clutch.coupon.claim.service;
 
+import com.clutch.coupon.claim.api.dto.CouponClaimCreateRequest;
+import com.clutch.coupon.claim.exception.CouponClaimException;
 import com.clutch.lolesports.service.PollingScheduler;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -8,17 +10,32 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * 쿠폰 발급 요청 동시성 통합 테스트
  */
-@SpringBootTest
+@SpringBootTest(
+        properties = "spring.datasource.hikari.maximum-pool-size=30"
+)
 class CouponClaimConcurrencyIntegrationTest {
+
+    private static final Logger log = LoggerFactory.getLogger(
+            CouponClaimConcurrencyIntegrationTest.class
+    );
 
     private static final Long ESPORTS_MATCH_ID = 9_200_001L;
     private static final Long COUPON_EVENT_ID = 9_200_001L;
@@ -28,6 +45,7 @@ class CouponClaimConcurrencyIntegrationTest {
 
     private static final int STOCK_QUANTITY = 10;
     private static final int REQUEST_COUNT = 100;
+    private static final long USER_ID_BASE = 9_300_000L;
 
     /**
      * 쿠폰 발급 요청 서비스
@@ -201,6 +219,126 @@ class CouponClaimConcurrencyIntegrationTest {
         );
 
         assertThat(occurrenceStatus).isEqualTo("OPEN");
+    }
+
+    /**
+     * 기본 DB 방식 재고 정합성 문제 재현
+     */
+    @Test
+    void databaseClaimExposesStockConsistencyViolation()
+            throws InterruptedException {
+        // given
+        ExecutorService executorService =
+                Executors.newFixedThreadPool(REQUEST_COUNT);
+
+        CountDownLatch readyLatch =
+                new CountDownLatch(REQUEST_COUNT);
+        CountDownLatch startLatch =
+                new CountDownLatch(1);
+        CountDownLatch doneLatch =
+                new CountDownLatch(REQUEST_COUNT);
+
+        AtomicInteger successResponseCount =
+                new AtomicInteger();
+        AtomicInteger failureResponseCount =
+                new AtomicInteger();
+        Queue<Throwable> unexpectedErrors =
+                new ConcurrentLinkedQueue<>();
+
+        CouponClaimCreateRequest request =
+                new CouponClaimCreateRequest(
+                        COUPON_EVENT_ITEM_ID
+                );
+
+        try {
+            for (int requestIndex = 0;
+                 requestIndex < REQUEST_COUNT;
+                 requestIndex++) {
+                long userId = USER_ID_BASE + requestIndex;
+
+                executorService.submit(() -> {
+                    readyLatch.countDown();
+
+                    try {
+                        startLatch.await();
+
+                        couponClaimService.claim(
+                                userId,
+                                COUPON_EVENT_ID,
+                                COUPON_EVENT_OCCURRENCE_ID,
+                                request
+                        );
+
+                        successResponseCount.incrementAndGet();
+                    } catch (CouponClaimException exception) {
+                        failureResponseCount.incrementAndGet();
+                    } catch (Throwable throwable) {
+                        unexpectedErrors.add(throwable);
+                    } finally {
+                        doneLatch.countDown();
+                    }
+                });
+            }
+
+            boolean allRequestsReady =
+                    readyLatch.await(10, TimeUnit.SECONDS);
+
+            assertThat(allRequestsReady).isTrue();
+
+            // when
+            startLatch.countDown();
+
+            boolean allRequestsCompleted =
+                    doneLatch.await(30, TimeUnit.SECONDS);
+
+            assertThat(allRequestsCompleted).isTrue();
+        } finally {
+            executorService.shutdownNow();
+        }
+
+        // then
+        Integer succeededClaimCount = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM coupon_claim_request
+                WHERE coupon_event_occurrence_id = ?
+                  AND request_status = 'SUCCEEDED'
+                """,
+                Integer.class,
+                COUPON_EVENT_OCCURRENCE_ID
+        );
+
+        Integer successCount = jdbcTemplate.queryForObject(
+                """
+                SELECT success_count
+                FROM coupon_event_item
+                WHERE coupon_event_item_id = ?
+                """,
+                Integer.class,
+                COUPON_EVENT_ITEM_ID
+        );
+
+        log.info(
+                "기본 DB 동시성 결과 - 요청: {}, 성공 응답: {}, "
+                        + "실패 응답: {}, DB 성공 요청: {}, DB 성공 수량: {}",
+                REQUEST_COUNT,
+                successResponseCount.get(),
+                failureResponseCount.get(),
+                succeededClaimCount,
+                successCount
+        );
+
+        assertThat(unexpectedErrors).isEmpty();
+        assertThat(
+                successResponseCount.get()
+                        + failureResponseCount.get()
+        ).isEqualTo(REQUEST_COUNT);
+        assertThat(succeededClaimCount)
+                .isEqualTo(successResponseCount.get());
+        assertThat(succeededClaimCount)
+                .isGreaterThan(STOCK_QUANTITY);
+        assertThat(successCount)
+                .isLessThan(succeededClaimCount);
     }
 
     /**
