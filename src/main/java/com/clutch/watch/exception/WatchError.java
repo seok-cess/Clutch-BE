@@ -16,6 +16,8 @@ public enum WatchError {
     WATCH_SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "시청 세션을 찾을 수 없습니다."),
     WATCH_SESSION_USER_MISMATCH(HttpStatus.FORBIDDEN, "다른 사용자의 시청 세션입니다."),
     INVALID_HEARTBEAT_SEQUENCE(HttpStatus.CONFLICT, "Heartbeat 순번이 올바르지 않습니다."),
+    REWARD_NOT_CLAIMABLE(HttpStatus.CONFLICT, "아직 시청 포인트를 수령할 수 없습니다."),
+    REWARD_SEQUENCE_MISMATCH(HttpStatus.CONFLICT, "포인트 수령 회차가 올바르지 않습니다."),
 
     SESSION_KEY_REQUIRED(HttpStatus.BAD_REQUEST, "세션 키는 필수입니다."),
     USER_ID_REQUIRED(HttpStatus.BAD_REQUEST, "사용자 ID는 필수입니다."),
@@ -40,6 +42,9 @@ public enum WatchError {
     SESSION_KEY_REPLACEMENT_RESULT_UNKNOWN(HttpStatus.INTERNAL_SERVER_ERROR,
             "알 수 없는 세션 키 교체 처리 결과입니다."),
     SESSION_KEY_REPLACEMENT_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "시청 세션 키를 교체하지 못했습니다."),
+    REWARD_CLAIM_RESULT_MISSING(HttpStatus.INTERNAL_SERVER_ERROR, "포인트 수령 Redis 처리 결과가 없습니다."),
+    REWARD_CLAIM_RESULT_UNKNOWN(HttpStatus.INTERNAL_SERVER_ERROR, "알 수 없는 포인트 수령 처리 결과입니다."),
+    REWARD_CLAIM_COMPLETION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "포인트 지급 후 다음 수령 회차를 시작하지 못했습니다."),
     REWARD_SNAPSHOT_REQUIRED(HttpStatus.INTERNAL_SERVER_ERROR, "포인트 지급에 필요한 Redis 시청 세션이 없습니다."),
     REDIS_SESSION_USER_MISMATCH(HttpStatus.INTERNAL_SERVER_ERROR, "Redis 세션의 사용자 ID가 DB 세션과 일치하지 않습니다."),
     REDIS_SESSION_MATCH_MISMATCH(HttpStatus.INTERNAL_SERVER_ERROR, "Redis 세션의 경기 ID가 DB 세션과 일치하지 않습니다."),

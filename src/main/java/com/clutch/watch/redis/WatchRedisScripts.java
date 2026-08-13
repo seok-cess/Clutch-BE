@@ -8,6 +8,83 @@ import org.springframework.data.redis.core.script.DefaultRedisScript;
 final class WatchRedisScripts {
 
     /**
+     * 포인트 지급 전에 수령 자격을 원자적으로 확인하고 세션 TTL을 연장한다.
+     */
+    static final DefaultRedisScript<String> PREPARE_REWARD_CLAIM = new DefaultRedisScript<>("""
+            if redis.call('GET', KEYS[1]) ~= ARGV[1] then
+                return 'REPLACED'
+            end
+            if redis.call('EXISTS', KEYS[2]) == 0 then
+                return 'EXPIRED'
+            end
+            if redis.call('EXISTS', KEYS[3]) == 0 then
+                return 'SESSION_NOT_FOUND'
+            end
+            if redis.call('HGET', KEYS[3], 'userId') ~= ARGV[2] then
+                return 'USER_MISMATCH'
+            end
+
+            local currentRewardSequence = tonumber(redis.call('HGET', KEYS[3], 'rewardSequence')) or 1
+            if currentRewardSequence ~= tonumber(ARGV[3]) then
+                return 'INVALID_REWARD_SEQUENCE'
+            end
+            local eligibleMilliseconds = tonumber(redis.call('HGET', KEYS[3], 'eligibleMilliseconds')) or 0
+            if eligibleMilliseconds < tonumber(ARGV[4]) then
+                return 'NOT_CLAIMABLE'
+            end
+
+            redis.call('PEXPIRE', KEYS[2], ARGV[5])
+            redis.call('PEXPIRE', KEYS[1], ARGV[6])
+            redis.call('PEXPIRE', KEYS[3], ARGV[7])
+            return 'SUCCESS'
+            """, String.class);
+
+    /**
+     * DB 포인트 지급이 확정된 회차의 누적시간을 초기화하고 다음 회차를 시작한다.
+     */
+    static final DefaultRedisScript<String> COMPLETE_REWARD_CLAIM = new DefaultRedisScript<>("""
+            if redis.call('GET', KEYS[1]) ~= ARGV[1] then
+                return 'REPLACED'
+            end
+
+            if redis.call('EXISTS', KEYS[2]) == 0 then
+                return 'EXPIRED'
+            end
+
+            if redis.call('EXISTS', KEYS[3]) == 0 then
+                return 'SESSION_NOT_FOUND'
+            end
+
+            if redis.call('HGET', KEYS[3], 'userId') ~= ARGV[2] then
+                return 'USER_MISMATCH'
+            end
+
+            local currentRewardSequence = tonumber(redis.call('HGET', KEYS[3], 'rewardSequence')) or 1
+            local requestedRewardSequence = tonumber(ARGV[3])
+            if currentRewardSequence > requestedRewardSequence then
+                return 'ALREADY_COMPLETED:' .. tostring(currentRewardSequence)
+            end
+            if currentRewardSequence < requestedRewardSequence then
+                return 'INVALID_REWARD_SEQUENCE'
+            end
+
+            local eligibleMilliseconds = tonumber(redis.call('HGET', KEYS[3], 'eligibleMilliseconds')) or 0
+            if eligibleMilliseconds < tonumber(ARGV[4]) then
+                return 'NOT_CLAIMABLE'
+            end
+
+            local nextRewardSequence = currentRewardSequence + 1
+            redis.call('HSET', KEYS[3],
+                    'lastSeen', ARGV[5],
+                    'eligibleMilliseconds', '0',
+                    'rewardSequence', tostring(nextRewardSequence))
+            redis.call('PEXPIRE', KEYS[2], ARGV[6])
+            redis.call('PEXPIRE', KEYS[1], ARGV[7])
+            redis.call('PEXPIRE', KEYS[3], ARGV[8])
+            return 'SUCCESS:' .. tostring(nextRewardSequence)
+            """, String.class);
+
+    /**
      * 동일 경기 재입장 시 누적 상태를 유지하면서 최신 sessionKey로 Redis 키를 교체한다.
      */
     static final DefaultRedisScript<String> REPLACE_SESSION_KEY = new DefaultRedisScript<>("""

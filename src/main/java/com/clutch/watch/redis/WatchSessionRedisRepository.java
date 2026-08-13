@@ -157,6 +157,70 @@ public class WatchSessionRedisRepository {
     }
 
     /**
+     * DB에서 지급이 확정된 회차를 Redis에 반영하고 다음 5분 누적을 시작한다.
+     */
+    public RewardClaimCompletionResult completeRewardClaim(
+            long userId,
+            String sessionKey,
+            long rewardSequence,
+            long claimedAt
+    ) {
+        String result = redisTemplate.execute(
+                WatchRedisScripts.COMPLETE_REWARD_CLAIM,
+                List.of(
+                        activeKey(userId),
+                        aliveKey(userId, sessionKey),
+                        redisSessionKey(sessionKey)
+                ),
+                sessionKey,
+                Long.toString(userId),
+                Long.toString(rewardSequence),
+                Long.toString(properties.claimInterval().toMillis()),
+                Long.toString(claimedAt),
+                Long.toString(properties.aliveTtl().toMillis()),
+                Long.toString(properties.activeTtl().toMillis()),
+                Long.toString(properties.sessionTtl().toMillis())
+        );
+        if (result == null) {
+            throw new WatchException(WatchError.REWARD_CLAIM_RESULT_MISSING);
+        }
+        return RewardClaimCompletionResult.from(result);
+    }
+
+    /**
+     * DB 지급 직전에 Redis 수령 자격을 확인하고 처리 중 만료되지 않도록 TTL을 갱신한다.
+     */
+    public RewardClaimCompletionStatus prepareRewardClaim(
+            long userId,
+            String sessionKey,
+            long rewardSequence
+    ) {
+        String result = redisTemplate.execute(
+                WatchRedisScripts.PREPARE_REWARD_CLAIM,
+                List.of(
+                        activeKey(userId),
+                        aliveKey(userId, sessionKey),
+                        redisSessionKey(sessionKey)
+                ),
+                sessionKey,
+                Long.toString(userId),
+                Long.toString(rewardSequence),
+                Long.toString(properties.claimInterval().toMillis()),
+                Long.toString(properties.aliveTtl().toMillis()),
+                Long.toString(properties.activeTtl().toMillis()),
+                Long.toString(properties.sessionTtl().toMillis())
+        );
+        if (result == null) {
+            throw new WatchException(WatchError.REWARD_CLAIM_RESULT_MISSING);
+        }
+        try {
+            return RewardClaimCompletionStatus.valueOf(result);
+        } catch (IllegalArgumentException exception) {
+            throw new WatchException(WatchError.REWARD_CLAIM_RESULT_UNKNOWN, exception);
+        }
+    }
+
+    /**
      * 사용자별 세션 전환 lock이 없을 때 token과 TTL을 가진 lock을 생성한다.
      *
      * @param userId 세션을 전환할 사용자 ID

@@ -156,6 +156,67 @@ class WatchRewardFlowIntegrationTest {
                 .findByWatchSessionIdAndRewardSequence(session.getId(), 1L)).isEmpty();
     }
 
+    @Test
+    void claimsOneHundredPointsAndStartsNextRewardSequence() throws Exception {
+        User user = saveUser();
+        EsportsMatch match = saveMatch("inProgress");
+        String sessionKey = startSession(user.getId(), match.getId());
+        setEligibleMilliseconds(sessionKey, 300_000L);
+
+        claimPoint(user.getId(), sessionKey, 1L, 200, null);
+
+        WatchSession session = watchSessionRepository.findBySessionKey(sessionKey).orElseThrow();
+        WatchSessionSnapshot snapshot = watchSessionRedisRepository.findSession(sessionKey)
+                .orElseThrow();
+        assertThat(userRepository.findById(user.getId()).orElseThrow().getPoint()).isEqualTo(100L);
+        assertThat(watchPointTransactionRepository
+                .findByWatchSessionIdAndRewardSequence(session.getId(), 1L)).isPresent();
+        assertThat(snapshot.eligibleMilliseconds()).isZero();
+        assertThat(snapshot.rewardSequence()).isEqualTo(2L);
+    }
+
+    @Test
+    void doesNotAwardPointTwiceForRepeatedClaimRequest() throws Exception {
+        User user = saveUser();
+        EsportsMatch match = saveMatch("inProgress");
+        String sessionKey = startSession(user.getId(), match.getId());
+        setEligibleMilliseconds(sessionKey, 300_000L);
+
+        claimPoint(user.getId(), sessionKey, 1L, 200, null);
+        claimPoint(user.getId(), sessionKey, 1L, 200, null);
+
+        assertThat(userRepository.findById(user.getId()).orElseThrow().getPoint()).isEqualTo(100L);
+        WatchSession session = watchSessionRepository.findBySessionKey(sessionKey).orElseThrow();
+        assertThat(watchPointTransactionRepository
+                .findByWatchSessionIdAndRewardSequence(session.getId(), 1L)).isPresent();
+    }
+
+    @Test
+    void rejectsPointClaimBeforeFiveMinutes() throws Exception {
+        User user = saveUser();
+        EsportsMatch match = saveMatch("inProgress");
+        String sessionKey = startSession(user.getId(), match.getId());
+        setEligibleMilliseconds(sessionKey, 299_999L);
+
+        claimPoint(user.getId(), sessionKey, 1L, 409, "REWARD_NOT_CLAIMABLE");
+
+        assertThat(userRepository.findById(user.getId()).orElseThrow().getPoint()).isZero();
+    }
+
+    @Test
+    void rejectsPointClaimAfterMatchEnds() throws Exception {
+        User user = saveUser();
+        EsportsMatch match = saveMatch("inProgress");
+        String sessionKey = startSession(user.getId(), match.getId());
+        setEligibleMilliseconds(sessionKey, 300_000L);
+        match.updateProgress("completed", match.getStartedAt(), match.getBestOf());
+        esportsMatchRepository.saveAndFlush(match);
+
+        claimPoint(user.getId(), sessionKey, 1L, 409, "MATCH_NOT_WATCHABLE");
+
+        assertThat(userRepository.findById(user.getId()).orElseThrow().getPoint()).isZero();
+    }
+
     /**
      * 다른 경기 입장 시 기존 세션을 미지급 종료하고 새 세션이 active로 유지되는지 검증한다.
      *
@@ -383,6 +444,26 @@ class WatchRewardFlowIntegrationTest {
                         "/api/users/{userId}/watch-sessions/{sessionKey}/heartbeat", userId, sessionKey)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"sequence\":" + sequence + "}"))
+                .andExpect(status().is(expectedStatus));
+        if (expectedCode != null) {
+            actions.andExpect(jsonPath("$.code").value(expectedCode));
+        }
+    }
+
+    private void claimPoint(
+            long userId,
+            String sessionKey,
+            long rewardSequence,
+            int expectedStatus,
+            String expectedCode
+    ) throws Exception {
+        var actions = mockMvc.perform(post(
+                        "/api/users/{userId}/watch-sessions/{sessionKey}/point-claims",
+                        userId,
+                        sessionKey
+                )
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"rewardSequence\":" + rewardSequence + "}"))
                 .andExpect(status().is(expectedStatus));
         if (expectedCode != null) {
             actions.andExpect(jsonPath("$.code").value(expectedCode));

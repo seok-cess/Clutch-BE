@@ -4,7 +4,9 @@ import com.clutch.watch.api.handler.WatchExceptionHandler;
 import com.clutch.watch.exception.WatchError;
 import com.clutch.watch.exception.WatchException;
 import com.clutch.watch.service.service.WatchSessionService;
+import com.clutch.watch.service.service.WatchPointClaimService;
 import com.clutch.watch.service.dto.WatchHeartbeatResult;
+import com.clutch.watch.service.dto.WatchPointClaimResult;
 import com.clutch.watch.service.dto.WatchRewardState;
 import com.clutch.watch.service.dto.WatchSessionStartResult;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,6 +41,9 @@ class WatchSessionControllerTest {
     @Mock
     private WatchSessionService watchSessionService;
 
+    @Mock
+    private WatchPointClaimService watchPointClaimService;
+
     private MockMvc mockMvc;
 
     /**
@@ -47,7 +52,10 @@ class WatchSessionControllerTest {
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders
-                .standaloneSetup(new WatchSessionController(watchSessionService))
+                .standaloneSetup(new WatchSessionController(
+                        watchSessionService,
+                        watchPointClaimService
+                ))
                 .setControllerAdvice(new WatchExceptionHandler())
                 .build();
     }
@@ -132,6 +140,27 @@ class WatchSessionControllerTest {
                 .andExpect(jsonPath("$.rewardPoint").value(100));
 
         verify(watchSessionService).heartbeat(USER_ID, SESSION_KEY, 1L);
+    }
+
+    @Test
+    void claimsWatchPoint() throws Exception {
+        when(watchPointClaimService.claim(USER_ID, SESSION_KEY, 1L))
+                .thenReturn(new WatchPointClaimResult(1L, 100L, 1_100L, 2L));
+
+        mockMvc.perform(post(
+                        "/api/users/{userId}/watch-sessions/{sessionKey}/point-claims",
+                        USER_ID,
+                        SESSION_KEY
+                )
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"rewardSequence\":1}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.rewardSequence").value(1))
+                .andExpect(jsonPath("$.awardedPoint").value(100))
+                .andExpect(jsonPath("$.totalPoint").value(1100))
+                .andExpect(jsonPath("$.nextRewardSequence").value(2));
+
+        verify(watchPointClaimService).claim(USER_ID, SESSION_KEY, 1L);
     }
 
     /**

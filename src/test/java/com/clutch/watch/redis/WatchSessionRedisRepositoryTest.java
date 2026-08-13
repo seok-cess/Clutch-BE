@@ -185,6 +185,61 @@ class WatchSessionRedisRepositoryTest {
         assertThat(ttlMillis("watch:alive:100:session-1")).isPositive();
     }
 
+    @Test
+    void completesRewardClaimAndStartsNextSequence() {
+        repository.initialize(100L, 200L, "session-1", 1_000_000L);
+        redisTemplate.opsForHash().put(
+                "watch:session:session-1",
+                "eligibleMilliseconds",
+                "300000"
+        );
+
+        assertThat(repository.prepareRewardClaim(100L, "session-1", 1L))
+                .isEqualTo(RewardClaimCompletionStatus.SUCCESS);
+        RewardClaimCompletionResult result = repository.completeRewardClaim(
+                100L,
+                "session-1",
+                1L,
+                1_300_000L
+        );
+        WatchSessionSnapshot snapshot = repository.findSession("session-1").orElseThrow();
+
+        assertThat(result.status()).isEqualTo(RewardClaimCompletionStatus.SUCCESS);
+        assertThat(result.nextRewardSequence()).isEqualTo(2L);
+        assertThat(snapshot.eligibleMilliseconds()).isZero();
+        assertThat(snapshot.rewardSequence()).isEqualTo(2L);
+        assertThat(snapshot.lastSeen()).isEqualTo(1_300_000L);
+    }
+
+    @Test
+    void rejectsRewardClaimBeforeFiveMinutes() {
+        repository.initialize(100L, 200L, "session-1", 1_000_000L);
+
+        assertThat(repository.prepareRewardClaim(100L, "session-1", 1L))
+                .isEqualTo(RewardClaimCompletionStatus.NOT_CLAIMABLE);
+    }
+
+    @Test
+    void reportsAlreadyCompletedForRepeatedRedisCompletion() {
+        repository.initialize(100L, 200L, "session-1", 1_000_000L);
+        redisTemplate.opsForHash().put(
+                "watch:session:session-1",
+                "eligibleMilliseconds",
+                "300000"
+        );
+        repository.completeRewardClaim(100L, "session-1", 1L, 1_300_000L);
+
+        RewardClaimCompletionResult result = repository.completeRewardClaim(
+                100L,
+                "session-1",
+                1L,
+                1_300_001L
+        );
+
+        assertThat(result.status()).isEqualTo(RewardClaimCompletionStatus.ALREADY_COMPLETED);
+        assertThat(result.nextRewardSequence()).isEqualTo(2L);
+    }
+
     /**
      * 동일 경기 재입장 시 누적 상태와 heartbeat 순번을 유지하면서 sessionKey를 교체하는지 검증한다.
      */

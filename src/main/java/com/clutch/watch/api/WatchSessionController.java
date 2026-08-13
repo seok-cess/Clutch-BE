@@ -3,6 +3,9 @@ package com.clutch.watch.api;
 import com.clutch.watch.api.dto.HeartbeatRequest;
 import com.clutch.watch.api.dto.HeartbeatResponse;
 import com.clutch.watch.api.dto.WatchSessionStartResponse;
+import com.clutch.watch.api.dto.WatchPointClaimRequest;
+import com.clutch.watch.api.dto.WatchPointClaimResponse;
+import com.clutch.watch.service.service.WatchPointClaimService;
 import com.clutch.watch.service.service.WatchSessionService;
 import com.clutch.watch.service.dto.WatchHeartbeatResult;
 import com.clutch.watch.service.dto.WatchSessionStartResult;
@@ -28,6 +31,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class WatchSessionController {
 
     private final WatchSessionService watchSessionService;
+    private final WatchPointClaimService watchPointClaimService;
 
     /**
      * 사용자를 경기에 입장시키고 새 시청 세션을 발급한다.
@@ -67,5 +71,19 @@ public class WatchSessionController {
                 request.sequence()
         );
         return ResponseEntity.ok(HeartbeatResponse.from(result));
+    }
+
+    /**
+     * 5분 누적을 완료한 현재 회차의 시청 포인트를 수령한다.
+     */
+    @PostMapping("/watch-sessions/{sessionKey}/point-claims")
+    public ResponseEntity<WatchPointClaimResponse> claimPoint(
+            @PathVariable @Positive(message = "사용자 ID는 1 이상이어야 합니다.") long userId,
+            @PathVariable String sessionKey,
+            @Valid @RequestBody WatchPointClaimRequest request
+    ) {
+        return ResponseEntity.ok(WatchPointClaimResponse.from(
+                watchPointClaimService.claim(userId, sessionKey, request.rewardSequence())
+        ));
     }
 }
