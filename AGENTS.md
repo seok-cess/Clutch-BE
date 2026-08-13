@@ -86,7 +86,7 @@ Notion의 논의가 구현 결정으로 확정되면 관련 코드와 함께 `do
 - 브랜치 이름은 `<type>/CLUTCH-<issue>` 형식을 사용하며 설명 suffix를 붙이지 않는다.
 - Jira 작업 하나당 작업 브랜치 하나를 사용한다.
 - 커밋 메시지는 Conventional Commits 형식을 사용하고 한글로 작성한다.
-- Pull Request 제목에는 Jira 이슈 키를 포함한다.
+- Pull Request 제목은 `<type>:[CLUTCH-<issue>] <작업 내용>` 형식을 사용한다.
 - Backend CI 성공과 1명 이상의 승인을 받은 후 Squash and merge한다.
 
 세부 규칙은 `docs/conventions/git-convention.md`와 `docs/conventions/jira-github-workflow.md`를 따른다.

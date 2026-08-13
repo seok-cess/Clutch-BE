@@ -123,12 +123,24 @@ chore(ci): GitHub Actions 설정 추가
 - Backend CI가 성공한 경우에만 병합한다.
 - 기본 병합 방식은 Squash and merge다.
 
-Pull Request 제목에는 Jira 이슈 키를 포함한다.
+Pull Request 제목에는 작업 타입, Jira 이슈 키와 작업 내용을 포함한다.
 
 ```text
-[CLUTCH-13] 백엔드 CI 구축
-[CLUTCH-21] 쿠폰 발급 API 구현
-[CLUTCH-32] 경기 목록 조회 구현
+<type>:[CLUTCH-<issue>] <작업 내용>
+```
+
+- 작업 타입은 소문자로 작성한다.
+- 작업 타입 뒤의 콜론과 여는 대괄호 사이는 띄어 쓰지 않는다.
+- Jira 프로젝트 키와 이슈 번호는 대괄호로 감싼다.
+- 작업 내용은 한글로 간결하게 작성한다.
+
+```text
+chore:[CLUTCH-13] 백엔드 CI 구축
+feat:[CLUTCH-21] 쿠폰 발급 API 구현
+feat:[CLUTCH-32] 경기 목록 조회 구현
+fix:[CLUTCH-45] 쿠폰 중복 발급 오류 수정
+refactor:[CLUTCH-53] 쿠폰 발급 로직 분리
+docs:[CLUTCH-62] AI 개발 규칙 및 협업 컨벤션 문서화
 ```
 
 ## 검증과 보안
