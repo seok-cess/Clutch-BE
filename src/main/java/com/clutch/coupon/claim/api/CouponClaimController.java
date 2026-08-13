@@ -1,0 +1,58 @@
+package com.clutch.coupon.claim.api;
+
+import com.clutch.coupon.claim.api.dto.CouponClaimCreateRequest;
+import com.clutch.coupon.claim.api.dto.CouponClaimCreateResponse;
+import com.clutch.coupon.claim.service.CouponClaimService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+/**
+ * 쿠폰 발급 요청 컨트롤러
+ */
+@RestController
+@RequestMapping("/api/v1/coupon-events")
+@RequiredArgsConstructor
+public class CouponClaimController {
+
+    private final CouponClaimService couponClaimService;
+
+    /**
+     * 쿠폰 발급 요청 생성
+     *
+     * @param userId 사용자 식별자
+     * @param couponEventId 쿠폰 이벤트 식별자
+     * @param request 쿠폰 발급 요청 DTO
+     * @return 쿠폰 발급 요청 생성 응답
+     */
+    @PostMapping("/{couponEventId}/claims")
+    public ResponseEntity<CouponClaimCreateResponse> claim(
+            @RequestHeader("X-User-Id")
+            Long userId,
+
+            @PathVariable
+            Long couponEventId,
+
+            @Valid
+            @RequestBody
+            CouponClaimCreateRequest request
+    ) {
+        CouponClaimCreateResponse response =
+                couponClaimService.claim(
+                        userId,
+                        couponEventId,
+                        request
+                );
+
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(response);
+    }
+}
