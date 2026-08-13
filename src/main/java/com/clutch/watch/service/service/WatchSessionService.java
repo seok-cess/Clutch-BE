@@ -77,7 +77,7 @@ public class WatchSessionService {
      * @param sessionKey heartbeat 대상 시청 세션 외부 식별자
      * @param sequence 프론트엔드가 이전 값보다 증가시킨 heartbeat 순번
      * @return heartbeat 처리 후 현재 회차의 포인트 수령 상태
-     * @throws WatchException Redis 세션의 경기가 없거나 현재 시청 가능한 상태가 아닌 경우
+     * @throws WatchException Redis 세션을 찾을 수 없거나 heartbeat 검증에 실패한 경우
      */
     @Transactional(readOnly = true)
     public WatchHeartbeatResult heartbeat(long userId, String sessionKey, long sequence) {
@@ -90,7 +90,6 @@ public class WatchSessionService {
         WatchSessionSnapshot snapshot = watchSessionRedisRepository.findSession(sessionKey)
                 .orElseThrow(() -> new WatchException(WatchError.WATCH_SESSION_NOT_FOUND));
 
-        validateMatch(snapshot.matchId());
         HeartbeatProcessingResult result = watchSessionRedisRepository.heartbeat(
                 userId,
                 sessionKey,

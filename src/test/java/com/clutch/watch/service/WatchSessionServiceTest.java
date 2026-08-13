@@ -282,8 +282,6 @@ class WatchSessionServiceTest {
                 .thenReturn(Optional.of(snapshot));
         when(watchSessionRedisRepository.findActiveSessionKey(USER_ID))
                 .thenReturn(Optional.of(OLD_SESSION_KEY));
-        when(esportsMatchRepository.findById(snapshot.matchId()))
-                .thenReturn(Optional.of(inProgressMatch()));
         when(watchSessionRedisRepository.heartbeat(
                 org.mockito.ArgumentMatchers.eq(USER_ID),
                 org.mockito.ArgumentMatchers.eq(OLD_SESSION_KEY),
@@ -311,6 +309,7 @@ class WatchSessionServiceTest {
                 org.mockito.ArgumentMatchers.eq(3L),
                 serverTime.capture()
         );
+        verify(esportsMatchRepository, never()).findById(anyLong());
         assertThat(serverTime.getValue()).isBetween(beforeRequest, afterRequest);
     }
 
@@ -321,8 +320,6 @@ class WatchSessionServiceTest {
                 .thenReturn(Optional.of(snapshot));
         when(watchSessionRedisRepository.findActiveSessionKey(USER_ID))
                 .thenReturn(Optional.of(OLD_SESSION_KEY));
-        when(esportsMatchRepository.findById(snapshot.matchId()))
-                .thenReturn(Optional.of(inProgressMatch()));
         when(watchSessionRedisRepository.heartbeat(
                 org.mockito.ArgumentMatchers.eq(USER_ID),
                 org.mockito.ArgumentMatchers.eq(OLD_SESSION_KEY),
@@ -355,27 +352,6 @@ class WatchSessionServiceTest {
                 WatchError.WATCH_SESSION_NOT_FOUND
         );
         verify(esportsMatchRepository, never()).findById(anyLong());
-        verify(watchSessionRedisRepository, never())
-                .heartbeat(anyLong(), anyString(), anyLong(), anyLong());
-    }
-
-    /**
-     * 경기 상태가 진행 중이 아니면 Redis 시청시간을 갱신하지 않는지 검증한다.
-     */
-    @Test
-    void rejectsHeartbeatWhenMatchIsNotWatchable() {
-        WatchSessionSnapshot snapshot = oldSnapshot();
-        when(watchSessionRedisRepository.findSession(OLD_SESSION_KEY))
-                .thenReturn(Optional.of(snapshot));
-        when(watchSessionRedisRepository.findActiveSessionKey(USER_ID))
-                .thenReturn(Optional.of(OLD_SESSION_KEY));
-        when(esportsMatchRepository.findById(snapshot.matchId()))
-                .thenReturn(Optional.of(completedMatch()));
-
-        assertThatThrownBy(() -> service.heartbeat(USER_ID, OLD_SESSION_KEY, 3L))
-                .isInstanceOf(WatchException.class)
-                .hasMessage("현재 시청 가능한 경기가 아닙니다.");
-
         verify(watchSessionRedisRepository, never())
                 .heartbeat(anyLong(), anyString(), anyLong(), anyLong());
     }

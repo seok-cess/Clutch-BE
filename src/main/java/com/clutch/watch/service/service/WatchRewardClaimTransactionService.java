@@ -1,7 +1,5 @@
 package com.clutch.watch.service.service;
 
-import com.clutch.lolesports.entity.EsportsMatch;
-import com.clutch.lolesports.repository.EsportsMatchRepository;
 import com.clutch.user.domain.User;
 import com.clutch.user.repository.UserRepository;
 import com.clutch.watch.domain.WatchPointTransaction;
@@ -23,12 +21,9 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class WatchRewardClaimTransactionService {
 
-    private static final String WATCHABLE_MATCH_STATUS = "inProgress";
-
     private final WatchSessionRepository watchSessionRepository;
     private final WatchPointTransactionRepository watchPointTransactionRepository;
     private final UserRepository userRepository;
-    private final EsportsMatchRepository esportsMatchRepository;
 
     @Transactional
     public WatchPointClaimTransactionResult award(
@@ -54,8 +49,6 @@ public class WatchRewardClaimTransactionService {
                     false
             );
         }
-
-        validateMatch(watchSession.getEsportsMatchId());
 
         try {
             user.changePoint(rewardPoint);
@@ -111,11 +104,4 @@ public class WatchRewardClaimTransactionService {
         }
     }
 
-    private void validateMatch(long matchId) {
-        EsportsMatch esportsMatch = esportsMatchRepository.findById(matchId)
-                .orElseThrow(() -> new WatchException(WatchError.MATCH_NOT_FOUND));
-        if (!WATCHABLE_MATCH_STATUS.equalsIgnoreCase(esportsMatch.getLifecycleStatus())) {
-            throw new WatchException(WatchError.MATCH_NOT_WATCHABLE);
-        }
-    }
 }

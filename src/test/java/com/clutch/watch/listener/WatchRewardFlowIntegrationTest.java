@@ -203,20 +203,6 @@ class WatchRewardFlowIntegrationTest {
         assertThat(userRepository.findById(user.getId()).orElseThrow().getPoint()).isZero();
     }
 
-    @Test
-    void rejectsPointClaimAfterMatchEnds() throws Exception {
-        User user = saveUser();
-        EsportsMatch match = saveMatch("inProgress");
-        String sessionKey = startSession(user.getId(), match.getId());
-        setEligibleMilliseconds(sessionKey, 300_000L);
-        match.updateProgress("completed", match.getStartedAt(), match.getBestOf());
-        esportsMatchRepository.saveAndFlush(match);
-
-        claimPoint(user.getId(), sessionKey, 1L, 409, "MATCH_NOT_WATCHABLE");
-
-        assertThat(userRepository.findById(user.getId()).orElseThrow().getPoint()).isZero();
-    }
-
     /**
      * 다른 경기 입장 시 기존 세션을 미지급 종료하고 새 세션이 active로 유지되는지 검증한다.
      *
