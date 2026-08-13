@@ -21,6 +21,7 @@ public enum WatchError {
     USER_ID_REQUIRED(HttpStatus.BAD_REQUEST, "사용자 ID는 필수입니다."),
     MATCH_ID_REQUIRED(HttpStatus.BAD_REQUEST, "경기 ID는 필수입니다."),
     WATCH_SESSION_ID_REQUIRED(HttpStatus.BAD_REQUEST, "시청 세션 ID는 필수입니다."),
+    REWARD_SEQUENCE_INVALID(HttpStatus.BAD_REQUEST, "포인트 수령 회차는 1 이상이어야 합니다."),
     ENTERED_AT_REQUIRED(HttpStatus.BAD_REQUEST, "입장 시각은 필수입니다."),
     LAST_SEEN_AT_REQUIRED(HttpStatus.BAD_REQUEST, "마지막 확인 시각은 필수입니다."),
     WATCH_SESSION_ALREADY_COMPLETED(HttpStatus.CONFLICT, "이미 완료된 시청 세션입니다."),

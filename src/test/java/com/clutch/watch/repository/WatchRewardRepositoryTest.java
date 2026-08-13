@@ -77,30 +77,42 @@ class WatchRewardRepositoryTest {
     }
 
     /**
-     * 포인트 거래를 저장한 뒤 시청 세션 ID로 존재 여부와 거래를 조회할 수 있는지 검증한다.
+     * 같은 시청 세션의 여러 수령 회차를 저장하고 회차별로 조회할 수 있는지 검증한다.
      */
     @Test
-    void savesAndFindsPointTransactionByWatchSessionId() {
+    void savesAndFindsPointTransactionsByRewardSequence() {
         RewardFixture fixture = saveRewardFixture("watch-transaction@example.com", "transaction-session-key");
-        WatchPointTransaction transaction = WatchPointTransaction.create(
+        WatchPointTransaction firstTransaction = WatchPointTransaction.create(
                 fixture.userId(),
                 fixture.watchSessionId(),
+                1L,
                 fixture.esportsMatchId(),
-                50L
+                100L
         );
-        watchPointTransactionRepository.saveAndFlush(transaction);
+        WatchPointTransaction secondTransaction = WatchPointTransaction.create(
+                fixture.userId(),
+                fixture.watchSessionId(),
+                2L,
+                fixture.esportsMatchId(),
+                100L
+        );
+        watchPointTransactionRepository.saveAllAndFlush(java.util.List.of(
+                firstTransaction,
+                secondTransaction
+        ));
         entityManager.clear();
 
         boolean exists = watchPointTransactionRepository
-                .existsByWatchSessionId(fixture.watchSessionId());
+                .existsByWatchSessionIdAndRewardSequence(fixture.watchSessionId(), 2L);
         WatchPointTransaction foundTransaction = watchPointTransactionRepository
-                .findByWatchSessionId(fixture.watchSessionId())
+                .findByWatchSessionIdAndRewardSequence(fixture.watchSessionId(), 2L)
                 .orElseThrow();
 
         assertThat(exists).isTrue();
         assertThat(foundTransaction.getUserId()).isEqualTo(fixture.userId());
+        assertThat(foundTransaction.getRewardSequence()).isEqualTo(2L);
         assertThat(foundTransaction.getEsportsMatchId()).isEqualTo(fixture.esportsMatchId());
-        assertThat(foundTransaction.getAwardedPoint()).isEqualTo(50L);
+        assertThat(foundTransaction.getAwardedPoint()).isEqualTo(100L);
     }
 
     private RewardFixture saveRewardFixture(String email, String sessionKey) {

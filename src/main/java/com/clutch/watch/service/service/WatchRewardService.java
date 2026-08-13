@@ -29,6 +29,7 @@ import java.time.ZoneOffset;
 public class WatchRewardService {
 
     private static final long MILLISECONDS_PER_MINUTE = 60_000L;
+    private static final long LEGACY_SETTLEMENT_SEQUENCE = 1L;
 
     private final WatchSessionRepository watchSessionRepository;
     private final WatchPointTransactionRepository watchPointTransactionRepository;
@@ -84,6 +85,7 @@ public class WatchRewardService {
         WatchPointTransaction transaction = WatchPointTransaction.create(
                 watchSession.getUserId(),
                 watchSession.getId(),
+                LEGACY_SETTLEMENT_SEQUENCE,
                 watchSession.getEsportsMatchId(),
                 awardedPoint
         );
@@ -123,7 +125,10 @@ public class WatchRewardService {
      */
     private WatchRewardResult existingSettlement(WatchSession watchSession) {
         WatchPointTransaction transaction = watchPointTransactionRepository
-                .findByWatchSessionId(watchSession.getId())
+                .findByWatchSessionIdAndRewardSequence(
+                        watchSession.getId(),
+                        LEGACY_SETTLEMENT_SEQUENCE
+                )
                 .orElseThrow(() -> new WatchException(WatchError.POINT_TRANSACTION_NOT_FOUND));
 
         return new WatchRewardResult(

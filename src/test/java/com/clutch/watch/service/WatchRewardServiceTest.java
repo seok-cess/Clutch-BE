@@ -124,11 +124,13 @@ class WatchRewardServiceTest {
         WatchPointTransaction transaction = WatchPointTransaction.create(
                 USER_ID,
                 WATCH_SESSION_ID,
+                1L,
                 MATCH_ID,
                 50L
         );
         when(watchSessionRepository.findBySessionKey(SESSION_KEY)).thenReturn(Optional.of(watchSession));
-        when(watchPointTransactionRepository.findByWatchSessionId(WATCH_SESSION_ID))
+        when(watchPointTransactionRepository.findByWatchSessionIdAndRewardSequence(
+                WATCH_SESSION_ID, 1L))
                 .thenReturn(Optional.of(transaction));
 
         WatchRewardResult result = service.settle(snapshot(319_000L));
@@ -238,7 +240,8 @@ class WatchRewardServiceTest {
         WatchSession watchSession = watchSession();
         watchSession.complete(ENTERED_AT.plusMinutes(1), 60_000L);
         when(watchSessionRepository.findBySessionKey(SESSION_KEY)).thenReturn(Optional.of(watchSession));
-        when(watchPointTransactionRepository.findByWatchSessionId(WATCH_SESSION_ID)).thenReturn(Optional.empty());
+        when(watchPointTransactionRepository.findByWatchSessionIdAndRewardSequence(
+                WATCH_SESSION_ID, 1L)).thenReturn(Optional.empty());
 
         assertWatchError(() -> service.settle(snapshot(60_000L)), WatchError.POINT_TRANSACTION_NOT_FOUND);
     }

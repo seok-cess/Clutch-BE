@@ -105,8 +105,7 @@ class WatchRewardFlowIntegrationTest {
         flushRedisDatabase();
         for (String sessionKey : sessionKeys) {
             watchSessionRepository.findBySessionKey(sessionKey).ifPresent(session -> {
-                watchPointTransactionRepository.findByWatchSessionId(session.getId())
-                        .ifPresent(watchPointTransactionRepository::delete);
+                watchPointTransactionRepository.deleteAllByWatchSessionId(session.getId());
                 watchSessionRepository.delete(session);
             });
         }
@@ -130,7 +129,7 @@ class WatchRewardFlowIntegrationTest {
 
         WatchSession session = watchSessionRepository.findBySessionKey(sessionKey).orElseThrow();
         WatchPointTransaction transaction = watchPointTransactionRepository
-                .findByWatchSessionId(session.getId()).orElseThrow();
+                .findByWatchSessionIdAndRewardSequence(session.getId(), 1L).orElseThrow();
         User rewardedUser = userRepository.findById(user.getId()).orElseThrow();
         assertThat(rewardedUser.getPoint()).isEqualTo(10L);
         assertThat(session.getStatus()).isEqualTo(WatchSessionStatus.COMPLETED);
@@ -156,7 +155,7 @@ class WatchRewardFlowIntegrationTest {
 
         WatchSession session = watchSessionRepository.findBySessionKey(sessionKey).orElseThrow();
         WatchPointTransaction transaction = watchPointTransactionRepository
-                .findByWatchSessionId(session.getId()).orElseThrow();
+                .findByWatchSessionIdAndRewardSequence(session.getId(), 1L).orElseThrow();
         assertThat(userRepository.findById(user.getId()).orElseThrow().getPoint()).isZero();
         assertThat(session.getStatus()).isEqualTo(WatchSessionStatus.COMPLETED);
         assertThat(transaction.getAwardedPoint()).isZero();
@@ -184,8 +183,10 @@ class WatchRewardFlowIntegrationTest {
         assertThat(secondSession.getStatus()).isEqualTo(WatchSessionStatus.WATCHING);
         assertThat(userRepository.findById(user.getId()).orElseThrow().getPoint()).isEqualTo(10L);
         assertThat(watchSessionRedisRepository.findActiveSessionKey(user.getId())).contains(secondSessionKey);
-        assertThat(watchPointTransactionRepository.findByWatchSessionId(firstSession.getId())).isPresent();
-        assertThat(watchPointTransactionRepository.findByWatchSessionId(secondSession.getId())).isEmpty();
+        assertThat(watchPointTransactionRepository
+                .findByWatchSessionIdAndRewardSequence(firstSession.getId(), 1L)).isPresent();
+        assertThat(watchPointTransactionRepository
+                .findByWatchSessionIdAndRewardSequence(secondSession.getId(), 1L)).isEmpty();
     }
 
     /**
@@ -207,7 +208,8 @@ class WatchRewardFlowIntegrationTest {
 
         WatchSession session = watchSessionRepository.findBySessionKey(sessionKey).orElseThrow();
         assertThat(userRepository.findById(user.getId()).orElseThrow().getPoint()).isEqualTo(10L);
-        assertThat(watchPointTransactionRepository.findByWatchSessionId(session.getId())).isPresent();
+        assertThat(watchPointTransactionRepository
+                .findByWatchSessionIdAndRewardSequence(session.getId(), 1L)).isPresent();
     }
 
     /**
@@ -229,7 +231,8 @@ class WatchRewardFlowIntegrationTest {
 
         WatchSession session = watchSessionRepository.findBySessionKey(sessionKey).orElseThrow();
         assertThat(userRepository.findById(user.getId()).orElseThrow().getPoint()).isEqualTo(10L);
-        assertThat(watchPointTransactionRepository.findByWatchSessionId(session.getId())).isPresent();
+        assertThat(watchPointTransactionRepository
+                .findByWatchSessionIdAndRewardSequence(session.getId(), 1L)).isPresent();
         assertThat(watchSessionRedisRepository.findSession(sessionKey)).isEmpty();
     }
 
@@ -337,7 +340,7 @@ class WatchRewardFlowIntegrationTest {
         setEligibleMilliseconds(sessionKey, 60_000L);
         WatchSession session = watchSessionRepository.findBySessionKey(sessionKey).orElseThrow();
         watchPointTransactionRepository.saveAndFlush(WatchPointTransaction.create(
-                user.getId(), session.getId(), match.getId(), 0L
+                user.getId(), session.getId(), 1L, match.getId(), 0L
         ));
 
         assertThatThrownBy(() -> expirationListener.handleExpiredKey(aliveKey(user.getId(), sessionKey)))

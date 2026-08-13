@@ -33,8 +33,11 @@ public class WatchPointTransaction {
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
-    @Column(name = "watch_session_id", nullable = false, unique = true)
+    @Column(name = "watch_session_id", nullable = false)
     private Long watchSessionId;
+
+    @Column(name = "reward_sequence", nullable = false)
+    private long rewardSequence;
 
     @Column(name = "esports_match_id", nullable = false)
     private Long esportsMatchId;
@@ -53,6 +56,7 @@ public class WatchPointTransaction {
     private WatchPointTransaction(
             Long userId,
             Long watchSessionId,
+            long rewardSequence,
             Long esportsMatchId,
             long awardedPoint
     ) {
@@ -62,6 +66,9 @@ public class WatchPointTransaction {
         if (watchSessionId == null) {
             throw new WatchException(WatchError.WATCH_SESSION_ID_REQUIRED);
         }
+        if (rewardSequence < 1L) {
+            throw new WatchException(WatchError.REWARD_SEQUENCE_INVALID);
+        }
         if (esportsMatchId == null) {
             throw new WatchException(WatchError.MATCH_ID_REQUIRED);
         }
@@ -70,6 +77,7 @@ public class WatchPointTransaction {
         }
         this.userId = userId;
         this.watchSessionId = watchSessionId;
+        this.rewardSequence = rewardSequence;
         this.esportsMatchId = esportsMatchId;
         this.awardedPoint = awardedPoint;
     }
@@ -77,9 +85,16 @@ public class WatchPointTransaction {
     public static WatchPointTransaction create(
             Long userId,
             Long watchSessionId,
+            long rewardSequence,
             Long esportsMatchId,
             long awardedPoint
     ) {
-        return new WatchPointTransaction(userId, watchSessionId, esportsMatchId, awardedPoint);
+        return new WatchPointTransaction(
+                userId,
+                watchSessionId,
+                rewardSequence,
+                esportsMatchId,
+                awardedPoint
+        );
     }
 }
