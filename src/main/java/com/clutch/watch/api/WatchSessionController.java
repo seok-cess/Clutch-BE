@@ -1,16 +1,17 @@
 package com.clutch.watch.api;
 
 import com.clutch.watch.api.dto.HeartbeatRequest;
+import com.clutch.watch.api.dto.HeartbeatResponse;
 import com.clutch.watch.api.dto.WatchSessionStartResponse;
-import com.clutch.watch.exception.WatchError;
-import com.clutch.watch.exception.WatchException;
-import com.clutch.watch.redis.HeartbeatResult;
+import com.clutch.watch.api.dto.WatchPointClaimRequest;
+import com.clutch.watch.api.dto.WatchPointClaimResponse;
+import com.clutch.watch.service.service.WatchPointClaimService;
 import com.clutch.watch.service.service.WatchSessionService;
+import com.clutch.watch.service.dto.WatchHeartbeatResult;
 import com.clutch.watch.service.dto.WatchSessionStartResult;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -29,6 +30,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class WatchSessionController {
 
     private final WatchSessionService watchSessionService;
+    private final WatchPointClaimService watchPointClaimService;
 
     /**
      * 사용자를 경기에 입장시키고 새 시청 세션을 발급한다.
@@ -43,8 +45,7 @@ public class WatchSessionController {
             @PathVariable @Positive(message = "경기 ID는 1 이상이어야 합니다.") long matchId
     ) {
         WatchSessionStartResult result = watchSessionService.start(userId, matchId);
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(WatchSessionStartResponse.from(result));
+        return ResponseEntity.ok(WatchSessionStartResponse.from(result));
     }
 
     /**
@@ -53,38 +54,33 @@ public class WatchSessionController {
      * @param userId Heartbeat를 보낸 사용자 ID
      * @param sessionKey Heartbeat 대상 시청 세션 외부 식별자
      * @param request 증가한 Heartbeat 순번을 담은 요청
-     * @return 정상 처리 시 body가 없는 204 응답
-     * @throws WatchException Redis 검증 결과 Heartbeat를 처리할 수 없는 경우
+     * @return 현재 회차의 누적시간과 포인트 수령 가능 상태
      */
     @PostMapping("/watch-sessions/{sessionKey}/heartbeat")
-    public ResponseEntity<Void> heartbeat(
+    public ResponseEntity<HeartbeatResponse> heartbeat(
             @PathVariable @Positive(message = "사용자 ID는 1 이상이어야 합니다.") long userId,
             @PathVariable String sessionKey,
             @Valid @RequestBody HeartbeatRequest request
     ) {
-        HeartbeatResult result = watchSessionService.heartbeat(userId, sessionKey, request.sequence());
-        if (result != HeartbeatResult.SUCCESS) {
-            throw new WatchException(toError(result));
-        }
-        return ResponseEntity.noContent().build();
+        WatchHeartbeatResult result = watchSessionService.heartbeat(
+                userId,
+                sessionKey,
+                request.sequence()
+        );
+        return ResponseEntity.ok(HeartbeatResponse.from(result));
     }
 
     /**
-     * Redis Heartbeat 처리 결과를 API 오류 정책으로 변환한다.
-     *
-     * @param result 실패한 Redis Heartbeat 처리 결과
-     * @return HTTP 상태와 메시지를 가진 시청 세션 오류
-     * @throws WatchException 성공 결과를 오류로 변환하려는 경우
+     * 5분 누적을 완료한 현재 회차의 시청 포인트를 수령한다.
      */
-    private WatchError toError(HeartbeatResult result) {
-        return switch (result) {
-            case SWITCHING -> WatchError.WATCH_SESSION_SWITCHING;
-            case REPLACED -> WatchError.WATCH_SESSION_REPLACED;
-            case EXPIRED -> WatchError.WATCH_SESSION_EXPIRED;
-            case SESSION_NOT_FOUND -> WatchError.WATCH_SESSION_NOT_FOUND;
-            case USER_MISMATCH -> WatchError.WATCH_SESSION_USER_MISMATCH;
-            case INVALID_SEQUENCE -> WatchError.INVALID_HEARTBEAT_SEQUENCE;
-            case SUCCESS -> throw new WatchException(WatchError.HEARTBEAT_SUCCESS_MAPPING);
-        };
+    @PostMapping("/watch-sessions/{sessionKey}/point-claims")
+    public ResponseEntity<WatchPointClaimResponse> claimPoint(
+            @PathVariable @Positive(message = "사용자 ID는 1 이상이어야 합니다.") long userId,
+            @PathVariable String sessionKey,
+            @Valid @RequestBody WatchPointClaimRequest request
+    ) {
+        return ResponseEntity.ok(WatchPointClaimResponse.from(
+                watchPointClaimService.claim(userId, sessionKey, request.rewardSequence())
+        ));
     }
 }

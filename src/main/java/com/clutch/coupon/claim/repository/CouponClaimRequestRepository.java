@@ -20,4 +20,6 @@ public interface CouponClaimRequestRepository
             Long userId,
             Long couponEventOccurrenceId
     );
+
+    boolean existsByCouponEventId(Long couponEventId);
 }

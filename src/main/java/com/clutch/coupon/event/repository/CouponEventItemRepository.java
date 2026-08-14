@@ -53,4 +53,10 @@ public interface CouponEventItemRepository
     int increaseSuccessCountAtomically(
             @Param("couponEventItemId") Long couponEventItemId
     );
+
+    List<CouponEventItem> findAllByCouponEventIdIn(
+            List<Long> couponEventIds
+    );
+
+    void deleteAllByCouponEventId(Long couponEventId);
 }

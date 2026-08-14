@@ -1,4 +1,4 @@
-package com.clutch.watch.redis;
+package com.clutch.watch.redis.heartbeat;
 
 import com.clutch.watch.exception.WatchError;
 import com.clutch.watch.exception.WatchException;
@@ -22,7 +22,7 @@ public enum HeartbeatResult {
      * @return 문자열에 대응하는 heartbeat 처리 결과
      * @throws WatchException 정의되지 않은 결과 문자열인 경우
      */
-    static HeartbeatResult from(String value) {
+    public static HeartbeatResult from(String value) {
         try {
             return HeartbeatResult.valueOf(value);
         } catch (IllegalArgumentException exception) {

@@ -99,6 +99,21 @@ public class WatchSession {
     }
 
     /**
+     * 동일 경기의 최신 입장 화면만 요청할 수 있도록 외부 세션 키를 교체한다.
+     *
+     * @param newSessionKey 새로 발급할 외부 세션 키
+     */
+    public void replaceSessionKey(String newSessionKey) {
+        if (newSessionKey == null || newSessionKey.isBlank()) {
+            throw new WatchException(WatchError.SESSION_KEY_REQUIRED);
+        }
+        if (status != WatchSessionStatus.WATCHING) {
+            throw new WatchException(WatchError.WATCH_SESSION_ALREADY_COMPLETED);
+        }
+        this.sessionKey = newSessionKey;
+    }
+
+    /**
      * Redis에서 확정한 마지막 시청 상태를 반영하고 세션을 완료한다.
      */
     public void complete(LocalDateTime lastSeenAt, long eligibleMilliseconds) {

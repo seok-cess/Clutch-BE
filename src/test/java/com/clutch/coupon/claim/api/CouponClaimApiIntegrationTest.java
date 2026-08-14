@@ -183,6 +183,22 @@ class CouponClaimApiIntegrationTest {
                 10,
                 0
         );
+
+        jdbcTemplate.update(
+                """
+                        INSERT INTO coupon_event_phase (
+                            coupon_event_id,
+                            coupon_event_item_id,
+                            phase_sequence,
+                            open_offset_seconds
+                        )
+                        VALUES (?, ?, ?, ?)
+                        """,
+                COUPON_EVENT_ID,
+                COUPON_EVENT_ITEM_ID,
+                1,
+                0
+        );
     }
 
     /**

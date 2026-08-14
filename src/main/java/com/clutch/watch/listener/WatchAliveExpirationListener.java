@@ -1,6 +1,6 @@
 package com.clutch.watch.listener;
 
-import com.clutch.watch.redis.WatchSessionRedisRepository;
+import com.clutch.watch.redis.session.WatchSessionRedisRepository;
 import com.clutch.watch.service.service.WatchRewardService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
 import java.nio.charset.StandardCharsets;
 
 /**
- * Redis Alive TTL 만료를 감지하여 시청 세션의 포인트를 지급하고 Redis 상태를 정리한다.
+ * Redis Alive TTL 만료를 감지하여 미수령 보상을 폐기하고 시청 세션을 정리한다.
  */
 @Slf4j
 @Component
@@ -35,7 +35,7 @@ public class WatchAliveExpirationListener implements MessageListener {
     }
 
     /**
-     * Alive 키 만료 시 session snapshot을 기준으로 포인트를 지급하고 Redis 상태를 정리한다.
+     * Alive 키 만료 시 session snapshot을 DB에 미지급 종료 상태로 반영하고 Redis 상태를 정리한다.
      * Alive 키 이외의 만료 이벤트와 형식이 잘못된 키는 처리하지 않는다.
      *
      * @param expiredKey 만료된 Redis 키
@@ -47,7 +47,7 @@ public class WatchAliveExpirationListener implements MessageListener {
         }
 
         watchSessionRedisRepository.findSession(aliveKey.sessionKey()).ifPresent(snapshot -> {
-            watchRewardService.settle(snapshot);
+            watchRewardService.discard(snapshot);
             watchSessionRedisRepository.deleteActiveIfMatches(aliveKey.userId(), aliveKey.sessionKey());
             watchSessionRedisRepository.deleteSession(aliveKey.sessionKey());
         });

@@ -190,6 +190,18 @@ public class DataCacheService {
         return buf != null && !buf.frames.isEmpty();
     }
 
+    /**
+     * 피드 기준으로 이 세트가 끝났는지.
+     *
+     * esports-api 의 state=completed 는 실제 종료보다 약 5분 늦다 (2026-08-13 실측).
+     * 피드는 종료 즉시 마지막 프레임을 gameState=finished 로 주므로, 화면의 "세트 종료"
+     * 표시는 이 값을 쓴다. 세트 승패는 여기서 알 수 없다 — 그건 gameWins 로 판정한다.
+     */
+    public boolean isFeedFinished(String gameId) {
+        WindowResponse.Frame last = getNewestWindowFrame(gameId);
+        return last != null && "finished".equalsIgnoreCase(last.gameState());
+    }
+
     // ---- details 프레임 버퍼 ----
 
     public void addDetailsFrames(String gameId, List<DetailsResponse.Frame> newFrames) {

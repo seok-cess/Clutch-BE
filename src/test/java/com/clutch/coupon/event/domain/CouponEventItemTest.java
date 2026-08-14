@@ -10,31 +10,6 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class CouponEventItemTest {
 
-    @Test
-    void couponItemIsAvailableOnlyWithinTimeWindow() {
-        CouponEventItem couponEventItem =
-                new CouponEventItem();
-
-        ReflectionTestUtils.setField(
-                couponEventItem,
-                "availableFromSeconds",
-                5
-        );
-        ReflectionTestUtils.setField(
-                couponEventItem,
-                "availableUntilSeconds",
-                10
-        );
-
-        assertThat(couponEventItem.isAvailableAt(4))
-                .isFalse();
-        assertThat(couponEventItem.isAvailableAt(5))
-                .isTrue();
-        assertThat(couponEventItem.isAvailableAt(9))
-                .isTrue();
-        assertThat(couponEventItem.isAvailableAt(10))
-                .isFalse();
-    }
     /**
      * 잔여 수량 계산 검증
      */

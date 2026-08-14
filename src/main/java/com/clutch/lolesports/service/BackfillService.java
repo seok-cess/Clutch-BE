@@ -187,6 +187,20 @@ public class BackfillService {
                 return false;
             }
 
+            // 이 세트의 진영 (세트마다 바뀐다)
+            String blueTeamId = null;
+            String redTeamId = null;
+            if (game.teams() != null) {
+                for (EventDetailsResponse.GameTeam t : game.teams()) {
+                    if ("blue".equalsIgnoreCase(t.side())) {
+                        blueTeamId = t.id();
+                    } else if ("red".equalsIgnoreCase(t.side())) {
+                        redTeamId = t.id();
+                    }
+                }
+            }
+
+            // 백필 대상은 이미 끝난 매치라 completed 가 맞다
             GamePersistService.MatchContext ctx = new GamePersistService.MatchContext(
                     event.match().id(),
                     event.league() != null ? event.league().name() : null,
@@ -195,7 +209,9 @@ public class BackfillService {
                     "completed",
                     event.match().strategy() != null ? event.match().strategy().count() : null,
                     game.number() != null ? game.number() : 1,
-                    event.match().teams() != null ? event.match().teams() : List.of());
+                    event.match().teams() != null ? event.match().teams() : List.of(),
+                    blueTeamId,
+                    redTeamId);
 
             boolean ok = persistService.persistGame(gameId, ctx);
             if (ok) {

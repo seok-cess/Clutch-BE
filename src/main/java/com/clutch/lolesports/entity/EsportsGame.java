@@ -51,6 +51,19 @@ public class EsportsGame {
     @Column(name = "red_match_team_id")
     private Long redMatchTeamId;
 
+    /**
+     * 세트 승리 팀.
+     *
+     * 소스가 세트 승자를 주지 않아 매치의 gameWins 증가분으로 판정한다.
+     * 세트 종료보다 약 5분 늦게 확정되므로, 그전까지는 null 이다.
+     */
+    @Column(name = "winner_match_team_id")
+    private Long winnerMatchTeamId;
+
+    /** 승자 확정 시각. null 이면 아직 판정되지 않았다 (정산은 이 값이 있을 때만 신뢰) */
+    @Column(name = "winner_decided_at")
+    private LocalDateTime winnerDecidedAt;
+
     @Column(name = "lifecycle_status", nullable = false, length = 20)
     private String lifecycleStatus;
 
@@ -156,6 +169,30 @@ public class EsportsGame {
     public void assignSides(Long blueMatchTeamId, Long redMatchTeamId) {
         this.blueMatchTeamId = blueMatchTeamId;
         this.redMatchTeamId = redMatchTeamId;
+    }
+
+    /**
+     * 세트 승자를 확정한다. 이 세트에 참여하지 않은 팀이면 무시한다
+     * (DB CHECK 제약과 같은 조건 — 진영 매핑이 없으면 저장하지 않는다).
+     *
+     * @return 실제로 확정했으면 true
+     */
+    public boolean decideWinner(Long winnerMatchTeamId, LocalDateTime decidedAt) {
+        if (winnerMatchTeamId == null || decidedAt == null) {
+            return false;
+        }
+        boolean participated = winnerMatchTeamId.equals(blueMatchTeamId)
+                || winnerMatchTeamId.equals(redMatchTeamId);
+        if (!participated) {
+            return false;
+        }
+        this.winnerMatchTeamId = winnerMatchTeamId;
+        this.winnerDecidedAt = decidedAt;
+        return true;
+    }
+
+    public boolean isWinnerDecided() {
+        return winnerMatchTeamId != null;
     }
 
     public void updateMeta(String telemetryState, String patchVersion,

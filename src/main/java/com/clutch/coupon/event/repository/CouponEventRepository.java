@@ -1,6 +1,9 @@
 package com.clutch.coupon.event.repository;
 
 import com.clutch.coupon.event.domain.CouponEvent;
+import com.clutch.coupon.event.domain.CouponEventStatus;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 /**
@@ -8,4 +11,33 @@ import org.springframework.data.jpa.repository.JpaRepository;
  */
 public interface CouponEventRepository
         extends JpaRepository<CouponEvent, Long> {
+
+    boolean existsByEsportsMatchIdAndTriggerType(
+            Long esportsMatchId,
+            String triggerType
+    );
+
+    boolean existsByEsportsMatchIdAndTriggerTypeAndIdNot(
+            Long esportsMatchId,
+            String triggerType,
+            Long couponEventId
+    );
+
+    Slice<CouponEvent> findAllByOrderByIdDesc(Pageable pageable);
+
+    Slice<CouponEvent> findByIdLessThanOrderByIdDesc(
+            Long cursor,
+            Pageable pageable
+    );
+
+    Slice<CouponEvent> findByEventStatusOrderByIdDesc(
+            CouponEventStatus eventStatus,
+            Pageable pageable
+    );
+
+    Slice<CouponEvent> findByEventStatusAndIdLessThanOrderByIdDesc(
+            CouponEventStatus eventStatus,
+            Long cursor,
+            Pageable pageable
+    );
 }

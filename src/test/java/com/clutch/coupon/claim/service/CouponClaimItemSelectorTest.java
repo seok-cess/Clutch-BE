@@ -3,7 +3,9 @@ package com.clutch.coupon.claim.service;
 import com.clutch.coupon.claim.exception.CouponClaimException;
 import com.clutch.coupon.event.domain.CouponEventItem;
 import com.clutch.coupon.event.domain.CouponEventOccurrence;
+import com.clutch.coupon.event.domain.CouponEventPhase;
 import com.clutch.coupon.event.repository.CouponEventItemRepository;
+import com.clutch.coupon.event.repository.CouponEventPhaseRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -11,7 +13,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
-import java.util.List;
+import java.util.Optional;
 
 import static com.clutch.coupon.claim.exception.CouponClaimErrorCode
         .COUPON_EVENT_ITEM_NOT_AVAILABLE;
@@ -34,19 +36,23 @@ class CouponClaimItemSelectorTest {
             couponEventItemRepository;
 
     @Mock
+    private CouponEventPhaseRepository
+            couponEventPhaseRepository;
+
+    @Mock
     private CouponEventOccurrence couponEventOccurrence;
 
     @Mock
-    private CouponEventItem firstCouponEventItem;
+    private CouponEventPhase activePhase;
 
     @Mock
-    private CouponEventItem secondCouponEventItem;
+    private CouponEventItem activeCouponEventItem;
 
     @InjectMocks
     private CouponClaimItemSelector couponClaimItemSelector;
 
     /**
-     * 경과 시간 기준 쿠폰 항목 선택 검증
+     * 경과 시간 기준 활성 단계 쿠폰 항목 선택 검증
      */
     @Test
     void selectsCouponItemAvailableAtElapsedTime() {
@@ -62,18 +68,20 @@ class CouponClaimItemSelectorTest {
         when(couponEventOccurrence.getOpenedAt())
                 .thenReturn(openedAt);
 
+        when(couponEventPhaseRepository
+                .findFirstByCouponEventIdAndOpenOffsetSecondsLessThanEqualOrderByOpenOffsetSecondsDesc(
+                        COUPON_EVENT_ID,
+                        7
+                ))
+                .thenReturn(Optional.of(activePhase));
+        when(activePhase.getCouponEventItemId())
+                .thenReturn(20L);
         when(couponEventItemRepository
-                .findAllByCouponEventId(COUPON_EVENT_ID))
-                .thenReturn(List.of(
-                        firstCouponEventItem,
-                        secondCouponEventItem
-                ));
-
-        when(firstCouponEventItem.isAvailableAt(7L))
-                .thenReturn(false);
-
-        when(secondCouponEventItem.isAvailableAt(7L))
-                .thenReturn(true);
+                .findByCouponEventIdAndId(
+                        COUPON_EVENT_ID,
+                        20L
+                ))
+                .thenReturn(Optional.of(activeCouponEventItem));
 
         CouponEventItem selectedCouponEventItem =
                 couponClaimItemSelector.select(
@@ -83,13 +91,13 @@ class CouponClaimItemSelectorTest {
                 );
 
         assertThat(selectedCouponEventItem)
-                .isSameAs(secondCouponEventItem);
+                .isSameAs(activeCouponEventItem);
 
-        verify(firstCouponEventItem)
-                .isAvailableAt(7L);
-
-        verify(secondCouponEventItem)
-                .isAvailableAt(7L);
+        verify(couponEventPhaseRepository)
+                .findFirstByCouponEventIdAndOpenOffsetSecondsLessThanEqualOrderByOpenOffsetSecondsDesc(
+                        COUPON_EVENT_ID,
+                        7
+                );
     }
 
     /**
@@ -109,12 +117,12 @@ class CouponClaimItemSelectorTest {
         when(couponEventOccurrence.getOpenedAt())
                 .thenReturn(openedAt);
 
-        when(couponEventItemRepository
-                .findAllByCouponEventId(COUPON_EVENT_ID))
-                .thenReturn(List.of(firstCouponEventItem));
-
-        when(firstCouponEventItem.isAvailableAt(15L))
-                .thenReturn(false);
+        when(couponEventPhaseRepository
+                .findFirstByCouponEventIdAndOpenOffsetSecondsLessThanEqualOrderByOpenOffsetSecondsDesc(
+                        COUPON_EVENT_ID,
+                        15
+                ))
+                .thenReturn(Optional.empty());
 
         CouponClaimException exception =
                 catchThrowableOfType(

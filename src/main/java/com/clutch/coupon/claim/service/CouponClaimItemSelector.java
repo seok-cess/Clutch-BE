@@ -3,7 +3,9 @@ package com.clutch.coupon.claim.service;
 import com.clutch.coupon.claim.exception.CouponClaimException;
 import com.clutch.coupon.event.domain.CouponEventItem;
 import com.clutch.coupon.event.domain.CouponEventOccurrence;
+import com.clutch.coupon.event.domain.CouponEventPhase;
 import com.clutch.coupon.event.repository.CouponEventItemRepository;
+import com.clutch.coupon.event.repository.CouponEventPhaseRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -22,6 +24,8 @@ public class CouponClaimItemSelector {
 
     private final CouponEventItemRepository
             couponEventItemRepository;
+    private final CouponEventPhaseRepository
+            couponEventPhaseRepository;
 
     /**
      * 활성 쿠폰 이벤트 항목 선택
@@ -41,19 +45,34 @@ public class CouponClaimItemSelector {
                 currentTime
         ).getSeconds();
 
+        if (elapsedSeconds < 0
+                || elapsedSeconds > Integer.MAX_VALUE) {
+            throw itemNotAvailable();
+        }
+
+        CouponEventPhase activePhase =
+                couponEventPhaseRepository
+                        .findFirstByCouponEventIdAndOpenOffsetSecondsLessThanEqualOrderByOpenOffsetSecondsDesc(
+                                couponEventId,
+                                (int) elapsedSeconds
+                        )
+                        .orElseThrow(
+                                CouponClaimItemSelector::itemNotAvailable
+                        );
+
         return couponEventItemRepository
-                .findAllByCouponEventId(couponEventId)
-                .stream()
-                .filter(couponEventItem ->
-                        couponEventItem.isAvailableAt(
-                                elapsedSeconds
-                        )
+                .findByCouponEventIdAndId(
+                        couponEventId,
+                        activePhase.getCouponEventItemId()
                 )
-                .findFirst()
-                .orElseThrow(() ->
-                        new CouponClaimException(
-                                COUPON_EVENT_ITEM_NOT_AVAILABLE
-                        )
+                .orElseThrow(
+                        CouponClaimItemSelector::itemNotAvailable
                 );
+    }
+
+    private static CouponClaimException itemNotAvailable() {
+        return new CouponClaimException(
+                COUPON_EVENT_ITEM_NOT_AVAILABLE
+        );
     }
 }
