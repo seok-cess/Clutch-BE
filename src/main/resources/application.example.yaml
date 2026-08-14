@@ -68,6 +68,9 @@ lolesports:
   live-stats-lag-seconds: 30
   # 재생 여유(초). 소스가 10초 블록으로 주므로 그만큼 뒤에서 재생해야 끊기지 않는다.
   display-lag-seconds: 15
+  # 매치 종료 판정 후 라이브 목록에 남겨둘 시간(초).
+  # 소스 getLive 는 경기가 끝나도 언제 내려갈지 예측할 수 없어 우리가 직접 내린다.
+  live-retain-after-finish-seconds: 300
   poll:
     live-check-ms: 60000    # getLive 감시 주기
     in-game-ms: 1000        # window/details 인게임 폴링 주기

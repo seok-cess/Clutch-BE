@@ -22,6 +22,15 @@ public record LolesportsProperties(
         long liveStatsLagSeconds,
         /** 화면 재생 시점 = now - 이 값(초). 프레임 버퍼에서 이 시점 프레임을 골라 응답 */
         long displayLagSeconds,
+        /**
+         * 매치 종료 판정 후 라이브 목록에 남겨둘 시간(초).
+         *
+         * 소스의 getLive 는 경기가 끝나도 언제 내려갈지 예측할 수 없다
+         * (2026-08-14 OME vs DOG: 종료 4.8분 뒤에도 잔류). 그래서 소스를 기다리지 않고
+         * 우리가 판정한 종료 시각 기준으로 이 시간이 지나면 목록에서 뺀다.
+         * 사용자가 최종 결과를 확인할 여유를 주는 값이다.
+         */
+        long liveRetainAfterFinishSeconds,
         Poll poll
 ) {
 
@@ -47,6 +56,9 @@ public record LolesportsProperties(
         }
         if (displayLagSeconds <= 0) {
             displayLagSeconds = 15;
+        }
+        if (liveRetainAfterFinishSeconds <= 0) {
+            liveRetainAfterFinishSeconds = 300;   // 5분
         }
         if (poll == null) {
             poll = new Poll(0, 0, 0, 0, 0);   // Poll 의 기본값 보정에 위임
