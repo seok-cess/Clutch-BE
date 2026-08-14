@@ -70,4 +70,33 @@ class MatchStateTest {
         assertEquals("completed", stateAfterSet(null, 1, 0));
         assertEquals("inProgress", stateAfterSet(null, 0, 0));
     }
+
+    /**
+     * 진영은 세트마다 바뀐다. getEventDetails 의 세트별 side 를 그대로 실어야
+     * 피드 메타가 없을 때도 승자를 진영에 귀속할 수 있다.
+     */
+    @Test
+    void 세트별_진영을_그_세트의_값으로_담는다() {
+        DataCacheService.LiveMatch match = new DataCacheService.LiveMatch(
+                "m1", "1주 차", "LCK", "2026-08-13T08:00:00Z",
+                List.of(team("tA", "AAA", 1), team("tB", "BBB", 1)),
+                List.of(
+                        new EventDetailsResponse.Game("g1", 1, "completed", List.of(
+                                new EventDetailsResponse.GameTeam("tA", "blue"),
+                                new EventDetailsResponse.GameTeam("tB", "red"))),
+                        new EventDetailsResponse.Game("g2", 2, "completed", List.of(
+                                new EventDetailsResponse.GameTeam("tB", "blue"),
+                                new EventDetailsResponse.GameTeam("tA", "red")))),
+                null);
+
+        GamePersistService.MatchContext g1 =
+                GamePersistService.MatchContext.of(match, "g1", 3);
+        assertEquals("tA", g1.blueTeamId());
+        assertEquals("tB", g1.redTeamId());
+
+        GamePersistService.MatchContext g2 =
+                GamePersistService.MatchContext.of(match, "g2", 3);
+        assertEquals("tB", g2.blueTeamId());
+        assertEquals("tA", g2.redTeamId());
+    }
 }

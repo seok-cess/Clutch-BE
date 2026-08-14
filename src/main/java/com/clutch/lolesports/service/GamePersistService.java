@@ -205,11 +205,18 @@ public class GamePersistService {
 
         WindowResponse.GameMetadata meta = cache.getWindowMeta(externalGameId);
 
-        // 진영 판별 — 스코어보드의 esportsTeamId 를 match_team 과 매칭한다
+        // 진영 판별 — 스코어보드의 esportsTeamId 를 match_team 과 매칭한다.
+        // 피드 메타가 없거나 매칭이 안 되면 getEventDetails 가 준 세트별 진영으로 보완한다.
         MatchTeam blue = meta != null && meta.blueTeamMetadata() != null
                 ? teamsByExternalId.get(meta.blueTeamMetadata().esportsTeamId()) : null;
         MatchTeam red = meta != null && meta.redTeamMetadata() != null
                 ? teamsByExternalId.get(meta.redTeamMetadata().esportsTeamId()) : null;
+        if (blue == null) {
+            blue = teamsByExternalId.get(ctx.blueTeamId());
+        }
+        if (red == null) {
+            red = teamsByExternalId.get(ctx.redTeamId());
+        }
         game.assignSides(blue != null ? blue.getId() : null, red != null ? red.getId() : null);
 
         Instant start = cache.getGameStart(externalGameId);
@@ -550,21 +557,40 @@ public class GamePersistService {
             String state,
             Integer bestOf,
             Integer gameNumber,
-            List<ScheduleResponse.Team> teams
+            List<ScheduleResponse.Team> teams,
+            /** 이 세트의 블루 진영 팀 id — getEventDetails 기준 (피드 메타가 없을 때 사용) */
+            String blueTeamId,
+            /** 이 세트의 레드 진영 팀 id */
+            String redTeamId
     ) {
         /** 라이브 매치 + 세트 번호로 만든다 */
         public static MatchContext of(DataCacheService.LiveMatch m, String gameId, Integer bestOf) {
             int number = 1;
+            String blueTeamId = null;
+            String redTeamId = null;
             if (m.games() != null) {
                 for (EventDetailsResponse.Game g : m.games()) {
-                    if (gameId.equals(g.id()) && g.number() != null) {
+                    if (!gameId.equals(g.id())) {
+                        continue;
+                    }
+                    if (g.number() != null) {
                         number = g.number();
+                    }
+                    // 진영은 세트마다 바뀐다 — 이 세트의 값을 쓴다
+                    if (g.teams() != null) {
+                        for (EventDetailsResponse.GameTeam t : g.teams()) {
+                            if ("blue".equalsIgnoreCase(t.side())) {
+                                blueTeamId = t.id();
+                            } else if ("red".equalsIgnoreCase(t.side())) {
+                                redTeamId = t.id();
+                            }
+                        }
                     }
                 }
             }
             List<ScheduleResponse.Team> teams = m.teams() != null ? m.teams() : List.of();
             return new MatchContext(m.matchId(), m.leagueName(), m.blockName(), m.startTime(),
-                    matchStateOf(teams, bestOf), bestOf, number, teams);
+                    matchStateOf(teams, bestOf), bestOf, number, teams, blueTeamId, redTeamId);
         }
 
         /**

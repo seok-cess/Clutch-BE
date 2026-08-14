@@ -15,6 +15,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -127,37 +128,82 @@ public class PollingScheduler {
     private DataCacheService.LiveMatch resolveLiveMatch(ScheduleResponse.Event event) {
         String matchId = event.match().id();
         List<EventDetailsResponse.Game> games = List.of();
+        List<ScheduleResponse.Team> detailTeams = List.of();
         String activeGameId = null;
 
         try {
             EventDetailsResponse details = api.getEventDetails(matchId);
             if (details != null && details.data() != null && details.data().event() != null
-                    && details.data().event().match() != null
-                    && details.data().event().match().games() != null) {
-                games = details.data().event().match().games();
-                activeGameId = games.stream()
-                        .filter(g -> "inProgress".equalsIgnoreCase(g.state()))
-                        .map(EventDetailsResponse.Game::id)
-                        .findFirst()
-                        .orElse(null);
+                    && details.data().event().match() != null) {
+                EventDetailsResponse.Match m = details.data().event().match();
+                if (m.teams() != null) {
+                    detailTeams = m.teams();
+                }
+                if (m.games() != null) {
+                    games = m.games();
+                    activeGameId = games.stream()
+                            .filter(g -> "inProgress".equalsIgnoreCase(g.state()))
+                            .map(EventDetailsResponse.Game::id)
+                            .findFirst()
+                            .orElse(null);
+                }
             }
         } catch (Exception e) {
             // 매치 하나 실패해도 나머지 라이브 매치 처리는 계속한다
             log.warn("getEventDetails 실패 (matchId={}): {}", matchId, e.toString());
         }
 
+        List<ScheduleResponse.Team> teams = mergeTeamIds(event.match().teams(), detailTeams);
+
         // gameWins 증가분으로 세트 승자를 확정한다 (세트별 승패를 주는 필드가 없다)
-        setWinners.observe(matchId, event.match().teams(), games);
+        setWinners.observe(matchId, teams, games);
 
         return new DataCacheService.LiveMatch(
                 matchId,
                 event.blockName(),
                 event.league() != null ? event.league().name() : null,
                 event.startTime(),
-                event.match().teams(),
+                teams,
                 games,
                 activeGameId
         );
+    }
+
+    /**
+     * 팀 id 를 채워 넣는다.
+     *
+     * getLive/getSchedule 의 팀 객체에는 id 가 없고 code·result·record 만 있다.
+     * 그래서 진영(블루/레드) 판별과 세트 승자 귀속이 불가능했다 —
+     * match_team.external_team_id 가 대부분 비어 있던 원인이다.
+     *
+     * getEventDetails 는 반대로 팀 id 를 주지만 result(gameWins)·record 를 주지 않는다.
+     * 두 응답을 팀 코드로 맞춰 id 만 보완한다.
+     *
+     * @param base   getLive/getSchedule 팀 (result·record 보유)
+     * @param detail getEventDetails 팀 (id 보유)
+     */
+    private static List<ScheduleResponse.Team> mergeTeamIds(List<ScheduleResponse.Team> base,
+                                                            List<ScheduleResponse.Team> detail) {
+        if (base == null || base.isEmpty() || detail == null || detail.isEmpty()) {
+            return base != null ? base : List.of();
+        }
+        Map<String, String> idByCode = new HashMap<>();
+        for (ScheduleResponse.Team t : detail) {
+            if (t.code() != null && t.id() != null) {
+                idByCode.put(t.code(), t.id());
+            }
+        }
+        if (idByCode.isEmpty()) {
+            return base;
+        }
+
+        List<ScheduleResponse.Team> merged = new ArrayList<>(base.size());
+        for (ScheduleResponse.Team t : base) {
+            String id = t.id() != null ? t.id() : idByCode.get(t.code());
+            merged.add(new ScheduleResponse.Team(
+                    id, t.name(), t.code(), t.image(), t.result(), t.record()));
+        }
+        return merged;
     }
 
     /**
