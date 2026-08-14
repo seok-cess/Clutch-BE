@@ -40,10 +40,39 @@ public class DataCacheService {
             String blockName,
             String leagueName,
             String startTime,
+            Integer bestOf,        // 다전제 수 — 매치 종료 판정에 필요하다
             List<ScheduleResponse.Team> teams,
             List<EventDetailsResponse.Game> games,
             String activeGameId    // state=inProgress 인 게임의 id (없으면 null)
     ) {
+
+        /**
+         * 매치가 끝났는지 우리가 판정한다.
+         *
+         * 소스의 getLive 는 매치가 끝나도 한동안 state=inProgress 로 남는다
+         * (2026-08-14 OME vs DOG: 3세트 종료·outcome 확정 후에도 getLive 에 잔류).
+         * 그 값을 기다리면 화면이 "밴픽/대기 중"에 머문다.
+         *
+         * gameWins 가 과반에 도달하면 최종 승리 팀이 정해진 것이므로 종료로 본다.
+         */
+        public boolean isFinished() {
+            return winnerTeamId() != null;
+        }
+
+        /** 매치 최종 승리 팀 id — 아직 안 끝났으면 null */
+        public String winnerTeamId() {
+            if (teams == null) {
+                return null;
+            }
+            int needed = (bestOf == null ? 1 : bestOf) / 2 + 1;
+            for (ScheduleResponse.Team t : teams) {
+                if (t.result() != null && t.result().gameWins() != null
+                        && t.result().gameWins() >= needed) {
+                    return t.id();
+                }
+            }
+            return null;
+        }
     }
 
     /** 게임 하나의 window 프레임 타임라인 (rfc460Timestamp 키 → 중복 자동 제거) */

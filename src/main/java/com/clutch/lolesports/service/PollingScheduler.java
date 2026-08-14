@@ -130,6 +130,7 @@ public class PollingScheduler {
         List<EventDetailsResponse.Game> games = List.of();
         List<ScheduleResponse.Team> detailTeams = List.of();
         String activeGameId = null;
+        Integer bestOf = null;
 
         try {
             EventDetailsResponse details = api.getEventDetails(matchId);
@@ -138,6 +139,9 @@ public class PollingScheduler {
                 EventDetailsResponse.Match m = details.data().event().match();
                 if (m.teams() != null) {
                     detailTeams = m.teams();
+                }
+                if (m.strategy() != null) {
+                    bestOf = m.strategy().count();
                 }
                 if (m.games() != null) {
                     games = m.games();
@@ -163,6 +167,7 @@ public class PollingScheduler {
                 event.blockName(),
                 event.league() != null ? event.league().name() : null,
                 event.startTime(),
+                bestOf != null ? bestOf : bestOfFromSchedule(matchId),
                 teams,
                 games,
                 activeGameId

@@ -7,6 +7,9 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * 세트 종료 시 저장되는 매치 상태 검증.
@@ -25,7 +28,7 @@ class MatchStateTest {
     /** 세트 하나가 끝난 상황을 만든다 (적재는 항상 세트 단위로 일어난다) */
     private static String stateAfterSet(Integer bestOf, Integer winsA, Integer winsB) {
         DataCacheService.LiveMatch match = new DataCacheService.LiveMatch(
-                "m1", "1주 차", "LCK", "2026-08-13T08:00:00Z",
+                "m1", "1주 차", "LCK", "2026-08-13T08:00:00Z", bestOf,
                 List.of(team("tA", "AAA", winsA), team("tB", "BBB", winsB)),
                 List.of(new EventDetailsResponse.Game("g1", 1, "completed", List.of())),
                 null);
@@ -71,6 +74,41 @@ class MatchStateTest {
         assertEquals("inProgress", stateAfterSet(null, 0, 0));
     }
 
+    private static DataCacheService.LiveMatch liveMatch(Integer bestOf, int winsA, int winsB,
+                                                        String activeGameId) {
+        return new DataCacheService.LiveMatch(
+                "m1", "1주 차", "LCK", "2026-08-13T08:00:00Z", bestOf,
+                List.of(team("tA", "AAA", winsA), team("tB", "BBB", winsB)),
+                List.of(new EventDetailsResponse.Game("g1", 1, "completed", List.of())),
+                activeGameId);
+    }
+
+    /**
+     * 소스의 getLive 는 매치가 끝나도 한동안 진행중으로 남는다 (2026-08-14 OME vs DOG:
+     * 3세트 종료·outcome 확정 후에도 잔류). 종료 판정을 소스에 맡기면 화면이
+     * "밴픽/대기 중"에 머물러, 과반 득점으로 우리가 판정한다.
+     */
+    @Test
+    void 과반_득점이면_소스와_무관하게_매치가_끝난_것으로_본다() {
+        DataCacheService.LiveMatch finished = liveMatch(3, 1, 2, null);
+        assertTrue(finished.isFinished());
+        assertEquals("tB", finished.winnerTeamId());
+    }
+
+    @Test
+    void 과반_전에는_매치가_끝나지_않았다() {
+        DataCacheService.LiveMatch ongoing = liveMatch(3, 1, 1, null);
+        assertFalse(ongoing.isFinished());
+        assertNull(ongoing.winnerTeamId());
+    }
+
+    /** 세트 사이(밴픽)에는 activeGameId 가 없지만 매치는 아직 진행중이다 */
+    @Test
+    void 세트_사이는_매치_종료가_아니다() {
+        DataCacheService.LiveMatch betweenSets = liveMatch(5, 2, 1, null);
+        assertFalse(betweenSets.isFinished());
+    }
+
     /**
      * 진영은 세트마다 바뀐다. getEventDetails 의 세트별 side 를 그대로 실어야
      * 피드 메타가 없을 때도 승자를 진영에 귀속할 수 있다.
@@ -78,7 +116,7 @@ class MatchStateTest {
     @Test
     void 세트별_진영을_그_세트의_값으로_담는다() {
         DataCacheService.LiveMatch match = new DataCacheService.LiveMatch(
-                "m1", "1주 차", "LCK", "2026-08-13T08:00:00Z",
+                "m1", "1주 차", "LCK", "2026-08-13T08:00:00Z", 3,
                 List.of(team("tA", "AAA", 1), team("tB", "BBB", 1)),
                 List.of(
                         new EventDetailsResponse.Game("g1", 1, "completed", List.of(
