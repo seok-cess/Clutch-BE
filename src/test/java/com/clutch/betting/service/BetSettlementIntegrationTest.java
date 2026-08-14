@@ -3,6 +3,7 @@ package com.clutch.betting.service;
 import com.clutch.betting.domain.BetPointTransaction;
 import com.clutch.betting.domain.BettingEvent;
 import com.clutch.betting.domain.BettingEventStatus;
+import com.clutch.betting.domain.BetPointTransactionType;
 import com.clutch.betting.domain.UserBet;
 import com.clutch.betting.domain.UserBetStatus;
 import com.clutch.betting.repository.BetPointTransactionRepository;
@@ -31,6 +32,9 @@ class BetSettlementIntegrationTest {
     private BetSettlementProcessor settlementProcessor;
 
     @Autowired
+    private BetRefundProcessor refundProcessor;
+
+    @Autowired
     private BettingEventRepository eventRepository;
 
     @Autowired
@@ -53,6 +57,9 @@ class BetSettlementIntegrationTest {
 
     @MockitoBean
     private BetSettlementScheduler settlementScheduler;
+
+    @MockitoBean
+    private BetRefundScheduler refundScheduler;
 
     @Test
     void settlesPersistedBetsExactlyOnce() {
@@ -99,5 +106,47 @@ class BetSettlementIntegrationTest {
                 .isEqualTo(2_000L);
         assertThat(userRepository.findById(loser.getId()).orElseThrow().getPoint())
                 .isZero();
+    }
+
+    @Test
+    void refundsCancelledBetExactlyOnce() {
+        User user = User.create(UserRole.USER, "refund-user@example.com");
+        user.changePoint(1_000L);
+        userRepository.saveAndFlush(user);
+        BettingEvent event = BettingEvent.open(
+                "refund-match",
+                3,
+                "team-a",
+                "team-b",
+                LocalDateTime.of(2026, 8, 14, 10, 0)
+        );
+        event.cancel();
+        eventRepository.saveAndFlush(event);
+        assertThat(userRepository.decreasePointIfEnough(user.getId(), 1_000L)).isEqualTo(1);
+        UserBet userBet = userBetRepository.saveAndFlush(
+                UserBet.place(event.getId(), user.getId(), "team-a", 1_000L)
+        );
+        transactionRepository.saveAndFlush(
+                BetPointTransaction.stake(userBet.getId(), userBet.getAmount())
+        );
+        entityManager.clear();
+
+        BetRefundResult firstResult = refundProcessor.refund(event.getId());
+        entityManager.flush();
+        entityManager.clear();
+        BetRefundResult secondResult = refundProcessor.refund(event.getId());
+        entityManager.flush();
+        entityManager.clear();
+
+        assertThat(firstResult.totalRefundPoint()).isEqualTo(1_000L);
+        assertThat(secondResult.alreadyProcessed()).isTrue();
+        assertThat(userRepository.findById(user.getId()).orElseThrow().getPoint())
+                .isEqualTo(1_000L);
+        assertThat(userBetRepository.findById(userBet.getId()).orElseThrow().getStatus())
+                .isEqualTo(UserBetStatus.REFUNDED);
+        assertThat(transactionRepository.existsByUserBetIdAndTransactionType(
+                userBet.getId(),
+                BetPointTransactionType.REFUND
+        )).isTrue();
     }
 }

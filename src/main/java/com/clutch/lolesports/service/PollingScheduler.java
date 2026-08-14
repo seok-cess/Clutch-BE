@@ -165,6 +165,7 @@ public class PollingScheduler {
                 event.startTime(),
                 teams,
                 games,
+                event.match().strategy() != null ? event.match().strategy().count() : null,
                 activeGameId
         );
     }

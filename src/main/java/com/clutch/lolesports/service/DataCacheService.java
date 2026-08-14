@@ -42,6 +42,7 @@ public class DataCacheService {
             String startTime,
             List<ScheduleResponse.Team> teams,
             List<EventDetailsResponse.Game> games,
+            Integer bestOf,
             String activeGameId    // state=inProgress 인 게임의 id (없으면 null)
     ) {
     }

@@ -98,6 +98,10 @@ public class UserBet {
         transitionFromPlaced(UserBetStatus.LOST);
     }
 
+    public void refund() {
+        transitionFromPlaced(UserBetStatus.REFUNDED);
+    }
+
     private void transitionFromPlaced(UserBetStatus targetStatus) {
         if (status == targetStatus) {
             return;

@@ -28,6 +28,7 @@ class MatchStateTest {
                 "m1", "1주 차", "LCK", "2026-08-13T08:00:00Z",
                 List.of(team("tA", "AAA", winsA), team("tB", "BBB", winsB)),
                 List.of(new EventDetailsResponse.Game("g1", 1, "completed", List.of())),
+                bestOf,
                 null);
         return GamePersistService.MatchContext.of(match, "g1", bestOf).state();
     }
@@ -87,6 +88,7 @@ class MatchStateTest {
                         new EventDetailsResponse.Game("g2", 2, "completed", List.of(
                                 new EventDetailsResponse.GameTeam("tB", "blue"),
                                 new EventDetailsResponse.GameTeam("tA", "red")))),
+                3,
                 null);
 
         GamePersistService.MatchContext g1 =

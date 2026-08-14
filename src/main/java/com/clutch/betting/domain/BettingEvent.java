@@ -188,6 +188,14 @@ public class BettingEvent {
         status = BettingEventStatus.SETTLED;
     }
 
+    public void cancel() {
+        if (status == BettingEventStatus.SETTLED || status == BettingEventStatus.CANCELLED) {
+            return;
+        }
+        winnerExternalTeamId = null;
+        status = BettingEventStatus.CANCELLED;
+    }
+
     private static String requireText(String value, String message) {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException(message);

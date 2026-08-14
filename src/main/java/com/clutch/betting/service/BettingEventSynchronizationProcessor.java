@@ -72,6 +72,17 @@ public class BettingEventSynchronizationProcessor {
                 event.recordWinner(set.winnerExternalTeamId());
             }
         }
+        if (liveMatch.matchFinished()) {
+            int lastFinishedSetNumber = sets.stream()
+                    .filter(SetSnapshot::finished)
+                    .mapToInt(SetSnapshot::setNumber)
+                    .max()
+                    .orElse(0);
+            bettingEventRepository.findAllFutureEventsForUpdate(
+                    liveMatch.externalMatchId(),
+                    lastFinishedSetNumber
+            ).forEach(BettingEvent::cancel);
+        }
     }
 
     private boolean isUsable(LiveMatchSnapshot liveMatch) {

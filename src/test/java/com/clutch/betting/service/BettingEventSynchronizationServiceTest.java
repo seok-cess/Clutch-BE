@@ -45,7 +45,8 @@ class BettingEventSynchronizationServiceTest {
                         true,
                         false,
                         null
-                ))
+                )),
+                false
         );
         given(repository.findByExternalMatchIdAndSetNumber("match-1", 1))
                 .willReturn(Optional.empty());
@@ -80,7 +81,8 @@ class BettingEventSynchronizationServiceTest {
         service.synchronizeMatch(new LiveMatchSnapshot(
                 "match-1",
                 List.of("team-a", "team-b"),
-                List.of(new SetSnapshot("game-1", 1, null, false, true, "team-a"))
+                List.of(new SetSnapshot("game-1", 1, null, false, true, "team-a")),
+                false
         ));
 
         assertThat(current.getStatus()).isEqualTo(BettingEventStatus.CLOSED);
@@ -96,11 +98,45 @@ class BettingEventSynchronizationServiceTest {
         service.synchronizeMatch(new LiveMatchSnapshot(
                 "match-1",
                 List.of("team-a", "team-b"),
-                List.of(new SetSnapshot("game-2", 2, null, false, false, null))
+                List.of(new SetSnapshot("game-2", 2, null, false, false, null)),
+                false
         ));
 
         org.mockito.Mockito.verify(repository, org.mockito.Mockito.never())
                 .save(any(BettingEvent.class));
+    }
+
+    @Test
+    void cancelsSpeculativeNextSetWhenMatchFinishes() {
+        BettingEvent current = BettingEvent.open(
+                "match-1",
+                2,
+                "team-a",
+                "team-b",
+                LocalDateTime.of(2026, 8, 14, 9, 59)
+        );
+        BettingEvent speculativeNext = BettingEvent.open(
+                "match-1",
+                3,
+                "team-a",
+                "team-b",
+                LocalDateTime.of(2026, 8, 14, 10, 1)
+        );
+        given(repository.findByExternalMatchIdAndSetNumber("match-1", 2))
+                .willReturn(Optional.of(current));
+        given(repository.findByExternalMatchIdAndSetNumber("match-1", 3))
+                .willReturn(Optional.of(speculativeNext));
+        given(repository.findAllFutureEventsForUpdate("match-1", 2))
+                .willReturn(List.of(speculativeNext));
+
+        service.synchronizeMatch(new LiveMatchSnapshot(
+                "match-1",
+                List.of("team-a", "team-b"),
+                List.of(new SetSnapshot("game-2", 2, null, false, true, "team-a")),
+                true
+        ));
+
+        assertThat(speculativeNext.getStatus()).isEqualTo(BettingEventStatus.CANCELLED);
     }
 
     private BettingEvent captureSavedEvent() {

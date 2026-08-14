@@ -75,6 +75,20 @@ public class LolesportsBettingCacheAdapter implements LiveBettingCache {
             }
         }
         sets.sort(Comparator.comparingInt(SetSnapshot::setNumber));
-        return new LiveMatchSnapshot(liveMatch.matchId(), teamIds, List.copyOf(sets));
+        return new LiveMatchSnapshot(
+                liveMatch.matchId(),
+                teamIds,
+                List.copyOf(sets),
+                isMatchFinished(liveMatch)
+        );
+    }
+
+    private boolean isMatchFinished(DataCacheService.LiveMatch liveMatch) {
+        int bestOf = liveMatch.bestOf() == null ? 1 : liveMatch.bestOf();
+        int requiredWins = bestOf / 2 + 1;
+        return liveMatch.teams() != null && liveMatch.teams().stream()
+                .map(team -> team.result())
+                .filter(result -> result != null && result.gameWins() != null)
+                .anyMatch(result -> result.gameWins() >= requiredWins);
     }
 }

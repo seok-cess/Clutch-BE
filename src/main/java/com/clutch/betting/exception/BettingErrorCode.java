@@ -8,7 +8,8 @@ public enum BettingErrorCode {
     DUPLICATE_BET("동일 세트에는 한 번만 배팅할 수 있습니다."),
     USER_NOT_FOUND("사용자를 찾을 수 없습니다."),
     INSUFFICIENT_POINT("보유 포인트가 부족합니다."),
-    RESULT_NOT_READY("아직 배팅 결과가 확정되지 않았습니다.");
+    RESULT_NOT_READY("아직 배팅 결과가 확정되지 않았습니다."),
+    EVENT_NOT_CANCELLED("취소된 배팅 이벤트만 환불할 수 있습니다.");
 
     private final String message;
 

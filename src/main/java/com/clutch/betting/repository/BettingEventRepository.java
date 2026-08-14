@@ -30,4 +30,26 @@ public interface BettingEventRepository extends JpaRepository<BettingEvent, Long
               and event.winnerExternalTeamId is not null
             """)
     List<Long> findIdsReadyToSettle();
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select event
+            from BettingEvent event
+            where event.externalMatchId = :externalMatchId
+              and event.setNumber > :setNumber
+            order by event.setNumber
+            """)
+    List<BettingEvent> findAllFutureEventsForUpdate(
+            String externalMatchId,
+            int setNumber
+    );
+
+    @Query("""
+            select distinct event.id
+            from BettingEvent event
+            join UserBet bet on bet.bettingEventId = event.id
+            where event.status = com.clutch.betting.domain.BettingEventStatus.CANCELLED
+              and bet.status = com.clutch.betting.domain.UserBetStatus.PLACED
+            """)
+    List<Long> findIdsCancelledWithPlacedBets();
 }

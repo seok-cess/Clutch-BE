@@ -12,7 +12,8 @@ public interface LiveBettingCache {
     record LiveMatchSnapshot(
             String externalMatchId,
             List<String> externalTeamIds,
-            List<SetSnapshot> sets
+            List<SetSnapshot> sets,
+            boolean matchFinished
     ) {
     }
 
