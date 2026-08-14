@@ -18,6 +18,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.time.Duration;
 import java.time.LocalDateTime;
 
+/** 한 매치의 특정 세트에 대한 배팅 가능 기간과 결과 상태를 관리한다. */
 @Getter
 @Entity
 @Table(
@@ -31,7 +32,6 @@ import java.time.LocalDateTime;
         }
 )
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-/** 한 매치의 특정 세트에 대한 배팅 가능 기간과 결과 상태를 관리한다. */
 public class BettingEvent {
 
     @Id
@@ -75,7 +75,16 @@ public class BettingEvent {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    /** 참가 팀과 오픈 시각을 검증하고 신규 이벤트를 OPEN 상태로 초기화한다. */
+    /**
+     * 참가 팀과 오픈 시각을 검증하고 신규 이벤트를 OPEN 상태로 초기화한다.
+     *
+     * @param externalMatchId 외부 매치 ID
+     * @param setNumber 세트 번호
+     * @param firstExternalTeamId 첫 번째 참가 팀 ID
+     * @param secondExternalTeamId 두 번째 참가 팀 ID
+     * @param openedAt 이벤트 오픈 시각
+     * @throws IllegalArgumentException 필수 값이 없거나 세트·참가 팀 조건이 올바르지 않을 때
+     */
     private BettingEvent(
             String externalMatchId,
             int setNumber,
@@ -100,7 +109,17 @@ public class BettingEvent {
         this.status = BettingEventStatus.OPEN;
     }
 
-    /** 외부 매치의 특정 세트에 대한 신규 배팅 이벤트를 연다. */
+    /**
+     * 외부 매치의 특정 세트에 대한 신규 배팅 이벤트를 연다.
+     *
+     * @param externalMatchId 외부 매치 ID
+     * @param setNumber 세트 번호
+     * @param firstExternalTeamId 첫 번째 참가 팀 ID
+     * @param secondExternalTeamId 두 번째 참가 팀 ID
+     * @param openedAt 이벤트 오픈 시각
+     * @return OPEN 상태의 신규 배팅 이벤트
+     * @throws IllegalArgumentException 필수 값이 없거나 세트·참가 팀 조건이 올바르지 않을 때
+     */
     public static BettingEvent open(
             String externalMatchId,
             int setNumber,
@@ -117,13 +136,23 @@ public class BettingEvent {
         );
     }
 
-    /** 주어진 외부 팀이 이 이벤트의 선택지에 포함되는지 확인한다. */
+    /**
+     * 주어진 외부 팀이 이 이벤트의 선택지에 포함되는지 확인한다.
+     *
+     * @param externalTeamId 확인할 외부 팀 ID
+     * @return 두 참가 팀 중 하나이면 true
+     */
     public boolean hasParticipant(String externalTeamId) {
         return firstExternalTeamId.equals(externalTeamId)
                 || secondExternalTeamId.equals(externalTeamId);
     }
 
-    /** 상태와 마감 시각을 함께 확인해 현재 배팅 가능 여부를 판단한다. */
+    /**
+     * 상태와 마감 시각을 함께 확인해 현재 배팅 가능 여부를 판단한다.
+     *
+     * @param now 판단 기준 시각
+     * @return OPEN 상태이고 마감 전이면 true
+     */
     public boolean isOpenAt(LocalDateTime now) {
         if (now == null || status != BettingEventStatus.OPEN) {
             return false;
@@ -131,7 +160,15 @@ public class BettingEvent {
         return closesAt == null || now.isBefore(closesAt);
     }
 
-    /** 실제 세트 ID를 연결하고 세트 시작 시각 기준 마감 시각을 계산한다. */
+    /**
+     * 실제 세트 ID를 연결하고 세트 시작 시각 기준 마감 시각을 계산한다.
+     *
+     * @param externalGameId 외부 세트 ID
+     * @param setStartedAt 세트 시작 시각
+     * @param bettingDurationAfterStart 세트 시작 후 배팅 허용 기간
+     * @throws IllegalArgumentException 외부 세트 ID가 없거나 배팅 허용 기간이 양수가 아닐 때
+     * @throws IllegalStateException 이미 다른 외부 세트가 연결됐을 때
+     */
     public void attachGame(
             String externalGameId,
             LocalDateTime setStartedAt,
@@ -156,7 +193,13 @@ public class BettingEvent {
         }
     }
 
-    /** 마감 시각이 지난 OPEN 이벤트를 CLOSED 상태로 전환한다. */
+    /**
+     * 마감 시각이 지난 OPEN 이벤트를 CLOSED 상태로 전환한다.
+     *
+     * @param now 판단 기준 시각
+     * @return 이번 호출에서 종료 상태로 전환했으면 true
+     * @throws IllegalArgumentException 기준 시각이 없을 때
+     */
     public boolean closeIfExpired(LocalDateTime now) {
         if (now == null) {
             throw new IllegalArgumentException("현재 시각은 필수입니다.");
@@ -177,7 +220,12 @@ public class BettingEvent {
         }
     }
 
-    /** 최초로 확인한 참가 팀 승자를 보존하고 이벤트를 종료한다. */
+    /**
+     * 최초로 확인한 참가 팀 승자를 보존하고 이벤트를 종료한다.
+     *
+     * @param externalTeamId 승리한 외부 팀 ID
+     * @throws IllegalArgumentException 승리 팀 ID가 없거나 참가 팀이 아닐 때
+     */
     public void recordWinner(String externalTeamId) {
         String winnerTeamId = requireText(externalTeamId, "승리 팀 ID는 필수입니다.");
         if (!hasParticipant(winnerTeamId)) {
@@ -193,7 +241,11 @@ public class BettingEvent {
         close();
     }
 
-    /** 승자가 확정된 종료 이벤트를 최종 정산 상태로 전환한다. */
+    /**
+     * 승자가 확정된 종료 이벤트를 최종 정산 상태로 전환한다.
+     *
+     * @throws IllegalStateException 이벤트가 종료 상태가 아니거나 승자가 없을 때
+     */
     public void settle() {
         if (status == BettingEventStatus.SETTLED) {
             return;
@@ -215,7 +267,14 @@ public class BettingEvent {
         status = BettingEventStatus.CANCELLED;
     }
 
-    /** 필수 문자열 값을 공백까지 포함해 검증한다. */
+    /**
+     * 필수 문자열 값을 공백까지 포함해 검증한다.
+     *
+     * @param value 검증할 문자열
+     * @param message 검증 실패 메시지
+     * @return 검증을 통과한 원본 문자열
+     * @throws IllegalArgumentException 값이 null 또는 공백일 때
+     */
     private static String requireText(String value, String message) {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException(message);

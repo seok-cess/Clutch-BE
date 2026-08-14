@@ -14,16 +14,21 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 
-@Service
 /** 한 라이브 매치의 세트 스냅샷을 배팅 이벤트 생명주기에 반영한다. */
+@Service
 public class BettingEventSynchronizationProcessor {
 
     private final BettingEventRepository bettingEventRepository;
     private final BettingProperties bettingProperties;
     private final Clock clock;
 
+    /**
+     * 운영 환경에서 UTC 시스템 시계를 사용하는 동기화 처리기를 구성한다.
+     *
+     * @param bettingEventRepository 배팅 이벤트 저장소
+     * @param bettingProperties 배팅 시간 설정
+     */
     @Autowired
-    /** 운영 환경에서 UTC 시스템 시계를 사용하는 동기화 처리기를 구성한다. */
     public BettingEventSynchronizationProcessor(
             BettingEventRepository bettingEventRepository,
             BettingProperties bettingProperties
@@ -31,7 +36,13 @@ public class BettingEventSynchronizationProcessor {
         this(bettingEventRepository, bettingProperties, Clock.systemUTC());
     }
 
-    /** 테스트에서 현재 시각을 고정할 수 있도록 동기화 처리기를 구성한다. */
+    /**
+     * 테스트에서 현재 시각을 고정할 수 있도록 동기화 처리기를 구성한다.
+     *
+     * @param bettingEventRepository 배팅 이벤트 저장소
+     * @param bettingProperties 배팅 시간 설정
+     * @param clock 현재 시각을 제공할 시계
+     */
     BettingEventSynchronizationProcessor(
             BettingEventRepository bettingEventRepository,
             BettingProperties bettingProperties,
@@ -42,8 +53,12 @@ public class BettingEventSynchronizationProcessor {
         this.clock = clock;
     }
 
+    /**
+     * 세트 시작·마감·종료·승자를 동기화하고 경기 종료 시 후속 이벤트를 취소한다.
+     *
+     * @param liveMatch 동기화할 라이브 매치 스냅샷
+     */
     @Transactional
-    /** 세트 시작·마감·종료·승자를 동기화하고 경기 종료 시 후속 이벤트를 취소한다. */
     public void synchronizeMatch(LiveMatchSnapshot liveMatch) {
         if (!isUsable(liveMatch)) {
             return;
@@ -95,7 +110,12 @@ public class BettingEventSynchronizationProcessor {
         }
     }
 
-    /** 매치 ID와 정확히 두 참가 팀을 가진 스냅샷만 처리 대상으로 인정한다. */
+    /**
+     * 매치 ID와 정확히 두 참가 팀을 가진 스냅샷만 처리 대상으로 인정한다.
+     *
+     * @param liveMatch 검증할 라이브 매치 스냅샷
+     * @return 동기화에 필요한 최소 정보가 있으면 true
+     */
     private boolean isUsable(LiveMatchSnapshot liveMatch) {
         return liveMatch != null
                 && liveMatch.externalMatchId() != null
@@ -104,7 +124,14 @@ public class BettingEventSynchronizationProcessor {
                 && liveMatch.externalTeamIds().size() == 2;
     }
 
-    /** 주어진 매치·세트에 대한 신규 배팅 이벤트를 저장한다. */
+    /**
+     * 주어진 매치·세트에 대한 신규 배팅 이벤트를 저장한다.
+     *
+     * @param liveMatch 라이브 매치 스냅샷
+     * @param setNumber 생성할 세트 번호
+     * @param openedAt 이벤트 오픈 시각
+     * @return 저장된 배팅 이벤트
+     */
     private BettingEvent openEvent(
             LiveMatchSnapshot liveMatch,
             int setNumber,
@@ -120,7 +147,13 @@ public class BettingEventSynchronizationProcessor {
         return bettingEventRepository.save(event);
     }
 
-    /** 이전 세트 종료 직후 다음 세트 이벤트를 중복 없이 선개설한다. */
+    /**
+     * 이전 세트 종료 직후 다음 세트 이벤트를 중복 없이 선개설한다.
+     *
+     * @param liveMatch 라이브 매치 스냅샷
+     * @param nextSetNumber 선개설할 다음 세트 번호
+     * @param openedAt 이벤트 오픈 시각
+     */
     private void openNextEventIfMissing(
             LiveMatchSnapshot liveMatch,
             int nextSetNumber,

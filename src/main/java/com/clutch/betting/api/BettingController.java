@@ -20,16 +20,21 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/** 세트별 배팅 조회·등록 요청을 서비스 계층으로 전달한다. */
 @Validated
 @RestController
 @RequestMapping("/api")
-/** 세트별 배팅 조회·등록 요청을 서비스 계층으로 전달한다. */
 public class BettingController {
 
     private final BetPlacementService placementService;
     private final BetQueryService queryService;
 
-    /** 배팅 등록과 조회 유스케이스를 주입받는다. */
+    /**
+     * 배팅 등록과 조회 유스케이스를 주입받는다.
+     *
+     * @param placementService 배팅 등록 서비스
+     * @param queryService 배팅 조회 서비스
+     */
     public BettingController(
             BetPlacementService placementService,
             BetQueryService queryService
@@ -38,8 +43,14 @@ public class BettingController {
         this.queryService = queryService;
     }
 
+    /**
+     * 특정 매치에서 현재 노출할 배팅 이벤트와 내 배팅을 조회한다.
+     *
+     * @param userId 요청 사용자 ID
+     * @param externalMatchId 외부 매치 ID
+     * @return 현재 배팅 이벤트 응답
+     */
     @GetMapping("/matches/{externalMatchId}/betting-events/current")
-    /** 특정 매치에서 현재 노출할 배팅 이벤트와 내 배팅을 조회한다. */
     public ResponseEntity<BettingEventResponse> getCurrentEvent(
             @CurrentUserId Long userId,
             @PathVariable @NotBlank String externalMatchId
@@ -49,8 +60,15 @@ public class BettingController {
         ));
     }
 
+    /**
+     * 사용자의 세트 승리 팀 선택과 배팅 금액을 등록한다.
+     *
+     * @param userId 요청 사용자 ID
+     * @param bettingEventId 배팅 이벤트 ID
+     * @param request 선택 팀과 배팅 금액
+     * @return 생성된 사용자 배팅 응답
+     */
     @PostMapping("/betting-events/{bettingEventId}/bets")
-    /** 사용자의 세트 승리 팀 선택과 배팅 금액을 등록한다. */
     public ResponseEntity<BetCreateResponse> placeBet(
             @CurrentUserId Long userId,
             @PathVariable @Positive Long bettingEventId,
@@ -66,8 +84,14 @@ public class BettingController {
         ));
     }
 
+    /**
+     * 특정 이벤트에 등록한 현재 사용자의 배팅을 조회한다.
+     *
+     * @param userId 요청 사용자 ID
+     * @param bettingEventId 배팅 이벤트 ID
+     * @return 사용자 배팅 상세 응답
+     */
     @GetMapping("/betting-events/{bettingEventId}/bets/me")
-    /** 특정 이벤트에 등록한 현재 사용자의 배팅을 조회한다. */
     public ResponseEntity<UserBetResponse> getMyBet(
             @CurrentUserId Long userId,
             @PathVariable @Positive Long bettingEventId

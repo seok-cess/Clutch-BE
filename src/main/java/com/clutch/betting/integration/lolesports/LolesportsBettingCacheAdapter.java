@@ -11,14 +11,19 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
-@Component
 /** lolesports 캐시를 배팅 도메인이 사용하는 라이브 스냅샷으로 변환한다. */
+@Component
 public class LolesportsBettingCacheAdapter implements LiveBettingCache {
 
     private final DataCacheService dataCacheService;
     private final SetWinnerTracker setWinnerTracker;
 
-    /** 라이브 매치 캐시와 세트 승자 추적기를 주입받는다. */
+    /**
+     * 라이브 매치 캐시와 세트 승자 추적기를 주입받는다.
+     *
+     * @param dataCacheService lolesports 라이브 데이터 캐시
+     * @param setWinnerTracker 세트별 승자 추적기
+     */
     public LolesportsBettingCacheAdapter(
             DataCacheService dataCacheService,
             SetWinnerTracker setWinnerTracker
@@ -27,16 +32,27 @@ public class LolesportsBettingCacheAdapter implements LiveBettingCache {
         this.setWinnerTracker = setWinnerTracker;
     }
 
+    /**
+     * 캐시된 모든 라이브 매치를 배팅용 스냅샷으로 변환한다.
+     *
+     * @return 배팅 동기화용 라이브 매치 스냅샷 목록
+     */
     @Override
-    /** 캐시된 모든 라이브 매치를 배팅용 스냅샷으로 변환한다. */
     public List<LiveMatchSnapshot> findLiveMatches() {
         return dataCacheService.getLiveMatches().stream()
                 .map(this::toSnapshot)
                 .toList();
     }
 
+    /**
+     * 경기 종료·참가 팀·이전 세트 종료 여부를 모두 만족할 때만 배팅을 허용한다.
+     *
+     * @param externalMatchId 외부 매치 ID
+     * @param externalGameId 연결된 외부 게임 ID 또는 선개설 이벤트이면 null
+     * @param setNumber 세트 번호
+     * @return 최신 캐시 상태에서 배팅 가능하면 true
+     */
     @Override
-    /** 경기 종료·참가 팀·이전 세트 종료 여부를 모두 만족할 때만 배팅을 허용한다. */
     public boolean isAcceptingBets(
             String externalMatchId,
             String externalGameId,
@@ -49,7 +65,12 @@ public class LolesportsBettingCacheAdapter implements LiveBettingCache {
                 .anyMatch(match -> isSetAcceptingBets(match, externalGameId, setNumber));
     }
 
-    /** 외부 라이브 매치에서 유효한 팀과 정렬된 세트 상태를 추출한다. */
+    /**
+     * 외부 라이브 매치에서 유효한 팀과 정렬된 세트 상태를 추출한다.
+     *
+     * @param liveMatch lolesports 라이브 매치 캐시 값
+     * @return 배팅 도메인용 라이브 매치 스냅샷
+     */
     private LiveMatchSnapshot toSnapshot(DataCacheService.LiveMatch liveMatch) {
         List<String> teamIds = liveMatch.teams() == null
                 ? List.of()
@@ -91,7 +112,12 @@ public class LolesportsBettingCacheAdapter implements LiveBettingCache {
         );
     }
 
-    /** best-of 승리 조건을 충족한 팀이 있는지 보수적으로 판단한다. */
+    /**
+     * best-of 승리 조건을 충족한 팀이 있는지 보수적으로 판단한다.
+     *
+     * @param liveMatch lolesports 라이브 매치 캐시 값
+     * @return 매치 승리 조건을 충족한 팀이 있으면 true
+     */
     private boolean isMatchFinished(DataCacheService.LiveMatch liveMatch) {
         if (liveMatch.bestOf() == null || liveMatch.bestOf() < 1) {
             return false;
@@ -104,7 +130,14 @@ public class LolesportsBettingCacheAdapter implements LiveBettingCache {
                 .anyMatch(result -> result.gameWins() >= requiredWins);
     }
 
-    /** 실제 또는 선개설 세트가 현재 배팅 가능한 순서와 상태인지 검증한다. */
+    /**
+     * 실제 또는 선개설 세트가 현재 배팅 가능한 순서와 상태인지 검증한다.
+     *
+     * @param match 배팅용 라이브 매치 스냅샷
+     * @param externalGameId 연결된 외부 게임 ID 또는 선개설 이벤트이면 null
+     * @param setNumber 세트 번호
+     * @return 이전 세트가 끝나고 대상 세트가 종료되지 않았으면 true
+     */
     private boolean isSetAcceptingBets(
             LiveMatchSnapshot match,
             String externalGameId,

@@ -7,8 +7,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
-@Service
 /** 캐시의 라이브 매치를 순회하며 매치별 동기화 실패를 격리한다. */
+@Service
 public class BettingEventSynchronizationService {
 
     private static final Logger log = LoggerFactory.getLogger(BettingEventSynchronizationService.class);
@@ -16,7 +16,12 @@ public class BettingEventSynchronizationService {
     private final LiveBettingCache liveBettingCache;
     private final BettingEventSynchronizationProcessor processor;
 
-    /** 라이브 캐시 포트와 매치 단위 처리기를 주입받는다. */
+    /**
+     * 라이브 캐시 포트와 매치 단위 처리기를 주입받는다.
+     *
+     * @param liveBettingCache 라이브 배팅 캐시 포트
+     * @param processor 매치 단위 동기화 처리기
+     */
     public BettingEventSynchronizationService(
             LiveBettingCache liveBettingCache,
             BettingEventSynchronizationProcessor processor

@@ -5,8 +5,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-@Service
 /** 정산 대상 이벤트를 탐색하고 이벤트별 독립 트랜잭션 처리를 조율한다. */
+@Service
 public class BetSettlementService {
 
     private static final Logger log = LoggerFactory.getLogger(BetSettlementService.class);
@@ -14,7 +14,12 @@ public class BetSettlementService {
     private final BettingEventRepository eventRepository;
     private final BetSettlementProcessor settlementProcessor;
 
-    /** 정산 대상 조회 저장소와 개별 처리기를 주입받는다. */
+    /**
+     * 정산 대상 조회 저장소와 개별 처리기를 주입받는다.
+     *
+     * @param eventRepository 배팅 이벤트 저장소
+     * @param settlementProcessor 이벤트 단위 정산 처리기
+     */
     public BetSettlementService(
             BettingEventRepository eventRepository,
             BetSettlementProcessor settlementProcessor

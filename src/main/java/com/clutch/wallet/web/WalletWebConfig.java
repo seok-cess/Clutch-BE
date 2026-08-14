@@ -10,8 +10,16 @@ import java.util.List;
 @Configuration
 public class WalletWebConfig implements WebMvcConfigurer {
 
+    /** 사용자 ID 인자 해석기 등록 구성을 생성한다. */
+    public WalletWebConfig() {
+    }
+
+    /**
+     * 사용자 ID 헤더 해석기를 Spring MVC 인자 해석기 목록에 추가한다.
+     *
+     * @param resolvers 애플리케이션에 등록할 MVC 인자 해석기 목록
+     */
     @Override
-    /** 사용자 ID 헤더 해석기를 Spring MVC 인자 해석기 목록에 추가한다. */
     public void addArgumentResolvers(List<HandlerMethodArgumentResolver> resolvers){
         resolvers.add(new CurrentUserIdArgumentResolver());
     }

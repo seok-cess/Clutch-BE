@@ -11,14 +11,32 @@ public class CurrentUserIdArgumentResolver implements HandlerMethodArgumentResol
 
     private static final String HEADER_NAME = "X-User-Id";
 
+    /** 상태 없는 사용자 ID 인자 해석기를 생성한다. */
+    public CurrentUserIdArgumentResolver() {
+    }
+
+    /**
+     * 현재 파라미터가 사용자 ID 주입 대상인지 확인한다.
+     *
+     * @param parameter 컨트롤러 메서드 파라미터
+     * @return CurrentUserId 애노테이션이 있으면 true
+     */
     @Override
-    /** 현재 파라미터가 사용자 ID 주입 대상인지 확인한다. */
     public boolean supportsParameter(MethodParameter parameter){
         return parameter.hasParameterAnnotation(CurrentUserId.class);
     }
 
+    /**
+     * 필수 헤더를 양수 Long 값으로 검증하고 컨트롤러 인자로 반환한다.
+     *
+     * @param parameter 해석할 컨트롤러 메서드 파라미터
+     * @param mavContainer 현재 요청의 모델·뷰 컨테이너
+     * @param webRequest 현재 웹 요청
+     * @param binderFactory 데이터 바인더 팩토리
+     * @return X-User-Id 헤더에서 변환한 양수 사용자 ID
+     * @throws MissingUserIdHeaderException 헤더가 없거나 양수 Long 값이 아닐 때
+     */
     @Override
-    /** 필수 헤더를 양수 Long 값으로 검증하고 컨트롤러 인자로 반환한다. */
     public Object resolveArgument(MethodParameter parameter, ModelAndViewContainer mavContainer,
                                   NativeWebRequest webRequest, WebDataBinderFactory binderFactory){
         String value = webRequest.getHeader(HEADER_NAME);

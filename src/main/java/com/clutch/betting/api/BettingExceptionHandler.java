@@ -12,12 +12,21 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-@RestControllerAdvice(assignableTypes = BettingController.class)
 /** 배팅 API에서 발생한 도메인·요청 검증 예외를 공통 응답으로 변환한다. */
+@RestControllerAdvice(assignableTypes = BettingController.class)
 public class BettingExceptionHandler {
 
+    /** 상태 없는 배팅 예외 처리기를 생성한다. */
+    public BettingExceptionHandler() {
+    }
+
+    /**
+     * 배팅 오류 코드를 HTTP 상태와 오류 응답으로 매핑한다.
+     *
+     * @param exception 처리할 배팅 예외
+     * @return 오류 코드에 대응하는 HTTP 응답
+     */
     @ExceptionHandler(BettingException.class)
-    /** 배팅 오류 코드를 HTTP 상태와 오류 응답으로 매핑한다. */
     public ResponseEntity<BettingErrorResponse> handleBettingException(
             BettingException exception
     ) {
@@ -26,13 +35,18 @@ public class BettingExceptionHandler {
                 .body(new BettingErrorResponse(code.name(), code.getMessage()));
     }
 
+    /**
+     * 요청 본문·경로·사용자 헤더 검증 실패를 400 응답으로 통합한다.
+     *
+     * @param exception 처리할 요청 검증 예외
+     * @return 잘못된 요청 오류 응답
+     */
     @ExceptionHandler({
             MethodArgumentNotValidException.class,
             ConstraintViolationException.class,
             HttpMessageNotReadableException.class,
             MissingUserIdHeaderException.class
     })
-    /** 요청 본문·경로·사용자 헤더 검증 실패를 400 응답으로 통합한다. */
     public ResponseEntity<BettingErrorResponse> handleInvalidRequest(Exception exception) {
         return ResponseEntity.badRequest().body(new BettingErrorResponse(
                 "INVALID_REQUEST",
@@ -40,7 +54,12 @@ public class BettingExceptionHandler {
         ));
     }
 
-    /** 오류 코드의 의미에 맞는 HTTP 상태를 선택한다. */
+    /**
+     * 오류 코드의 의미에 맞는 HTTP 상태를 선택한다.
+     *
+     * @param code 배팅 오류 코드
+     * @return 오류 코드에 대응하는 HTTP 상태
+     */
     private HttpStatus statusOf(BettingErrorCode code) {
         return switch (code) {
             case EVENT_NOT_FOUND, BET_NOT_FOUND, USER_NOT_FOUND -> HttpStatus.NOT_FOUND;
@@ -49,7 +68,12 @@ public class BettingExceptionHandler {
         };
     }
 
-    /** 검증 예외에서 클라이언트에 전달할 첫 번째 유효 메시지를 추출한다. */
+    /**
+     * 검증 예외에서 클라이언트에 전달할 첫 번째 유효 메시지를 추출한다.
+     *
+     * @param exception 요청 검증 예외
+     * @return 클라이언트에 전달할 검증 메시지
+     */
     private String validationMessage(Exception exception) {
         if (exception instanceof MethodArgumentNotValidException validationException) {
             return validationException.getBindingResult().getFieldErrors().stream()

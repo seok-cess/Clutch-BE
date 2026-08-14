@@ -124,7 +124,12 @@ public class PollingScheduler {
         }
     }
 
-    /** getEventDetails로 진행 중 게임과 팀을 결합하고 배팅 종료 판단 정보까지 LiveMatch로 조립한다. */
+    /**
+     * getEventDetails로 진행 중 게임과 팀을 결합하고 배팅 종료 판단 정보까지 LiveMatch로 조립한다.
+     *
+     * @param event getLive에서 조회한 라이브 일정 이벤트
+     * @return 팀·세트·best-of 정보가 결합된 라이브 매치 캐시 값
+     */
     private DataCacheService.LiveMatch resolveLiveMatch(ScheduleResponse.Event event) {
         String matchId = event.match().id();
         List<EventDetailsResponse.Game> games = List.of();

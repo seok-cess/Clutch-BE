@@ -34,7 +34,18 @@ public class DataCacheService {
      */
     private static final long BUFFER_RETENTION_SECONDS = 7200;
 
-    /** 진행중인 매치 하나에 대한 상태 (getLive + getEventDetails 조합) */
+    /**
+     * 진행 중인 매치 하나에 대한 getLive와 getEventDetails 조합 상태다.
+     *
+     * @param matchId 외부 매치 ID
+     * @param blockName 일정 블록 이름
+     * @param leagueName 리그 이름
+     * @param startTime 매치 시작 시각 문자열
+     * @param teams 참가 팀과 현재 세트 승수
+     * @param games 매치의 세트 목록
+     * @param bestOf 매치 최대 세트 수 또는 알 수 없으면 null
+     * @param activeGameId 진행 중인 게임 ID 또는 없으면 null
+     */
     public record LiveMatch(
             String matchId,
             String blockName,
@@ -42,8 +53,8 @@ public class DataCacheService {
             String startTime,
             List<ScheduleResponse.Team> teams,
             List<EventDetailsResponse.Game> games,
-            Integer bestOf,         // 배팅 동기화에서 매치 종료 승수를 계산할 때 사용 (알 수 없으면 null)
-            String activeGameId    // state=inProgress 인 게임의 id (없으면 null)
+            Integer bestOf,
+            String activeGameId
     ) {
     }
 
