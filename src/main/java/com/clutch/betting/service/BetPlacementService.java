@@ -109,9 +109,8 @@ public class BetPlacementService {
                 selectedExternalTeamId,
                 amount,
                 userBet.getStatus(),
-                userRepository.findById(userId)
+                userRepository.findPointById(userId)
                         .orElseThrow(() -> new BettingException(BettingErrorCode.USER_NOT_FOUND))
-                        .getPoint()
         );
     }
 

@@ -7,6 +7,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Optional;
+
 /**
  * 사용자 저장소.
  */
@@ -36,4 +38,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
             @Param("userId") Long userId,
             @Param("amount") long amount
     );
+
+    @Query("select user.point from User user where user.id = :userId")
+    Optional<Long> findPointById(@Param("userId") Long userId);
 }

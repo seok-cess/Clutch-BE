@@ -10,8 +10,6 @@ import com.clutch.betting.repository.BetPointTransactionRepository;
 import com.clutch.betting.repository.BettingEventRepository;
 import com.clutch.betting.repository.UserBetRepository;
 import com.clutch.user.repository.UserRepository;
-import com.clutch.user.domain.User;
-import com.clutch.user.domain.UserRole;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -58,9 +56,7 @@ class BetPlacementServiceTest {
         });
         given(transactionRepository.saveAndFlush(any(BetPointTransaction.class)))
                 .willAnswer(invocation -> invocation.getArgument(0));
-        User user = User.create(UserRole.USER, "bet-placement@example.com");
-        user.changePoint(9_000L);
-        given(userRepository.findById(20L)).willReturn(Optional.of(user));
+        given(userRepository.findPointById(20L)).willReturn(Optional.of(9_000L));
 
         BetPlacementResult result = service.place(20L, 10L, "team-a", 1_000L);
 
