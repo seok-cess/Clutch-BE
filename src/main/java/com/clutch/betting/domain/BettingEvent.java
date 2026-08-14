@@ -16,6 +16,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
+import java.time.Duration;
 
 @Getter
 @Entity
@@ -116,6 +117,58 @@ public class BettingEvent {
     public boolean hasParticipant(String externalTeamId) {
         return firstExternalTeamId.equals(externalTeamId)
                 || secondExternalTeamId.equals(externalTeamId);
+    }
+
+    public void attachGame(
+            String externalGameId,
+            LocalDateTime setStartedAt,
+            Duration bettingDurationAfterStart
+    ) {
+        String normalizedGameId = requireText(externalGameId, "외부 세트 ID는 필수입니다.");
+        if (this.externalGameId != null && !this.externalGameId.equals(normalizedGameId)) {
+            throw new IllegalStateException("이미 다른 세트 ID가 연결된 배팅 이벤트입니다.");
+        }
+        this.externalGameId = normalizedGameId;
+        if (setStartedAt != null) {
+            if (bettingDurationAfterStart == null
+                    || bettingDurationAfterStart.isZero()
+                    || bettingDurationAfterStart.isNegative()) {
+                throw new IllegalArgumentException("세트 시작 후 배팅 가능 시간은 양수여야 합니다.");
+            }
+            LocalDateTime calculatedClosesAt = setStartedAt.plus(bettingDurationAfterStart);
+            this.closesAt = calculatedClosesAt;
+        }
+    }
+
+    public boolean closeIfExpired(LocalDateTime now) {
+        if (now == null) {
+            throw new IllegalArgumentException("현재 시각은 필수입니다.");
+        }
+        if (status == BettingEventStatus.OPEN
+                && closesAt != null
+                && !now.isBefore(closesAt)) {
+            status = BettingEventStatus.CLOSED;
+            return true;
+        }
+        return false;
+    }
+
+    public void close() {
+        if (status == BettingEventStatus.OPEN) {
+            status = BettingEventStatus.CLOSED;
+        }
+    }
+
+    public void recordWinner(String externalTeamId) {
+        String winnerTeamId = requireText(externalTeamId, "승리 팀 ID는 필수입니다.");
+        if (!hasParticipant(winnerTeamId)) {
+            throw new IllegalArgumentException("승리 팀은 배팅 이벤트 참가 팀이어야 합니다.");
+        }
+        if (status == BettingEventStatus.SETTLED || status == BettingEventStatus.CANCELLED) {
+            return;
+        }
+        this.winnerExternalTeamId = winnerTeamId;
+        close();
     }
 
     private static String requireText(String value, String message) {

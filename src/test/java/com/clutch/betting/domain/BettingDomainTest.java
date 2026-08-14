@@ -3,6 +3,7 @@ package com.clutch.betting.domain;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
+import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -59,5 +60,45 @@ class BettingDomainTest {
         assertThat(stake.getPointDelta()).isEqualTo(-1_000L);
         assertThat(payout.getPointDelta()).isEqualTo(2_000L);
         assertThat(refund.getPointDelta()).isEqualTo(1_000L);
+    }
+
+    @Test
+    void attachesSetAndClosesTwoMinutesAfterStart() {
+        BettingEvent event = BettingEvent.open(
+                "match-1",
+                1,
+                "team-a",
+                "team-b",
+                LocalDateTime.of(2026, 8, 14, 10, 0)
+        );
+
+        event.attachGame(
+                "game-1",
+                LocalDateTime.of(2026, 8, 14, 10, 1),
+                Duration.ofMinutes(2)
+        );
+
+        assertThat(event.getExternalGameId()).isEqualTo("game-1");
+        assertThat(event.getClosesAt()).isEqualTo(LocalDateTime.of(2026, 8, 14, 10, 3));
+        assertThat(event.closeIfExpired(LocalDateTime.of(2026, 8, 14, 10, 3))).isTrue();
+        assertThat(event.getStatus()).isEqualTo(BettingEventStatus.CLOSED);
+    }
+
+    @Test
+    void recordsOnlyParticipantAsWinner() {
+        BettingEvent event = BettingEvent.open(
+                "match-1",
+                1,
+                "team-a",
+                "team-b",
+                LocalDateTime.of(2026, 8, 14, 10, 0)
+        );
+
+        event.recordWinner("team-a");
+
+        assertThat(event.getWinnerExternalTeamId()).isEqualTo("team-a");
+        assertThat(event.getStatus()).isEqualTo(BettingEventStatus.CLOSED);
+        assertThatThrownBy(() -> event.recordWinner("team-c"))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 }
