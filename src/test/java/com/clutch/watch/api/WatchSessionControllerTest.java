@@ -3,8 +3,11 @@ package com.clutch.watch.api;
 import com.clutch.watch.api.handler.WatchExceptionHandler;
 import com.clutch.watch.exception.WatchError;
 import com.clutch.watch.exception.WatchException;
-import com.clutch.watch.redis.HeartbeatResult;
 import com.clutch.watch.service.service.WatchSessionService;
+import com.clutch.watch.service.service.WatchPointClaimService;
+import com.clutch.watch.service.dto.WatchHeartbeatResult;
+import com.clutch.watch.service.dto.WatchPointClaimResult;
+import com.clutch.watch.service.dto.WatchRewardState;
 import com.clutch.watch.service.dto.WatchSessionStartResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,6 +41,9 @@ class WatchSessionControllerTest {
     @Mock
     private WatchSessionService watchSessionService;
 
+    @Mock
+    private WatchPointClaimService watchPointClaimService;
+
     private MockMvc mockMvc;
 
     /**
@@ -46,7 +52,10 @@ class WatchSessionControllerTest {
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders
-                .standaloneSetup(new WatchSessionController(watchSessionService))
+                .standaloneSetup(new WatchSessionController(
+                        watchSessionService,
+                        watchPointClaimService
+                ))
                 .setControllerAdvice(new WatchExceptionHandler())
                 .build();
     }
@@ -64,38 +73,92 @@ class WatchSessionControllerTest {
                 MATCH_ID,
                 enteredAt,
                 30L,
-                90L
+                90L,
+                0L
         ));
 
         mockMvc.perform(post("/api/users/{userId}/matches/{matchId}/watch-sessions", USER_ID, MATCH_ID))
-                .andExpect(status().isCreated())
+                .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.sessionKey").value(SESSION_KEY))
                 .andExpect(jsonPath("$.matchId").value(MATCH_ID))
                 .andExpect(jsonPath("$.enteredAt").value("2026-08-13T03:00:00Z"))
                 .andExpect(jsonPath("$.heartbeatIntervalSeconds").value(30))
-                .andExpect(jsonPath("$.sessionTimeoutSeconds").value(90));
+                .andExpect(jsonPath("$.sessionTimeoutSeconds").value(90))
+                .andExpect(jsonPath("$.heartbeatSequence").value(0));
 
         verify(watchSessionService).start(USER_ID, MATCH_ID);
     }
 
     /**
-     * 정상 Heartbeat가 body 없는 204 응답을 반환하는지 검증한다.
+     * 동일 경기 재입장은 기존 세션 상태를 이어받았음을 200 응답으로 반환하는지 검증한다.
+     */
+    @Test
+    void resumesSameMatchSession() throws Exception {
+        Instant enteredAt = Instant.parse("2026-08-13T03:00:00Z");
+        when(watchSessionService.start(USER_ID, MATCH_ID)).thenReturn(new WatchSessionStartResult(
+                SESSION_KEY,
+                MATCH_ID,
+                enteredAt,
+                30L,
+                90L,
+                7L
+        ));
+
+        mockMvc.perform(post("/api/users/{userId}/matches/{matchId}/watch-sessions", USER_ID, MATCH_ID))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sessionKey").value(SESSION_KEY))
+                .andExpect(jsonPath("$.heartbeatSequence").value(7));
+    }
+
+    /**
+     * 정상 Heartbeat가 현재 포인트 수령 상태를 반환하는지 검증한다.
      *
      * @throws Exception MockMvc 요청 처리에 실패한 경우
      */
     @Test
     void acceptsHeartbeat() throws Exception {
         when(watchSessionService.heartbeat(USER_ID, SESSION_KEY, 1L))
-                .thenReturn(HeartbeatResult.SUCCESS);
+                .thenReturn(new WatchHeartbeatResult(
+                        WatchRewardState.CLAIMABLE,
+                        1L,
+                        300L,
+                        0L,
+                        100L
+                ));
 
         mockMvc.perform(post("/api/users/{userId}/watch-sessions/{sessionKey}/heartbeat", USER_ID, SESSION_KEY)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"sequence\":1}"))
-                .andExpect(status().isNoContent())
-                .andExpect(content().string(""));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.rewardState").value("CLAIMABLE"))
+                .andExpect(jsonPath("$.rewardSequence").value(1))
+                .andExpect(jsonPath("$.accumulatedSeconds").value(300))
+                .andExpect(jsonPath("$.remainingSeconds").value(0))
+                .andExpect(jsonPath("$.rewardPoint").value(100));
 
         verify(watchSessionService).heartbeat(USER_ID, SESSION_KEY, 1L);
+    }
+
+    @Test
+    void claimsWatchPoint() throws Exception {
+        when(watchPointClaimService.claim(USER_ID, SESSION_KEY, 1L))
+                .thenReturn(new WatchPointClaimResult(1L, 100L, 1_100L, 2L));
+
+        mockMvc.perform(post(
+                        "/api/users/{userId}/watch-sessions/{sessionKey}/point-claims",
+                        USER_ID,
+                        SESSION_KEY
+                )
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"rewardSequence\":1}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.rewardSequence").value(1))
+                .andExpect(jsonPath("$.awardedPoint").value(100))
+                .andExpect(jsonPath("$.totalPoint").value(1100))
+                .andExpect(jsonPath("$.nextRewardSequence").value(2));
+
+        verify(watchPointClaimService).claim(USER_ID, SESSION_KEY, 1L);
     }
 
     /**
@@ -109,11 +172,12 @@ class WatchSessionControllerTest {
     @ParameterizedTest
     @MethodSource("heartbeatErrors")
     void convertsHeartbeatFailureToApiError(
-            HeartbeatResult result,
+            WatchError error,
             int expectedStatus,
             String expectedCode
     ) throws Exception {
-        when(watchSessionService.heartbeat(USER_ID, SESSION_KEY, 1L)).thenReturn(result);
+        when(watchSessionService.heartbeat(USER_ID, SESSION_KEY, 1L))
+                .thenThrow(new WatchException(error));
 
         mockMvc.perform(post("/api/users/{userId}/watch-sessions/{sessionKey}/heartbeat", USER_ID, SESSION_KEY)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -189,12 +253,12 @@ class WatchSessionControllerTest {
      */
     private static Stream<Arguments> heartbeatErrors() {
         return Stream.of(
-                Arguments.of(HeartbeatResult.SWITCHING, 409, "WATCH_SESSION_SWITCHING"),
-                Arguments.of(HeartbeatResult.REPLACED, 409, "WATCH_SESSION_REPLACED"),
-                Arguments.of(HeartbeatResult.EXPIRED, 410, "WATCH_SESSION_EXPIRED"),
-                Arguments.of(HeartbeatResult.SESSION_NOT_FOUND, 404, "WATCH_SESSION_NOT_FOUND"),
-                Arguments.of(HeartbeatResult.USER_MISMATCH, 403, "WATCH_SESSION_USER_MISMATCH"),
-                Arguments.of(HeartbeatResult.INVALID_SEQUENCE, 409, "INVALID_HEARTBEAT_SEQUENCE")
+                Arguments.of(WatchError.WATCH_SESSION_SWITCHING, 409, "WATCH_SESSION_SWITCHING"),
+                Arguments.of(WatchError.WATCH_SESSION_REPLACED, 409, "WATCH_SESSION_REPLACED"),
+                Arguments.of(WatchError.WATCH_SESSION_EXPIRED, 410, "WATCH_SESSION_EXPIRED"),
+                Arguments.of(WatchError.WATCH_SESSION_NOT_FOUND, 404, "WATCH_SESSION_NOT_FOUND"),
+                Arguments.of(WatchError.WATCH_SESSION_USER_MISMATCH, 403, "WATCH_SESSION_USER_MISMATCH"),
+                Arguments.of(WatchError.INVALID_HEARTBEAT_SEQUENCE, 409, "INVALID_HEARTBEAT_SEQUENCE")
         );
     }
 }

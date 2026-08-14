@@ -2,6 +2,7 @@ package com.clutch.watch.repository;
 
 import com.clutch.watch.domain.WatchPointTransaction;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 
@@ -11,7 +12,13 @@ import java.util.Optional;
 public interface WatchPointTransactionRepository
         extends JpaRepository<WatchPointTransaction, Long> {
 
-    boolean existsByWatchSessionId(Long watchSessionId);
+    boolean existsByWatchSessionIdAndRewardSequence(Long watchSessionId, long rewardSequence);
 
-    Optional<WatchPointTransaction> findByWatchSessionId(Long watchSessionId);
+    Optional<WatchPointTransaction> findByWatchSessionIdAndRewardSequence(
+            Long watchSessionId,
+            long rewardSequence
+    );
+
+    @Transactional
+    void deleteAllByWatchSessionId(Long watchSessionId);
 }

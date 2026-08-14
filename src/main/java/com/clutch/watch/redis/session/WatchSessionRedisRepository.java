@@ -1,8 +1,11 @@
-package com.clutch.watch.redis;
+package com.clutch.watch.redis.session;
 
 import com.clutch.watch.config.WatchRewardProperties;
 import com.clutch.watch.exception.WatchError;
 import com.clutch.watch.exception.WatchException;
+import com.clutch.watch.redis.heartbeat.HeartbeatProcessingResult;
+import com.clutch.watch.redis.reward.RewardClaimCompletionResult;
+import com.clutch.watch.redis.reward.RewardClaimCompletionStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Repository;
@@ -39,7 +42,8 @@ public class WatchSessionRedisRepository {
                 "enteredAt", Long.toString(enteredAt),
                 "lastSeen", Long.toString(enteredAt),
                 "eligibleMilliseconds", "0",
-                "sequence", "0"
+                "sequence", "0",
+                "rewardSequence", "1"
         ));
         redisTemplate.expire(sessionRedisKey, properties.sessionTtl());
         redisTemplate.opsForValue().set(
@@ -89,7 +93,7 @@ public class WatchSessionRedisRepository {
      * @return heartbeat 처리 결과
      * @throws WatchException Lua 스크립트 결과가 없거나 정의되지 않은 경우
      */
-    public HeartbeatResult heartbeat(
+    public HeartbeatProcessingResult heartbeat(
             long userId,
             String sessionKey,
             long sequence,
@@ -108,6 +112,7 @@ public class WatchSessionRedisRepository {
                 Long.toString(sequence),
                 Long.toString(nowMillis),
                 Long.toString(properties.maxEligibleInterval().toMillis()),
+                Long.toString(properties.claimInterval().toMillis()),
                 Long.toString(properties.aliveTtl().toMillis()),
                 Long.toString(properties.activeTtl().toMillis()),
                 Long.toString(properties.sessionTtl().toMillis())
@@ -115,7 +120,107 @@ public class WatchSessionRedisRepository {
         if (result == null) {
             throw new WatchException(WatchError.HEARTBEAT_RESULT_MISSING);
         }
-        return HeartbeatResult.from(result);
+        return HeartbeatProcessingResult.from(result);
+    }
+
+    /**
+     * 동일 경기의 Redis 누적 상태를 유지하면서 최신 화면용 sessionKey로 원자적으로 교체한다.
+     *
+     * @param userId 시청 사용자 ID
+     * @param oldSessionKey 이전 화면의 세션 키
+     * @param newSessionKey 최신 화면에 발급할 세션 키
+     * @return Redis 세션 키 교체 결과
+     */
+    public SessionKeyReplacementResult replaceSessionKey(
+            long userId,
+            String oldSessionKey,
+            String newSessionKey
+    ) {
+        String result = redisTemplate.execute(
+                WatchRedisScripts.REPLACE_SESSION_KEY,
+                List.of(
+                        activeKey(userId),
+                        redisSessionKey(oldSessionKey),
+                        aliveKey(userId, oldSessionKey),
+                        redisSessionKey(newSessionKey),
+                        aliveKey(userId, newSessionKey)
+                ),
+                oldSessionKey,
+                newSessionKey,
+                Long.toString(userId),
+                ALIVE_VALUE,
+                Long.toString(properties.aliveTtl().toMillis()),
+                Long.toString(properties.activeTtl().toMillis()),
+                Long.toString(properties.sessionTtl().toMillis())
+        );
+        if (result == null) {
+            throw new WatchException(WatchError.SESSION_KEY_REPLACEMENT_RESULT_MISSING);
+        }
+        return SessionKeyReplacementResult.from(result);
+    }
+
+    /**
+     * DB에서 지급이 확정된 회차를 Redis에 반영하고 다음 5분 누적을 시작한다.
+     */
+    public RewardClaimCompletionResult completeRewardClaim(
+            long userId,
+            String sessionKey,
+            long rewardSequence,
+            long claimedAt
+    ) {
+        String result = redisTemplate.execute(
+                WatchRedisScripts.COMPLETE_REWARD_CLAIM,
+                List.of(
+                        activeKey(userId),
+                        aliveKey(userId, sessionKey),
+                        redisSessionKey(sessionKey)
+                ),
+                sessionKey,
+                Long.toString(userId),
+                Long.toString(rewardSequence),
+                Long.toString(properties.claimInterval().toMillis()),
+                Long.toString(claimedAt),
+                Long.toString(properties.aliveTtl().toMillis()),
+                Long.toString(properties.activeTtl().toMillis()),
+                Long.toString(properties.sessionTtl().toMillis())
+        );
+        if (result == null) {
+            throw new WatchException(WatchError.REWARD_CLAIM_RESULT_MISSING);
+        }
+        return RewardClaimCompletionResult.from(result);
+    }
+
+    /**
+     * DB 지급 직전에 Redis 수령 자격을 확인하고 처리 중 만료되지 않도록 TTL을 갱신한다.
+     */
+    public RewardClaimCompletionStatus prepareRewardClaim(
+            long userId,
+            String sessionKey,
+            long rewardSequence
+    ) {
+        String result = redisTemplate.execute(
+                WatchRedisScripts.PREPARE_REWARD_CLAIM,
+                List.of(
+                        activeKey(userId),
+                        aliveKey(userId, sessionKey),
+                        redisSessionKey(sessionKey)
+                ),
+                sessionKey,
+                Long.toString(userId),
+                Long.toString(rewardSequence),
+                Long.toString(properties.claimInterval().toMillis()),
+                Long.toString(properties.aliveTtl().toMillis()),
+                Long.toString(properties.activeTtl().toMillis()),
+                Long.toString(properties.sessionTtl().toMillis())
+        );
+        if (result == null) {
+            throw new WatchException(WatchError.REWARD_CLAIM_RESULT_MISSING);
+        }
+        try {
+            return RewardClaimCompletionStatus.valueOf(result);
+        } catch (IllegalArgumentException exception) {
+            throw new WatchException(WatchError.REWARD_CLAIM_RESULT_UNKNOWN, exception);
+        }
     }
 
     /**
