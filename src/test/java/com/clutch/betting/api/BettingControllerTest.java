@@ -62,6 +62,7 @@ class BettingControllerTest {
         given(placementService.place(10L, 1L, "team-a", 1_000L)).willReturn(
                 new BetPlacementResult(
                         100L,
+                        10L,
                         1L,
                         "team-a",
                         1_000L,
@@ -78,6 +79,7 @@ class BettingControllerTest {
                                 """))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.userBetId").value(100))
+                .andExpect(jsonPath("$.userId").value(10))
                 .andExpect(jsonPath("$.remainingPoint").value(9000));
     }
 
@@ -85,6 +87,7 @@ class BettingControllerTest {
     void getsMyBetResult() throws Exception {
         given(queryService.getMyBet(1L, 10L)).willReturn(new UserBetView(
                 100L,
+                10L,
                 1L,
                 "team-a",
                 1_000L,
@@ -95,6 +98,7 @@ class BettingControllerTest {
         mockMvc.perform(get("/api/betting-events/1/bets/me")
                         .header("X-User-Id", "10"))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userId").value(10))
                 .andExpect(jsonPath("$.status").value("WON"))
                 .andExpect(jsonPath("$.currentPoint").value(11000));
     }

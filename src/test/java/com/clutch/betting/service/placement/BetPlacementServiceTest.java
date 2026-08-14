@@ -61,6 +61,7 @@ class BetPlacementServiceTest {
         BetPlacementResult result = service.place(20L, 10L, "team-a", 1_000L);
 
         assertThat(result.userBetId()).isEqualTo(30L);
+        assertThat(result.userId()).isEqualTo(20L);
         verify(userRepository).decreasePointIfEnough(20L, 1_000L);
         verify(transactionRepository).saveAndFlush(any(BetPointTransaction.class));
     }

@@ -136,6 +136,7 @@ public class BetPlacementService {
 
         return new BetPlacementResult(
                 userBet.getId(),
+                userBet.getUserId(),
                 bettingEventId,
                 selectedExternalTeamId,
                 amount,

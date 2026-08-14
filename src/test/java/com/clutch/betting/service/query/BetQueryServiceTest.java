@@ -91,4 +91,18 @@ class BetQueryServiceTest {
         assertThat(view.bettingAvailable()).isFalse();
         assertThat(view.myBet().userBetId()).isEqualTo(20L);
     }
+
+    @Test
+    void returnsMyBetWithOwnerId() {
+        UserBet userBet = UserBet.place(2L, 10L, "team-a", 1_000L);
+        ReflectionTestUtils.setField(userBet, "id", 20L);
+        given(userBetRepository.findByBettingEventIdAndUserId(2L, 10L))
+                .willReturn(Optional.of(userBet));
+        given(userRepository.findPointById(10L)).willReturn(Optional.of(9_000L));
+
+        UserBetView view = service.getMyBet(2L, 10L);
+
+        assertThat(view.userBetId()).isEqualTo(20L);
+        assertThat(view.userId()).isEqualTo(10L);
+    }
 }

@@ -7,6 +7,7 @@ import com.clutch.betting.service.query.UserBetView;
  * 사용자 배팅 상세와 현재 포인트를 반환한다.
  *
  * @param userBetId 사용자 배팅 ID
+ * @param userId 배팅을 등록한 사용자 ID
  * @param bettingEventId 배팅 이벤트 ID
  * @param selectedTeamId 사용자가 선택한 외부 팀 ID
  * @param amount 배팅 포인트
@@ -15,6 +16,7 @@ import com.clutch.betting.service.query.UserBetView;
  */
 public record UserBetResponse(
         Long userBetId,
+        Long userId,
         Long bettingEventId,
         String selectedTeamId,
         long amount,
@@ -31,6 +33,7 @@ public record UserBetResponse(
     public static UserBetResponse from(UserBetView view) {
         return new UserBetResponse(
                 view.userBetId(),
+                view.userId(),
                 view.bettingEventId(),
                 view.selectedExternalTeamId(),
                 view.amount(),

@@ -131,6 +131,7 @@ public class BetQueryService {
                 .orElseThrow(() -> new BettingException(BettingErrorCode.USER_NOT_FOUND));
         return new UserBetView(
                 userBet.getId(),
+                userBet.getUserId(),
                 bettingEventId,
                 userBet.getSelectedExternalTeamId(),
                 userBet.getAmount(),

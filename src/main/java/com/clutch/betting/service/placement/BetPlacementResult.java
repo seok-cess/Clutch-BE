@@ -6,6 +6,7 @@ import com.clutch.betting.domain.UserBetStatus;
  * 배팅 등록 결과와 원자적 차감 이후의 사용자 잔여 포인트다.
  *
  * @param userBetId 사용자 배팅 ID
+ * @param userId 배팅을 등록한 사용자 ID
  * @param bettingEventId 배팅 이벤트 ID
  * @param selectedExternalTeamId 선택한 외부 팀 ID
  * @param amount 배팅 포인트
@@ -14,6 +15,7 @@ import com.clutch.betting.domain.UserBetStatus;
  */
 public record BetPlacementResult(
         Long userBetId,
+        Long userId,
         Long bettingEventId,
         String selectedExternalTeamId,
         long amount,
