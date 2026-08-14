@@ -8,7 +8,6 @@ import com.clutch.coupon.event.api.dto.CouponEventItemCreateResponse;
 import com.clutch.coupon.event.api.dto.CouponEventListResponse;
 import com.clutch.coupon.event.api.dto.CouponEventUpdateRequest;
 import com.clutch.coupon.event.api.dto.CouponEventUpdateResponse;
-import com.clutch.coupon.event.domain.CouponEventOpenMode;
 import com.clutch.coupon.event.domain.CouponEventStatus;
 import com.clutch.coupon.event.domain.CouponIssueMode;
 import com.clutch.coupon.event.exception.CouponEventErrorCode;
@@ -48,12 +47,10 @@ class CouponEventAdminControllerTest {
                         1L,
                         10L,
                         "펜타킬 이벤트",
-                        CouponEventOpenMode.GAME_TRIGGERED,
                         CouponIssueMode.PHASED_FIRST_COME,
                         "PENTA_KILL",
                         CouponEventStatus.READY,
                         90,
-                        null,
                         10_000,
                         1_000,
                         9_000,
@@ -91,7 +88,6 @@ class CouponEventAdminControllerTest {
                                 {
                                   "esportsMatchId": 2,
                                   "eventName": "진행 이벤트",
-                                  "openMode": "GAME_TRIGGERED",
                                   "issueMode": "PHASED_FIRST_COME",
                                   "triggerType": "FIRST_BLOOD",
                                   "claimWindowSeconds": 60,
@@ -136,10 +132,10 @@ class CouponEventAdminControllerTest {
                         .content("""
                                 {
                                   "eventName": "예약 이벤트",
-                                  "openMode": "SCHEDULED",
                                   "issueMode": "SINGLE_FIRST_COME",
+                                  "esportsMatchId": 1,
+                                  "triggerType": "FIRST_BLOOD",
                                   "claimWindowSeconds": 60,
-                                  "scheduledOpenAt": "2026-08-20T09:30:00",
                                   "items": [
                                     {
                                       "couponTypeId": 1,
@@ -185,11 +181,9 @@ class CouponEventAdminControllerTest {
         CouponEventUpdateRequest request = new CouponEventUpdateRequest(
                 2L,
                 "퍼블 이벤트",
-                CouponEventOpenMode.GAME_TRIGGERED,
                 CouponIssueMode.PHASED_FIRST_COME,
                 "FIRST_BLOOD",
                 60,
-                null,
                 List.of(
                         new CouponEventItemCreateRequest(10L, 5_000, 0),
                         new CouponEventItemCreateRequest(20L, 1_000, 30)
@@ -199,12 +193,10 @@ class CouponEventAdminControllerTest {
                 1L,
                 2L,
                 "퍼블 이벤트",
-                CouponEventOpenMode.GAME_TRIGGERED,
                 CouponIssueMode.PHASED_FIRST_COME,
                 "FIRST_BLOOD",
                 CouponEventStatus.READY,
                 60,
-                null,
                 null,
                 List.of()
         );
@@ -216,7 +208,6 @@ class CouponEventAdminControllerTest {
                                 {
                                   "esportsMatchId": 2,
                                   "eventName": "퍼블 이벤트",
-                                  "openMode": "GAME_TRIGGERED",
                                   "issueMode": "PHASED_FIRST_COME",
                                   "triggerType": "FIRST_BLOOD",
                                   "claimWindowSeconds": 60,
@@ -285,11 +276,9 @@ class CouponEventAdminControllerTest {
         CouponEventCreateRequest request = new CouponEventCreateRequest(
                 1L,
                 "펜타킬 이벤트",
-                CouponEventOpenMode.GAME_TRIGGERED,
                 CouponIssueMode.PHASED_FIRST_COME,
                 "PENTA_KILL",
                 90,
-                null,
                 List.of(
                         new CouponEventItemCreateRequest(1L, 5_000, 0),
                         new CouponEventItemCreateRequest(2L, 2_500, 30)
@@ -299,12 +288,10 @@ class CouponEventAdminControllerTest {
                 10L,
                 1L,
                 "펜타킬 이벤트",
-                CouponEventOpenMode.GAME_TRIGGERED,
                 CouponIssueMode.PHASED_FIRST_COME,
                 "PENTA_KILL",
                 CouponEventStatus.READY,
                 90,
-                null,
                 null,
                 List.of(
                         new CouponEventItemCreateResponse(
@@ -323,7 +310,6 @@ class CouponEventAdminControllerTest {
                                 {
                                   "esportsMatchId": 1,
                                   "eventName": "펜타킬 이벤트",
-                                  "openMode": "GAME_TRIGGERED",
                                   "issueMode": "PHASED_FIRST_COME",
                                   "triggerType": "PENTA_KILL",
                                   "claimWindowSeconds": 90,

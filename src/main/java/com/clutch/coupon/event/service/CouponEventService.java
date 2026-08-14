@@ -14,7 +14,6 @@ import com.clutch.coupon.event.api.dto.CouponEventUpdateResponse;
 import com.clutch.coupon.event.domain.CouponEvent;
 import com.clutch.coupon.event.domain.CouponEventItem;
 import com.clutch.coupon.event.domain.CouponEventOccurrence;
-import com.clutch.coupon.event.domain.CouponEventOpenMode;
 import com.clutch.coupon.event.domain.CouponEventPhase;
 import com.clutch.coupon.event.domain.CouponEventStatus;
 import com.clutch.coupon.event.domain.CouponIssueMode;
@@ -61,11 +60,9 @@ public class CouponEventService {
         CouponEvent event = CouponEvent.create(
                 request.esportsMatchId(),
                 request.eventName(),
-                request.openMode(),
                 request.issueMode(),
                 normalizeTriggerType(request.triggerType()),
-                request.claimWindowSeconds(),
-                request.scheduledOpenAt()
+                request.claimWindowSeconds()
         );
         CouponEvent savedEvent = couponEventRepository.save(event);
 
@@ -76,12 +73,10 @@ public class CouponEventService {
                 savedEvent.getId(),
                 savedEvent.getEsportsMatchId(),
                 savedEvent.getEventName(),
-                savedEvent.getOpenMode(),
                 savedEvent.getIssueMode(),
                 savedEvent.getTriggerType(),
                 savedEvent.getEventStatus(),
                 savedEvent.getClaimWindowSeconds(),
-                savedEvent.getScheduledOpenAt(),
                 savedEvent.getCreatedAt(),
                 itemResponses
         );
@@ -109,11 +104,9 @@ public class CouponEventService {
         event.updateConfiguration(
                 request.esportsMatchId(),
                 request.eventName(),
-                request.openMode(),
                 request.issueMode(),
                 normalizeTriggerType(request.triggerType()),
-                request.claimWindowSeconds(),
-                request.scheduledOpenAt()
+                request.claimWindowSeconds()
         );
         CouponEvent savedEvent = couponEventRepository.saveAndFlush(event);
 
@@ -125,12 +118,10 @@ public class CouponEventService {
                 savedEvent.getId(),
                 savedEvent.getEsportsMatchId(),
                 savedEvent.getEventName(),
-                savedEvent.getOpenMode(),
                 savedEvent.getIssueMode(),
                 savedEvent.getTriggerType(),
                 savedEvent.getEventStatus(),
                 savedEvent.getClaimWindowSeconds(),
-                savedEvent.getScheduledOpenAt(),
                 savedEvent.getUpdatedAt(),
                 itemResponses
         );
@@ -250,12 +241,10 @@ public class CouponEventService {
                 event.getId(),
                 event.getEsportsMatchId(),
                 event.getEventName(),
-                event.getOpenMode(),
                 event.getIssueMode(),
                 event.getTriggerType(),
                 event.getEventStatus(),
                 event.getClaimWindowSeconds(),
-                event.getScheduledOpenAt(),
                 totalQuantity,
                 issuedQuantity,
                 totalQuantity - issuedQuantity,
@@ -325,11 +314,9 @@ public class CouponEventService {
                 event.getEventName(),
                 event.getEsportsMatchId(),
                 event.getTriggerType(),
-                event.getOpenMode(),
                 event.getIssueMode(),
                 event.getEventStatus(),
                 event.getClaimWindowSeconds(),
-                event.getScheduledOpenAt(),
                 totalQuantity,
                 issuedQuantity,
                 totalQuantity - issuedQuantity,
@@ -430,48 +417,34 @@ public class CouponEventService {
     }
 
     private void validateRequest(CouponEventCreateRequest request) {
-        if (request.openMode() == CouponEventOpenMode.SCHEDULED) {
-            validateScheduledEvent(request);
-        } else if (request.openMode() == CouponEventOpenMode.GAME_TRIGGERED) {
-            validateGameTriggeredEvent(request);
-        }
+        validateTrigger(request);
+        validateIssueMode(request);
         validateItems(request);
     }
 
-    private void validateScheduledEvent(CouponEventCreateRequest request) {
-        if (request.issueMode() != CouponIssueMode.SINGLE_FIRST_COME) {
-            invalid("예약 이벤트는 일반 선착순 발급 방식이어야 합니다.");
-        }
-        if (request.esportsMatchId() != null
-                || (request.triggerType() != null
-                && !request.triggerType().isBlank())) {
-            invalid("예약 이벤트에는 경기 ID와 트리거 종류를 설정할 수 없습니다.");
-        }
-        if (request.scheduledOpenAt() == null) {
-            invalid("예약 이벤트에는 오픈 시간이 필요합니다.");
-        }
-        if (request.items().size() != 1
-                || request.items().getFirst().openOffsetSeconds() != 0) {
-            invalid("일반 선착순 이벤트는 오픈 시간 0초인 쿠폰 항목 한 개만 등록할 수 있습니다.");
-        }
-    }
-
-    private void validateGameTriggeredEvent(CouponEventCreateRequest request) {
-        if (request.issueMode() != CouponIssueMode.PHASED_FIRST_COME) {
-            invalid("경기 트리거 이벤트는 차등 혜택 발급 방식이어야 합니다.");
-        }
+    private void validateTrigger(CouponEventCreateRequest request) {
         if (request.esportsMatchId() == null
                 || request.esportsMatchId() <= 0) {
-            invalid("경기 트리거 이벤트에는 경기 ID가 필요합니다.");
+            invalid("쿠폰 이벤트에는 경기 ID가 필요합니다.");
         }
         if (request.triggerType() == null
                 || request.triggerType().isBlank()) {
-            invalid("경기 트리거 이벤트에는 트리거 종류가 필요합니다.");
+            invalid("쿠폰 이벤트에는 트리거 종류가 필요합니다.");
         }
-        if (request.scheduledOpenAt() != null) {
-            invalid("경기 트리거 이벤트에는 예약 오픈 시간을 설정할 수 없습니다.");
+    }
+
+    private void validateIssueMode(CouponEventCreateRequest request) {
+        if (request.issueMode() == CouponIssueMode.SINGLE_FIRST_COME) {
+            if (request.items().size() != 1
+                    || request.items().getFirst().openOffsetSeconds() != 0) {
+                invalid(
+                        "일반 선착순 이벤트는 오픈 시간 0초인 쿠폰 항목 한 개만 등록할 수 있습니다."
+                );
+            }
+            return;
         }
-        if (request.items().size() < 2) {
+        if (request.issueMode() == CouponIssueMode.PHASED_FIRST_COME
+                && request.items().size() < 2) {
             invalid("차등 혜택 이벤트에는 쿠폰 단계가 두 개 이상 필요합니다.");
         }
     }
@@ -503,9 +476,6 @@ public class CouponEventService {
     }
 
     private void validateDuplicateTriggerEvent(CouponEventCreateRequest request) {
-        if (request.openMode() != CouponEventOpenMode.GAME_TRIGGERED) {
-            return;
-        }
         if (couponEventRepository.existsByEsportsMatchIdAndTriggerType(
                 request.esportsMatchId(),
                 request.triggerType().trim()
@@ -520,9 +490,6 @@ public class CouponEventService {
             Long couponEventId,
             CouponEventCreateRequest request
     ) {
-        if (request.openMode() != CouponEventOpenMode.GAME_TRIGGERED) {
-            return;
-        }
         if (couponEventRepository
                 .existsByEsportsMatchIdAndTriggerTypeAndIdNot(
                         request.esportsMatchId(),

@@ -9,7 +9,6 @@ import com.clutch.coupon.event.api.dto.CouponEventUpdateRequest;
 import com.clutch.coupon.event.api.dto.CouponEventUpdateResponse;
 import com.clutch.coupon.event.domain.CouponEvent;
 import com.clutch.coupon.event.domain.CouponEventItem;
-import com.clutch.coupon.event.domain.CouponEventOpenMode;
 import com.clutch.coupon.event.domain.CouponEventPhase;
 import com.clutch.coupon.event.domain.CouponEventStatus;
 import com.clutch.coupon.event.domain.CouponIssueMode;
@@ -33,7 +32,6 @@ import org.springframework.data.domain.SliceImpl;
 
 import java.util.List;
 import java.util.Optional;
-import java.time.LocalDateTime;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -81,17 +79,13 @@ class CouponEventServiceTest {
     }
 
     @Test
-    void 예약형_일반_선착순_이벤트를_등록한다() {
-        LocalDateTime scheduledOpenAt =
-                LocalDateTime.of(2026, 8, 20, 9, 30);
+    void 트리거형_일반_선착순_이벤트를_등록한다() {
         CouponEventCreateRequest request = new CouponEventCreateRequest(
-                null,
-                "오전 선착순 이벤트",
-                CouponEventOpenMode.SCHEDULED,
+                1L,
+                "퍼블 일반 선착순 이벤트",
                 CouponIssueMode.SINGLE_FIRST_COME,
-                null,
+                "FIRST_BLOOD",
                 60,
-                scheduledOpenAt,
                 List.of(new CouponEventItemCreateRequest(
                         1L,
                         10_000,
@@ -107,18 +101,17 @@ class CouponEventServiceTest {
 
         CouponEventCreateResponse response = couponEventService.create(request);
 
-        assertThat(response.openMode())
-                .isEqualTo(CouponEventOpenMode.SCHEDULED);
         assertThat(response.issueMode())
                 .isEqualTo(CouponIssueMode.SINGLE_FIRST_COME);
-        assertThat(response.scheduledOpenAt()).isEqualTo(scheduledOpenAt);
+        assertThat(response.esportsMatchId()).isEqualTo(1L);
+        assertThat(response.triggerType()).isEqualTo("FIRST_BLOOD");
         assertThat(response.items()).singleElement()
                 .satisfies(item -> {
                     assertThat(item.quantity()).isEqualTo(10_000);
                     assertThat(item.openOffsetSeconds()).isZero();
                 });
-        verify(couponEventRepository, never())
-                .existsByEsportsMatchIdAndTriggerType(any(), any());
+        verify(couponEventRepository)
+                .existsByEsportsMatchIdAndTriggerType(1L, "FIRST_BLOOD");
     }
 
     @Test
@@ -126,11 +119,9 @@ class CouponEventServiceTest {
         CouponEventCreateRequest request = new CouponEventCreateRequest(
                 1L,
                 "잘못된 단계 이벤트",
-                CouponEventOpenMode.GAME_TRIGGERED,
                 CouponIssueMode.PHASED_FIRST_COME,
                 "PENTA_KILL",
                 90,
-                null,
                 List.of(
                         new CouponEventItemCreateRequest(1L, 5_000, 10),
                         new CouponEventItemCreateRequest(2L, 1_000, 30)
@@ -147,11 +138,9 @@ class CouponEventServiceTest {
         CouponEventCreateRequest request = new CouponEventCreateRequest(
                 1L,
                 "중복 쿠폰 이벤트",
-                CouponEventOpenMode.GAME_TRIGGERED,
                 CouponIssueMode.PHASED_FIRST_COME,
                 "PENTA_KILL",
                 90,
-                null,
                 List.of(
                         new CouponEventItemCreateRequest(1L, 5_000, 0),
                         new CouponEventItemCreateRequest(1L, 1_000, 30)
@@ -518,11 +507,9 @@ class CouponEventServiceTest {
         CouponEventCreateRequest request = new CouponEventCreateRequest(
                 1L,
                 "펜타킬 이벤트",
-                CouponEventOpenMode.GAME_TRIGGERED,
                 CouponIssueMode.PHASED_FIRST_COME,
                 "PENTA_KILL",
                 60,
-                null,
                 List.of(
                         new CouponEventItemCreateRequest(1L, 5_000, 0),
                         new CouponEventItemCreateRequest(2L, 2_500, 60)
@@ -555,11 +542,9 @@ class CouponEventServiceTest {
         return new CouponEventCreateRequest(
                 1L,
                 "펜타킬 이벤트",
-                CouponEventOpenMode.GAME_TRIGGERED,
                 CouponIssueMode.PHASED_FIRST_COME,
                 "PENTA_KILL",
                 90,
-                null,
                 List.of(
                         new CouponEventItemCreateRequest(1L, 5_000, 0),
                         new CouponEventItemCreateRequest(2L, 2_500, 30),
@@ -572,11 +557,9 @@ class CouponEventServiceTest {
         return CouponEvent.create(
                 1L,
                 eventName,
-                CouponEventOpenMode.GAME_TRIGGERED,
                 CouponIssueMode.PHASED_FIRST_COME,
                 "PENTA_KILL",
-                90,
-                null
+                90
         );
     }
 
@@ -584,11 +567,9 @@ class CouponEventServiceTest {
         return new CouponEventUpdateRequest(
                 2L,
                 "퍼블 이벤트",
-                CouponEventOpenMode.GAME_TRIGGERED,
                 CouponIssueMode.PHASED_FIRST_COME,
                 "FIRST_BLOOD",
                 60,
-                null,
                 List.of(
                         new CouponEventItemCreateRequest(10L, 5_000, 0),
                         new CouponEventItemCreateRequest(20L, 1_000, 30)
