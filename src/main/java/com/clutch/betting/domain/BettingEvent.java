@@ -178,6 +178,16 @@ public class BettingEvent {
         close();
     }
 
+    public void settle() {
+        if (status == BettingEventStatus.SETTLED) {
+            return;
+        }
+        if (status != BettingEventStatus.CLOSED || winnerExternalTeamId == null) {
+            throw new IllegalStateException("승리 팀이 확정된 종료 이벤트만 정산할 수 있습니다.");
+        }
+        status = BettingEventStatus.SETTLED;
+    }
+
     private static String requireText(String value, String message) {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException(message);

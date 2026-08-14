@@ -12,7 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 public interface UserRepository extends JpaRepository<User, Long> {
 
-    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Modifying(flushAutomatically = true)
     @Transactional
     @Query("""
             update User user
@@ -25,7 +25,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
             @Param("amount") long amount
     );
 
-    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Modifying(flushAutomatically = true)
     @Transactional
     @Query("""
             update User user

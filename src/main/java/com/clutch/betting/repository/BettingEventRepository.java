@@ -22,4 +22,12 @@ public interface BettingEventRepository extends JpaRepository<BettingEvent, Long
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select event from BettingEvent event where event.id = :id")
     Optional<BettingEvent> findByIdForUpdate(Long id);
+
+    @Query("""
+            select event.id
+            from BettingEvent event
+            where event.status = com.clutch.betting.domain.BettingEventStatus.CLOSED
+              and event.winnerExternalTeamId is not null
+            """)
+    List<Long> findIdsReadyToSettle();
 }

@@ -89,4 +89,22 @@ public class UserBet {
     ) {
         return new UserBet(bettingEventId, userId, selectedExternalTeamId, amount);
     }
+
+    public void win() {
+        transitionFromPlaced(UserBetStatus.WON);
+    }
+
+    public void lose() {
+        transitionFromPlaced(UserBetStatus.LOST);
+    }
+
+    private void transitionFromPlaced(UserBetStatus targetStatus) {
+        if (status == targetStatus) {
+            return;
+        }
+        if (status != UserBetStatus.PLACED) {
+            throw new IllegalStateException("등록 상태의 배팅만 정산할 수 있습니다.");
+        }
+        status = targetStatus;
+    }
 }

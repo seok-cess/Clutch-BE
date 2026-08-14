@@ -101,4 +101,26 @@ class BettingDomainTest {
         assertThatThrownBy(() -> event.recordWinner("team-c"))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void settlesEventAndUserBets() {
+        BettingEvent event = BettingEvent.open(
+                "match-1",
+                1,
+                "team-a",
+                "team-b",
+                LocalDateTime.of(2026, 8, 14, 10, 0)
+        );
+        UserBet wonBet = UserBet.place(1L, 10L, "team-a", 1_000L);
+        UserBet lostBet = UserBet.place(1L, 20L, "team-b", 1_000L);
+
+        event.recordWinner("team-a");
+        wonBet.win();
+        lostBet.lose();
+        event.settle();
+
+        assertThat(event.getStatus()).isEqualTo(BettingEventStatus.SETTLED);
+        assertThat(wonBet.getStatus()).isEqualTo(UserBetStatus.WON);
+        assertThat(lostBet.getStatus()).isEqualTo(UserBetStatus.LOST);
+    }
 }
