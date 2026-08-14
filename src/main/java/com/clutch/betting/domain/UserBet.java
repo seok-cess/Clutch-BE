@@ -1,5 +1,7 @@
 package com.clutch.betting.domain;
 
+import com.clutch.betting.exception.BettingErrorCode;
+import com.clutch.betting.exception.BettingException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -71,20 +73,20 @@ public class UserBet {
      * @param userId 사용자 ID
      * @param selectedExternalTeamId 선택한 외부 팀 ID
      * @param amount 배팅 포인트
-     * @throws IllegalArgumentException 필수 값이 없거나 금액이 허용 범위를 벗어날 때
+     * @throws BettingException 필수 값이 없거나 금액이 허용 범위를 벗어날 때
      */
     private UserBet(Long bettingEventId, Long userId, String selectedExternalTeamId, long amount) {
         if (bettingEventId == null) {
-            throw new IllegalArgumentException("배팅 이벤트 ID는 필수입니다.");
+            throw new BettingException(BettingErrorCode.BETTING_EVENT_ID_REQUIRED);
         }
         if (userId == null) {
-            throw new IllegalArgumentException("사용자 ID는 필수입니다.");
+            throw new BettingException(BettingErrorCode.USER_ID_REQUIRED);
         }
         if (selectedExternalTeamId == null || selectedExternalTeamId.isBlank()) {
-            throw new IllegalArgumentException("선택 팀 ID는 필수입니다.");
+            throw new BettingException(BettingErrorCode.SELECTED_TEAM_ID_REQUIRED);
         }
         if (amount < MIN_AMOUNT || amount > MAX_AMOUNT) {
-            throw new IllegalArgumentException("배팅 금액은 1,000포인트 이상 100,000포인트 이하여야 합니다.");
+            throw new BettingException(BettingErrorCode.BET_AMOUNT_OUT_OF_RANGE);
         }
         this.bettingEventId = bettingEventId;
         this.userId = userId;
@@ -101,7 +103,7 @@ public class UserBet {
      * @param selectedExternalTeamId 선택한 외부 팀 ID
      * @param amount 배팅 포인트
      * @return PLACED 상태의 사용자 배팅
-     * @throws IllegalArgumentException 필수 값이 없거나 금액이 허용 범위를 벗어날 때
+     * @throws BettingException 필수 값이 없거나 금액이 허용 범위를 벗어날 때
      */
     public static UserBet place(
             Long bettingEventId,
@@ -131,14 +133,14 @@ public class UserBet {
      * 이미 처리된 결과는 멱등하게 유지하고 다른 완료 상태 간 변경은 차단한다.
      *
      * @param targetStatus 전환할 최종 배팅 상태
-     * @throws IllegalStateException 등록 상태가 아닌 배팅을 다른 결과로 바꾸려 할 때
+     * @throws BettingException 등록 상태가 아닌 배팅을 다른 결과로 바꾸려 할 때
      */
     private void transitionFromPlaced(UserBetStatus targetStatus) {
         if (status == targetStatus) {
             return;
         }
         if (status != UserBetStatus.PLACED) {
-            throw new IllegalStateException("등록 상태의 배팅만 정산할 수 있습니다.");
+            throw new BettingException(BettingErrorCode.USER_BET_NOT_PLACED);
         }
         status = targetStatus;
     }

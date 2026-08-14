@@ -32,7 +32,7 @@ public class BettingExceptionHandler {
     ) {
         BettingErrorCode code = exception.getErrorCode();
         return ResponseEntity.status(statusOf(code))
-                .body(new BettingErrorResponse(code.name(), code.getMessage()));
+                .body(new BettingErrorResponse(code, code.getMessage()));
     }
 
     /**
@@ -49,7 +49,7 @@ public class BettingExceptionHandler {
     })
     public ResponseEntity<BettingErrorResponse> handleInvalidRequest(Exception exception) {
         return ResponseEntity.badRequest().body(new BettingErrorResponse(
-                "INVALID_REQUEST",
+                BettingErrorCode.INVALID_REQUEST,
                 validationMessage(exception)
         ));
     }
@@ -79,16 +79,16 @@ public class BettingExceptionHandler {
             return validationException.getBindingResult().getFieldErrors().stream()
                     .findFirst()
                     .map(error -> error.getDefaultMessage())
-                    .orElse("요청 값이 올바르지 않습니다.");
+                    .orElse(BettingErrorCode.INVALID_REQUEST.getMessage());
         }
         if (exception instanceof ConstraintViolationException violationException) {
             return violationException.getConstraintViolations().stream()
                     .findFirst()
                     .map(violation -> violation.getMessage())
-                    .orElse("요청 값이 올바르지 않습니다.");
+                    .orElse(BettingErrorCode.INVALID_REQUEST.getMessage());
         }
         return exception.getMessage() == null
-                ? "요청 값이 올바르지 않습니다."
+                ? BettingErrorCode.INVALID_REQUEST.getMessage()
                 : exception.getMessage();
     }
 }

@@ -1,5 +1,7 @@
 package com.clutch.betting.domain;
 
+import com.clutch.betting.exception.BettingErrorCode;
+import com.clutch.betting.exception.BettingException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -83,7 +85,7 @@ public class BettingEvent {
      * @param firstExternalTeamId 첫 번째 참가 팀 ID
      * @param secondExternalTeamId 두 번째 참가 팀 ID
      * @param openedAt 이벤트 오픈 시각
-     * @throws IllegalArgumentException 필수 값이 없거나 세트·참가 팀 조건이 올바르지 않을 때
+     * @throws BettingException 필수 값이 없거나 세트·참가 팀 조건이 올바르지 않을 때
      */
     private BettingEvent(
             String externalMatchId,
@@ -92,18 +94,18 @@ public class BettingEvent {
             String secondExternalTeamId,
             LocalDateTime openedAt
     ) {
-        this.externalMatchId = requireText(externalMatchId, "외부 매치 ID는 필수입니다.");
+        this.externalMatchId = requireText(externalMatchId, BettingErrorCode.EXTERNAL_MATCH_ID_REQUIRED);
         if (setNumber < 1) {
-            throw new IllegalArgumentException("세트 번호는 1 이상이어야 합니다.");
+            throw new BettingException(BettingErrorCode.INVALID_SET_NUMBER);
         }
         this.setNumber = setNumber;
-        this.firstExternalTeamId = requireText(firstExternalTeamId, "첫 번째 팀 ID는 필수입니다.");
-        this.secondExternalTeamId = requireText(secondExternalTeamId, "두 번째 팀 ID는 필수입니다.");
+        this.firstExternalTeamId = requireText(firstExternalTeamId, BettingErrorCode.FIRST_TEAM_ID_REQUIRED);
+        this.secondExternalTeamId = requireText(secondExternalTeamId, BettingErrorCode.SECOND_TEAM_ID_REQUIRED);
         if (this.firstExternalTeamId.equals(this.secondExternalTeamId)) {
-            throw new IllegalArgumentException("배팅 선택지의 두 팀은 서로 달라야 합니다.");
+            throw new BettingException(BettingErrorCode.DUPLICATE_TEAM_OPTIONS);
         }
         if (openedAt == null) {
-            throw new IllegalArgumentException("배팅 오픈 시각은 필수입니다.");
+            throw new BettingException(BettingErrorCode.EVENT_OPENED_AT_REQUIRED);
         }
         this.openedAt = openedAt;
         this.status = BettingEventStatus.OPEN;
@@ -118,7 +120,7 @@ public class BettingEvent {
      * @param secondExternalTeamId 두 번째 참가 팀 ID
      * @param openedAt 이벤트 오픈 시각
      * @return OPEN 상태의 신규 배팅 이벤트
-     * @throws IllegalArgumentException 필수 값이 없거나 세트·참가 팀 조건이 올바르지 않을 때
+     * @throws BettingException 필수 값이 없거나 세트·참가 팀 조건이 올바르지 않을 때
      */
     public static BettingEvent open(
             String externalMatchId,
@@ -166,8 +168,7 @@ public class BettingEvent {
      * @param externalGameId 외부 세트 ID
      * @param setStartedAt 세트 시작 시각
      * @param bettingDurationAfterStart 세트 시작 후 배팅 허용 기간
-     * @throws IllegalArgumentException 외부 세트 ID가 없거나 배팅 허용 기간이 양수가 아닐 때
-     * @throws IllegalStateException 이미 다른 외부 세트가 연결됐을 때
+     * @throws BettingException 외부 세트 ID가 없거나 배팅 허용 기간이 양수가 아니거나 다른 세트가 연결됐을 때
      */
     public void attachGame(
             String externalGameId,
@@ -177,16 +178,16 @@ public class BettingEvent {
         if (status == BettingEventStatus.SETTLED || status == BettingEventStatus.CANCELLED) {
             return;
         }
-        String normalizedGameId = requireText(externalGameId, "외부 세트 ID는 필수입니다.");
+        String normalizedGameId = requireText(externalGameId, BettingErrorCode.EXTERNAL_GAME_ID_REQUIRED);
         if (this.externalGameId != null && !this.externalGameId.equals(normalizedGameId)) {
-            throw new IllegalStateException("이미 다른 세트 ID가 연결된 배팅 이벤트입니다.");
+            throw new BettingException(BettingErrorCode.EVENT_GAME_ALREADY_ATTACHED);
         }
         this.externalGameId = normalizedGameId;
         if (setStartedAt != null) {
             if (bettingDurationAfterStart == null
                     || bettingDurationAfterStart.isZero()
                     || bettingDurationAfterStart.isNegative()) {
-                throw new IllegalArgumentException("세트 시작 후 배팅 가능 시간은 양수여야 합니다.");
+                throw new BettingException(BettingErrorCode.INVALID_BETTING_DURATION);
             }
             LocalDateTime calculatedClosesAt = setStartedAt.plus(bettingDurationAfterStart);
             this.closesAt = calculatedClosesAt;
@@ -198,11 +199,11 @@ public class BettingEvent {
      *
      * @param now 판단 기준 시각
      * @return 이번 호출에서 종료 상태로 전환했으면 true
-     * @throws IllegalArgumentException 기준 시각이 없을 때
+     * @throws BettingException 기준 시각이 없을 때
      */
     public boolean closeIfExpired(LocalDateTime now) {
         if (now == null) {
-            throw new IllegalArgumentException("현재 시각은 필수입니다.");
+            throw new BettingException(BettingErrorCode.CURRENT_TIME_REQUIRED);
         }
         if (status == BettingEventStatus.OPEN
                 && closesAt != null
@@ -224,12 +225,12 @@ public class BettingEvent {
      * 최초로 확인한 참가 팀 승자를 보존하고 이벤트를 종료한다.
      *
      * @param externalTeamId 승리한 외부 팀 ID
-     * @throws IllegalArgumentException 승리 팀 ID가 없거나 참가 팀이 아닐 때
+     * @throws BettingException 승리 팀 ID가 없거나 참가 팀이 아닐 때
      */
     public void recordWinner(String externalTeamId) {
-        String winnerTeamId = requireText(externalTeamId, "승리 팀 ID는 필수입니다.");
+        String winnerTeamId = requireText(externalTeamId, BettingErrorCode.WINNER_TEAM_ID_REQUIRED);
         if (!hasParticipant(winnerTeamId)) {
-            throw new IllegalArgumentException("승리 팀은 배팅 이벤트 참가 팀이어야 합니다.");
+            throw new BettingException(BettingErrorCode.WINNER_NOT_PARTICIPANT);
         }
         if (status == BettingEventStatus.SETTLED || status == BettingEventStatus.CANCELLED) {
             return;
@@ -244,14 +245,14 @@ public class BettingEvent {
     /**
      * 승자가 확정된 종료 이벤트를 최종 정산 상태로 전환한다.
      *
-     * @throws IllegalStateException 이벤트가 종료 상태가 아니거나 승자가 없을 때
+     * @throws BettingException 이벤트가 종료 상태가 아니거나 승자가 없을 때
      */
     public void settle() {
         if (status == BettingEventStatus.SETTLED) {
             return;
         }
         if (status != BettingEventStatus.CLOSED || winnerExternalTeamId == null) {
-            throw new IllegalStateException("승리 팀이 확정된 종료 이벤트만 정산할 수 있습니다.");
+            throw new BettingException(BettingErrorCode.EVENT_NOT_SETTLEABLE);
         }
         status = BettingEventStatus.SETTLED;
     }
@@ -271,13 +272,13 @@ public class BettingEvent {
      * 필수 문자열 값을 공백까지 포함해 검증한다.
      *
      * @param value 검증할 문자열
-     * @param message 검증 실패 메시지
+     * @param errorCode 검증 실패 시 반환할 배팅 오류 코드
      * @return 검증을 통과한 원본 문자열
-     * @throws IllegalArgumentException 값이 null 또는 공백일 때
+     * @throws BettingException 값이 null 또는 공백일 때
      */
-    private static String requireText(String value, String message) {
+    private static String requireText(String value, BettingErrorCode errorCode) {
         if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException(message);
+            throw new BettingException(errorCode);
         }
         return value;
     }

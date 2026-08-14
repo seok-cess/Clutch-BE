@@ -1,5 +1,7 @@
 package com.clutch.betting.domain;
 
+import com.clutch.betting.exception.BettingErrorCode;
+import com.clutch.betting.exception.BettingException;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
@@ -29,9 +31,11 @@ class BettingDomainTest {
         LocalDateTime openedAt = LocalDateTime.of(2026, 8, 14, 10, 0);
 
         assertThatThrownBy(() -> BettingEvent.open("match-1", 0, "team-a", "team-b", openedAt))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOfSatisfying(BettingException.class, exception -> assertThat(exception.getErrorCode())
+                        .isEqualTo(BettingErrorCode.INVALID_SET_NUMBER));
         assertThatThrownBy(() -> BettingEvent.open("match-1", 1, "team-a", "team-a", openedAt))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOfSatisfying(BettingException.class, exception -> assertThat(exception.getErrorCode())
+                        .isEqualTo(BettingErrorCode.DUPLICATE_TEAM_OPTIONS));
     }
 
     @Test
@@ -46,9 +50,11 @@ class BettingDomainTest {
     @Test
     void rejectsBetOutsideAllowedAmount() {
         assertThatThrownBy(() -> UserBet.place(10L, 20L, "team-a", 999L))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOfSatisfying(BettingException.class, exception -> assertThat(exception.getErrorCode())
+                        .isEqualTo(BettingErrorCode.BET_AMOUNT_OUT_OF_RANGE));
         assertThatThrownBy(() -> UserBet.place(10L, 20L, "team-a", 100_001L))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOfSatisfying(BettingException.class, exception -> assertThat(exception.getErrorCode())
+                        .isEqualTo(BettingErrorCode.BET_AMOUNT_OUT_OF_RANGE));
     }
 
     @Test
@@ -99,7 +105,8 @@ class BettingDomainTest {
         assertThat(event.getWinnerExternalTeamId()).isEqualTo("team-a");
         assertThat(event.getStatus()).isEqualTo(BettingEventStatus.CLOSED);
         assertThatThrownBy(() -> event.recordWinner("team-c"))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOfSatisfying(BettingException.class, exception -> assertThat(exception.getErrorCode())
+                        .isEqualTo(BettingErrorCode.WINNER_NOT_PARTICIPANT));
     }
 
     @Test

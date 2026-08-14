@@ -92,7 +92,6 @@ public class BetPlacementService {
      * @param amount 배팅 포인트
      * @return 등록된 배팅과 잔여 포인트
      * @throws BettingException 이벤트·팀·사용자·포인트·중복 조건을 만족하지 못할 때
-     * @throws IllegalArgumentException 배팅 금액 또는 필수 값이 도메인 조건을 만족하지 못할 때
      */
     @Transactional
     public BetPlacementResult place(
