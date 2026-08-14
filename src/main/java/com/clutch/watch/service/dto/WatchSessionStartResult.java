@@ -11,7 +11,6 @@ import java.time.Instant;
  * @param heartbeatIntervalSeconds 프론트엔드 heartbeat 전송 주기(초)
  * @param sessionTimeoutSeconds heartbeat 중단을 판단하는 시간(초)
  * @param heartbeatSequence 마지막으로 처리한 heartbeat 순번
- * @param newlyCreated 새 시청 세션을 생성했으면 true, 동일 경기 세션을 이어받았으면 false
  */
 public record WatchSessionStartResult(
         String sessionKey,
@@ -19,7 +18,6 @@ public record WatchSessionStartResult(
         Instant enteredAt,
         long heartbeatIntervalSeconds,
         long sessionTimeoutSeconds,
-        long heartbeatSequence,
-        boolean newlyCreated
+        long heartbeatSequence
 ) {
 }

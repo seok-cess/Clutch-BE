@@ -1,6 +1,10 @@
-package com.clutch.watch.redis;
+package com.clutch.watch.redis.session;
 
 import com.clutch.watch.config.WatchRewardProperties;
+import com.clutch.watch.redis.heartbeat.HeartbeatProcessingResult;
+import com.clutch.watch.redis.heartbeat.HeartbeatResult;
+import com.clutch.watch.redis.reward.RewardClaimCompletionResult;
+import com.clutch.watch.redis.reward.RewardClaimCompletionStatus;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -267,6 +271,38 @@ class WatchSessionRedisRepositoryTest {
                 .isEqualTo(HeartbeatResult.REPLACED);
     }
 
+    @Test
+    void returnsExpiredWhenReplacingSessionWithoutActiveKey() {
+        repository.initialize(100L, 200L, "session-1", 1_000_000L);
+        repository.deleteActiveIfMatches(100L, "session-1");
+
+        SessionKeyReplacementResult result = repository.replaceSessionKey(
+                100L,
+                "session-1",
+                "session-2"
+        );
+
+        assertThat(result).isEqualTo(SessionKeyReplacementResult.EXPIRED);
+        assertThat(repository.findSession("session-1")).isPresent();
+        assertThat(repository.findSession("session-2")).isEmpty();
+    }
+
+    @Test
+    void returnsReplacedWhenAnotherSessionIsActive() {
+        repository.initialize(100L, 200L, "session-1", 1_000_000L);
+        repository.initialize(100L, 201L, "session-2", 1_010_000L);
+
+        SessionKeyReplacementResult result = repository.replaceSessionKey(
+                100L,
+                "session-1",
+                "session-3"
+        );
+
+        assertThat(result).isEqualTo(SessionKeyReplacementResult.REPLACED);
+        assertThat(repository.findSession("session-1")).isPresent();
+        assertThat(repository.findSession("session-3")).isEmpty();
+    }
+
     /**
      * 이미 처리한 sequence 이하의 heartbeat가 시간과 상태를 다시 변경하지 않는지 검증한다.
      */
@@ -315,6 +351,21 @@ class WatchSessionRedisRepositoryTest {
 
         assertThat(result.status()).isEqualTo(HeartbeatResult.REPLACED);
         assertThat(repository.findSession("session-1").orElseThrow().eligibleMilliseconds()).isZero();
+    }
+
+    /**
+     * active 키가 사라진 세션의 heartbeat가 교체가 아닌 만료 결과를 반환하는지 검증한다.
+     */
+    @Test
+    void rejectsHeartbeatAfterActiveExpired() {
+        repository.initialize(100L, 200L, "session-1", 1_000_000L);
+        repository.deleteActiveIfMatches(100L, "session-1");
+
+        HeartbeatProcessingResult result = repository.heartbeat(
+                100L, "session-1", 1L, 1_030_000L);
+
+        assertThat(result.status()).isEqualTo(HeartbeatResult.EXPIRED);
+        assertThat(repository.findSession("session-1").orElseThrow().sequence()).isZero();
     }
 
     /**

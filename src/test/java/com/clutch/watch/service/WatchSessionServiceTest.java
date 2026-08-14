@@ -7,11 +7,11 @@ import com.clutch.watch.config.WatchRewardProperties;
 import com.clutch.watch.domain.WatchSession;
 import com.clutch.watch.exception.WatchError;
 import com.clutch.watch.exception.WatchException;
-import com.clutch.watch.redis.HeartbeatProcessingResult;
-import com.clutch.watch.redis.HeartbeatResult;
-import com.clutch.watch.redis.SessionKeyReplacementResult;
-import com.clutch.watch.redis.WatchSessionRedisRepository;
-import com.clutch.watch.redis.WatchSessionSnapshot;
+import com.clutch.watch.redis.heartbeat.HeartbeatProcessingResult;
+import com.clutch.watch.redis.heartbeat.HeartbeatResult;
+import com.clutch.watch.redis.session.SessionKeyReplacementResult;
+import com.clutch.watch.redis.session.WatchSessionRedisRepository;
+import com.clutch.watch.redis.session.WatchSessionSnapshot;
 import com.clutch.watch.repository.WatchSessionRepository;
 import com.clutch.watch.service.dto.WatchHeartbeatResult;
 import com.clutch.watch.service.dto.WatchRewardState;
@@ -95,7 +95,6 @@ class WatchSessionServiceTest {
         assertThat(result.heartbeatIntervalSeconds()).isEqualTo(30L);
         assertThat(result.sessionTimeoutSeconds()).isEqualTo(90L);
         assertThat(result.heartbeatSequence()).isZero();
-        assertThat(result.newlyCreated()).isTrue();
 
         ArgumentCaptor<WatchSession> sessionCaptor = ArgumentCaptor.forClass(WatchSession.class);
         verify(watchSessionRepository).save(sessionCaptor.capture());
@@ -164,7 +163,6 @@ class WatchSessionServiceTest {
 
         WatchSessionStartResult result = service.start(USER_ID, MATCH_ID);
 
-        assertThat(result.newlyCreated()).isFalse();
         assertThat(result.sessionKey()).isNotEqualTo(OLD_SESSION_KEY);
         assertThat(result.heartbeatSequence()).isEqualTo(snapshot.sequence());
         assertThat(watchSession.getSessionKey()).isEqualTo(result.sessionKey());

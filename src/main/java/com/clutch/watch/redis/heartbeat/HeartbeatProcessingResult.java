@@ -1,4 +1,4 @@
-package com.clutch.watch.redis;
+package com.clutch.watch.redis.heartbeat;
 
 import com.clutch.watch.exception.WatchError;
 import com.clutch.watch.exception.WatchException;
@@ -14,7 +14,7 @@ public record HeartbeatProcessingResult(
 
     private static final String SUCCESS_PREFIX = "SUCCESS:";
 
-    static HeartbeatProcessingResult from(String value) {
+    public static HeartbeatProcessingResult from(String value) {
         if (!value.startsWith(SUCCESS_PREFIX)) {
             return failure(HeartbeatResult.from(value));
         }

@@ -12,7 +12,6 @@ import com.clutch.watch.service.dto.WatchSessionStartResult;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -46,9 +45,7 @@ public class WatchSessionController {
             @PathVariable @Positive(message = "경기 ID는 1 이상이어야 합니다.") long matchId
     ) {
         WatchSessionStartResult result = watchSessionService.start(userId, matchId);
-        HttpStatus status = result.newlyCreated() ? HttpStatus.CREATED : HttpStatus.OK;
-        return ResponseEntity.status(status)
-                .body(WatchSessionStartResponse.from(result));
+        return ResponseEntity.ok(WatchSessionStartResponse.from(result));
     }
 
     /**

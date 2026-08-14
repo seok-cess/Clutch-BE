@@ -1,4 +1,4 @@
-package com.clutch.watch.redis;
+package com.clutch.watch.redis.reward;
 
 /**
  * DB 포인트 지급 후 Redis 회차 전환 결과.

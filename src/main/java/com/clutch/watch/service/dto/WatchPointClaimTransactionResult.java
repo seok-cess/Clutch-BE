@@ -6,7 +6,6 @@ package com.clutch.watch.service.dto;
 public record WatchPointClaimTransactionResult(
         long rewardSequence,
         long awardedPoint,
-        long totalPoint,
-        boolean newlyAwarded
+        long totalPoint
 ) {
 }

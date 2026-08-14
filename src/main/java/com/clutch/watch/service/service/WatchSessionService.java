@@ -7,11 +7,11 @@ import com.clutch.watch.config.WatchRewardProperties;
 import com.clutch.watch.domain.WatchSession;
 import com.clutch.watch.exception.WatchError;
 import com.clutch.watch.exception.WatchException;
-import com.clutch.watch.redis.HeartbeatProcessingResult;
-import com.clutch.watch.redis.HeartbeatResult;
-import com.clutch.watch.redis.SessionKeyReplacementResult;
-import com.clutch.watch.redis.WatchSessionRedisRepository;
-import com.clutch.watch.redis.WatchSessionSnapshot;
+import com.clutch.watch.redis.heartbeat.HeartbeatProcessingResult;
+import com.clutch.watch.redis.heartbeat.HeartbeatResult;
+import com.clutch.watch.redis.session.SessionKeyReplacementResult;
+import com.clutch.watch.redis.session.WatchSessionRedisRepository;
+import com.clutch.watch.redis.session.WatchSessionSnapshot;
 import com.clutch.watch.repository.WatchSessionRepository;
 import com.clutch.watch.service.dto.WatchHeartbeatResult;
 import com.clutch.watch.service.dto.WatchRewardState;
@@ -32,8 +32,6 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class WatchSessionService {
-
-    private static final String WATCHABLE_MATCH_STATUS = "inProgress";
 
     private final UserRepository userRepository;
     private final EsportsMatchRepository esportsMatchRepository;
@@ -102,6 +100,13 @@ public class WatchSessionService {
         return toHeartbeatResult(result);
     }
 
+    /**
+     * Redis heartbeat 처리 결과를 프론트엔드 응답에 필요한 포인트 적립 상태로 변환한다.
+     * 누적시간은 수령 기준을 넘지 않도록 제한하고, 남은 시간은 초 단위로 올림하여 반환한다.
+     *
+     * @param result Redis heartbeat 처리 결과
+     * @return 현재 수령 상태, 회차, 누적시간과 남은 시간을 포함한 응답 결과
+     */
     private WatchHeartbeatResult toHeartbeatResult(HeartbeatProcessingResult result) {
         long claimIntervalMillis = properties.claimInterval().toMillis();
         long eligibleMilliseconds = Math.min(
@@ -122,10 +127,25 @@ public class WatchSessionService {
         );
     }
 
+    /**
+     * 밀리초를 초 단위로 올림한다.
+     * 1밀리초라도 남아 있으면 다음 1초로 계산하여 수령 가능 시점을 앞당겨 표시하지 않는다.
+     *
+     * @param milliseconds 변환할 밀리초
+     * @return 올림한 초. 입력값이 0이면 0
+     */
     private long ceilSeconds(long milliseconds) {
         return milliseconds == 0L ? 0L : ((milliseconds - 1L) / 1_000L) + 1L;
     }
 
+    /**
+     * Redis heartbeat 실패 상태를 API에서 사용하는 시청 도메인 오류로 변환한다.
+     * 성공 결과는 오류로 변환할 수 없으므로 호출 흐름 오류로 처리한다.
+     *
+     * @param result Redis heartbeat 처리 상태
+     * @return 처리 상태에 대응하는 시청 도메인 오류
+     * @throws WatchException 성공 상태를 오류로 변환하려는 경우
+     */
     private WatchError toError(HeartbeatResult result) {
         return switch (result) {
             case SWITCHING -> WatchError.WATCH_SESSION_SWITCHING;
@@ -157,9 +177,11 @@ public class WatchSessionService {
      * @throws WatchException 경기가 없거나 진행 중 상태가 아닌 경우
      */
     private void validateMatch(long matchId) {
+        // TODO: lolesports는 첫 세트 종료 시 EsportsMatch를 생성할 수 있어, 진행 중인 첫 세트에서는 DB 조회가 실패할 수 있다.
+        //  경기 식별자 및 생성 시점 계약이 확정되면 입장 검증 기준을 변경해야 한다.
         EsportsMatch esportsMatch = esportsMatchRepository.findById(matchId)
                 .orElseThrow(() -> new WatchException(WatchError.MATCH_NOT_FOUND));
-        if (!WATCHABLE_MATCH_STATUS.equalsIgnoreCase(esportsMatch.getLifecycleStatus())) {
+        if (!"inProgress".equals(esportsMatch.getLifecycleStatus())) {
             throw new WatchException(WatchError.MATCH_NOT_WATCHABLE);
         }
     }
@@ -218,8 +240,7 @@ public class WatchSessionService {
                 newSessionKey,
                 snapshot.matchId(),
                 Instant.ofEpochMilli(snapshot.enteredAt()),
-                snapshot.sequence(),
-                false
+                snapshot.sequence()
         );
     }
 
@@ -256,8 +277,7 @@ public class WatchSessionService {
                 sessionKey,
                 matchId,
                 enteredAt,
-                0L,
-                true
+                0L
         );
     }
 
@@ -265,8 +285,7 @@ public class WatchSessionService {
             String sessionKey,
             long matchId,
             Instant enteredAt,
-            long heartbeatSequence,
-            boolean newlyCreated
+            long heartbeatSequence
     ) {
         return new WatchSessionStartResult(
                 sessionKey,
@@ -274,8 +293,7 @@ public class WatchSessionService {
                 enteredAt,
                 properties.heartbeatInterval().toSeconds(),
                 properties.aliveTtl().toSeconds(),
-                heartbeatSequence,
-                newlyCreated
+                heartbeatSequence
         );
     }
 }

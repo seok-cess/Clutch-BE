@@ -1,8 +1,11 @@
-package com.clutch.watch.redis;
+package com.clutch.watch.redis.session;
 
 import com.clutch.watch.config.WatchRewardProperties;
 import com.clutch.watch.exception.WatchError;
 import com.clutch.watch.exception.WatchException;
+import com.clutch.watch.redis.heartbeat.HeartbeatProcessingResult;
+import com.clutch.watch.redis.reward.RewardClaimCompletionResult;
+import com.clutch.watch.redis.reward.RewardClaimCompletionStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Repository;

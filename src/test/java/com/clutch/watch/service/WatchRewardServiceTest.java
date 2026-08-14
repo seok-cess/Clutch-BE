@@ -4,7 +4,7 @@ import com.clutch.watch.domain.WatchSession;
 import com.clutch.watch.domain.WatchSessionStatus;
 import com.clutch.watch.exception.WatchError;
 import com.clutch.watch.exception.WatchException;
-import com.clutch.watch.redis.WatchSessionSnapshot;
+import com.clutch.watch.redis.session.WatchSessionSnapshot;
 import com.clutch.watch.repository.WatchSessionRepository;
 import com.clutch.watch.service.service.WatchRewardService;
 import org.junit.jupiter.api.BeforeEach;

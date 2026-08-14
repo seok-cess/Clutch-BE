@@ -1,4 +1,4 @@
-package com.clutch.watch.redis;
+package com.clutch.watch.redis.reward;
 
 import com.clutch.watch.exception.WatchError;
 import com.clutch.watch.exception.WatchException;
@@ -11,7 +11,7 @@ public record RewardClaimCompletionResult(
         long nextRewardSequence
 ) {
 
-    static RewardClaimCompletionResult from(String value) {
+    public static RewardClaimCompletionResult from(String value) {
         String[] fields = value.split(":", -1);
         try {
             RewardClaimCompletionStatus status = RewardClaimCompletionStatus.valueOf(fields[0]);

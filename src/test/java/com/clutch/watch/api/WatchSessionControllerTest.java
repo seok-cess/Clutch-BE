@@ -74,12 +74,11 @@ class WatchSessionControllerTest {
                 enteredAt,
                 30L,
                 90L,
-                0L,
-                true
+                0L
         ));
 
         mockMvc.perform(post("/api/users/{userId}/matches/{matchId}/watch-sessions", USER_ID, MATCH_ID))
-                .andExpect(status().isCreated())
+                .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.sessionKey").value(SESSION_KEY))
                 .andExpect(jsonPath("$.matchId").value(MATCH_ID))
@@ -103,8 +102,7 @@ class WatchSessionControllerTest {
                 enteredAt,
                 30L,
                 90L,
-                7L,
-                false
+                7L
         ));
 
         mockMvc.perform(post("/api/users/{userId}/matches/{matchId}/watch-sessions", USER_ID, MATCH_ID))

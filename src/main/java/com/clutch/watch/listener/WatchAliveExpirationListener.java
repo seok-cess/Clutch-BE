@@ -1,6 +1,6 @@
 package com.clutch.watch.listener;
 
-import com.clutch.watch.redis.WatchSessionRedisRepository;
+import com.clutch.watch.redis.session.WatchSessionRedisRepository;
 import com.clutch.watch.service.service.WatchRewardService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

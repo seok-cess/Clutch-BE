@@ -1,5 +1,6 @@
-package com.clutch.watch.redis;
+package com.clutch.watch.redis.session;
 
+import com.clutch.watch.redis.heartbeat.HeartbeatResult;
 import com.clutch.watch.config.WatchRewardProperties;
 import com.clutch.watch.exception.WatchError;
 import com.clutch.watch.exception.WatchException;
