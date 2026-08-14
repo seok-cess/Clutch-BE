@@ -3,6 +3,7 @@ package com.clutch.coupon.event.repository;
 import com.clutch.coupon.event.domain.CouponEventItem;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -22,4 +23,12 @@ public interface CouponEventItemRepository
             Long couponEventId,
             Long couponEventItemId
     );
+
+    List<CouponEventItem> findAllByCouponEventId(Long couponEventId);
+
+    List<CouponEventItem> findAllByCouponEventIdIn(
+            List<Long> couponEventIds
+    );
+
+    void deleteAllByCouponEventId(Long couponEventId);
 }
