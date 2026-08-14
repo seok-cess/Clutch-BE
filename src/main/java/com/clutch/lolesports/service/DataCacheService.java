@@ -42,7 +42,7 @@ public class DataCacheService {
             String startTime,
             List<ScheduleResponse.Team> teams,
             List<EventDetailsResponse.Game> games,
-            Integer bestOf,
+            Integer bestOf,         // 배팅 동기화에서 매치 종료 승수를 계산할 때 사용 (알 수 없으면 null)
             String activeGameId    // state=inProgress 인 게임의 id (없으면 null)
     ) {
     }

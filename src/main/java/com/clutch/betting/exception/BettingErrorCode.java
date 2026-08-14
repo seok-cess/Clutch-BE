@@ -1,5 +1,6 @@
 package com.clutch.betting.exception;
 
+/** 배팅 유스케이스에서 클라이언트에 노출하는 오류 종류와 메시지다. */
 public enum BettingErrorCode {
     EVENT_NOT_FOUND("배팅 이벤트를 찾을 수 없습니다."),
     BET_NOT_FOUND("사용자 배팅을 찾을 수 없습니다."),
@@ -14,10 +15,12 @@ public enum BettingErrorCode {
 
     private final String message;
 
+    /** 오류 코드에 고정된 사용자 메시지를 연결한다. */
     BettingErrorCode(String message) {
         this.message = message;
     }
 
+    /** 오류 응답에 사용할 사용자 메시지를 반환한다. */
     public String getMessage() {
         return message;
     }

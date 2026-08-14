@@ -8,6 +8,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 @Service
+/** 캐시의 라이브 매치를 순회하며 매치별 동기화 실패를 격리한다. */
 public class BettingEventSynchronizationService {
 
     private static final Logger log = LoggerFactory.getLogger(BettingEventSynchronizationService.class);
@@ -15,6 +16,7 @@ public class BettingEventSynchronizationService {
     private final LiveBettingCache liveBettingCache;
     private final BettingEventSynchronizationProcessor processor;
 
+    /** 라이브 캐시 포트와 매치 단위 처리기를 주입받는다. */
     public BettingEventSynchronizationService(
             LiveBettingCache liveBettingCache,
             BettingEventSynchronizationProcessor processor
@@ -23,6 +25,7 @@ public class BettingEventSynchronizationService {
         this.processor = processor;
     }
 
+    /** 모든 라이브 매치를 동기화하되 중복 생성과 개별 오류를 다음 매치와 격리한다. */
     public void synchronize() {
         for (LiveMatchSnapshot liveMatch : liveBettingCache.findLiveMatches()) {
             try {

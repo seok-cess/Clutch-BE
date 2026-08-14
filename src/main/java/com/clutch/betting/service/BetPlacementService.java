@@ -20,6 +20,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 
 @Service
+/** 배팅 가능 상태를 검증하고 포인트 차감과 사용자 배팅 등록을 한 트랜잭션으로 처리한다. */
 public class BetPlacementService {
 
     private final BettingEventRepository bettingEventRepository;
@@ -30,6 +31,7 @@ public class BetPlacementService {
     private final Clock clock;
 
     @Autowired
+    /** 운영 환경에서 UTC 시스템 시계를 사용하는 등록 서비스를 구성한다. */
     public BetPlacementService(
             BettingEventRepository bettingEventRepository,
             UserBetRepository userBetRepository,
@@ -47,6 +49,7 @@ public class BetPlacementService {
         );
     }
 
+    /** 테스트에서 결정적인 현재 시각을 주입할 수 있도록 서비스를 구성한다. */
     BetPlacementService(
             BettingEventRepository bettingEventRepository,
             UserBetRepository userBetRepository,
@@ -64,6 +67,7 @@ public class BetPlacementService {
     }
 
     @Transactional
+    /** 이벤트 행을 잠근 뒤 중복·라이브 상태·포인트를 검증하고 배팅을 등록한다. */
     public BetPlacementResult place(
             Long userId,
             Long bettingEventId,
@@ -115,6 +119,7 @@ public class BetPlacementService {
         );
     }
 
+    /** 조건부 갱신으로 포인트를 원자적으로 차감하고 실패 원인을 구분한다. */
     private void decreasePoint(Long userId, long amount) {
         int updated = userRepository.decreasePointIfEnough(userId, amount);
         if (updated == 1) {

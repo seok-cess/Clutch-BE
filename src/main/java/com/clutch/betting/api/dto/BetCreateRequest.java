@@ -4,6 +4,7 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 
+/** 배팅 대상 팀과 포인트를 전달하는 등록 요청이다. */
 public record BetCreateRequest(
         @NotBlank(message = "선택 팀 ID는 필수입니다.")
         String selectedTeamId,

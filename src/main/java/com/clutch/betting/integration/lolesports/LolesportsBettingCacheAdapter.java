@@ -12,11 +12,13 @@ import java.util.Comparator;
 import java.util.List;
 
 @Component
+/** lolesports 캐시를 배팅 도메인이 사용하는 라이브 스냅샷으로 변환한다. */
 public class LolesportsBettingCacheAdapter implements LiveBettingCache {
 
     private final DataCacheService dataCacheService;
     private final SetWinnerTracker setWinnerTracker;
 
+    /** 라이브 매치 캐시와 세트 승자 추적기를 주입받는다. */
     public LolesportsBettingCacheAdapter(
             DataCacheService dataCacheService,
             SetWinnerTracker setWinnerTracker
@@ -26,6 +28,7 @@ public class LolesportsBettingCacheAdapter implements LiveBettingCache {
     }
 
     @Override
+    /** 캐시된 모든 라이브 매치를 배팅용 스냅샷으로 변환한다. */
     public List<LiveMatchSnapshot> findLiveMatches() {
         return dataCacheService.getLiveMatches().stream()
                 .map(this::toSnapshot)
@@ -33,6 +36,7 @@ public class LolesportsBettingCacheAdapter implements LiveBettingCache {
     }
 
     @Override
+    /** 경기 종료·참가 팀·이전 세트 종료 여부를 모두 만족할 때만 배팅을 허용한다. */
     public boolean isAcceptingBets(
             String externalMatchId,
             String externalGameId,
@@ -45,6 +49,7 @@ public class LolesportsBettingCacheAdapter implements LiveBettingCache {
                 .anyMatch(match -> isSetAcceptingBets(match, externalGameId, setNumber));
     }
 
+    /** 외부 라이브 매치에서 유효한 팀과 정렬된 세트 상태를 추출한다. */
     private LiveMatchSnapshot toSnapshot(DataCacheService.LiveMatch liveMatch) {
         List<String> teamIds = liveMatch.teams() == null
                 ? List.of()
@@ -86,6 +91,7 @@ public class LolesportsBettingCacheAdapter implements LiveBettingCache {
         );
     }
 
+    /** best-of 승리 조건을 충족한 팀이 있는지 보수적으로 판단한다. */
     private boolean isMatchFinished(DataCacheService.LiveMatch liveMatch) {
         if (liveMatch.bestOf() == null || liveMatch.bestOf() < 1) {
             return false;
@@ -98,6 +104,7 @@ public class LolesportsBettingCacheAdapter implements LiveBettingCache {
                 .anyMatch(result -> result.gameWins() >= requiredWins);
     }
 
+    /** 실제 또는 선개설 세트가 현재 배팅 가능한 순서와 상태인지 검증한다. */
     private boolean isSetAcceptingBets(
             LiveMatchSnapshot match,
             String externalGameId,

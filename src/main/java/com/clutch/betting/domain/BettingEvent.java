@@ -31,6 +31,7 @@ import java.time.LocalDateTime;
         }
 )
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+/** 한 매치의 특정 세트에 대한 배팅 가능 기간과 결과 상태를 관리한다. */
 public class BettingEvent {
 
     @Id
@@ -74,6 +75,7 @@ public class BettingEvent {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
+    /** 참가 팀과 오픈 시각을 검증하고 신규 이벤트를 OPEN 상태로 초기화한다. */
     private BettingEvent(
             String externalMatchId,
             int setNumber,
@@ -98,6 +100,7 @@ public class BettingEvent {
         this.status = BettingEventStatus.OPEN;
     }
 
+    /** 외부 매치의 특정 세트에 대한 신규 배팅 이벤트를 연다. */
     public static BettingEvent open(
             String externalMatchId,
             int setNumber,
@@ -114,11 +117,13 @@ public class BettingEvent {
         );
     }
 
+    /** 주어진 외부 팀이 이 이벤트의 선택지에 포함되는지 확인한다. */
     public boolean hasParticipant(String externalTeamId) {
         return firstExternalTeamId.equals(externalTeamId)
                 || secondExternalTeamId.equals(externalTeamId);
     }
 
+    /** 상태와 마감 시각을 함께 확인해 현재 배팅 가능 여부를 판단한다. */
     public boolean isOpenAt(LocalDateTime now) {
         if (now == null || status != BettingEventStatus.OPEN) {
             return false;
@@ -126,6 +131,7 @@ public class BettingEvent {
         return closesAt == null || now.isBefore(closesAt);
     }
 
+    /** 실제 세트 ID를 연결하고 세트 시작 시각 기준 마감 시각을 계산한다. */
     public void attachGame(
             String externalGameId,
             LocalDateTime setStartedAt,
@@ -150,6 +156,7 @@ public class BettingEvent {
         }
     }
 
+    /** 마감 시각이 지난 OPEN 이벤트를 CLOSED 상태로 전환한다. */
     public boolean closeIfExpired(LocalDateTime now) {
         if (now == null) {
             throw new IllegalArgumentException("현재 시각은 필수입니다.");
@@ -163,12 +170,14 @@ public class BettingEvent {
         return false;
     }
 
+    /** 열려 있는 이벤트를 명시적으로 종료한다. */
     public void close() {
         if (status == BettingEventStatus.OPEN) {
             status = BettingEventStatus.CLOSED;
         }
     }
 
+    /** 최초로 확인한 참가 팀 승자를 보존하고 이벤트를 종료한다. */
     public void recordWinner(String externalTeamId) {
         String winnerTeamId = requireText(externalTeamId, "승리 팀 ID는 필수입니다.");
         if (!hasParticipant(winnerTeamId)) {
@@ -184,6 +193,7 @@ public class BettingEvent {
         close();
     }
 
+    /** 승자가 확정된 종료 이벤트를 최종 정산 상태로 전환한다. */
     public void settle() {
         if (status == BettingEventStatus.SETTLED) {
             return;
@@ -194,6 +204,7 @@ public class BettingEvent {
         status = BettingEventStatus.SETTLED;
     }
 
+    /** 승자가 없는 미정산 이벤트를 취소 상태로 전환한다. */
     public void cancel() {
         if (status == BettingEventStatus.SETTLED
                 || status == BettingEventStatus.CANCELLED
@@ -204,6 +215,7 @@ public class BettingEvent {
         status = BettingEventStatus.CANCELLED;
     }
 
+    /** 필수 문자열 값을 공백까지 포함해 검증한다. */
     private static String requireText(String value, String message) {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException(message);

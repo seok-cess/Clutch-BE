@@ -124,7 +124,7 @@ public class PollingScheduler {
         }
     }
 
-    /** getEventDetails 로 진행중 게임(gameId)을 찾아 LiveMatch 로 조립 */
+    /** getEventDetails로 진행 중 게임과 팀을 결합하고 배팅 종료 판단 정보까지 LiveMatch로 조립한다. */
     private DataCacheService.LiveMatch resolveLiveMatch(ScheduleResponse.Event event) {
         String matchId = event.match().id();
         List<EventDetailsResponse.Game> games = List.of();
@@ -158,6 +158,7 @@ public class PollingScheduler {
         // gameWins 증가분으로 세트 승자를 확정한다 (세트별 승패를 주는 필드가 없다)
         setWinners.observe(matchId, teams, games);
 
+        // 배팅 이벤트가 Bo3/Bo5의 종료 시점을 판단할 수 있도록 매치 전략도 함께 캐시한다.
         return new DataCacheService.LiveMatch(
                 matchId,
                 event.blockName(),

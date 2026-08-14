@@ -27,6 +27,7 @@ import java.time.LocalDateTime;
         )
 )
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+/** 사용자가 특정 세트에서 선택한 팀과 배팅 금액 및 정산 상태를 관리한다. */
 public class UserBet {
 
     public static final long MIN_AMOUNT = 1_000L;
@@ -61,6 +62,7 @@ public class UserBet {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
+    /** 배팅 식별자·팀·금액을 검증하고 PLACED 상태로 초기화한다. */
     private UserBet(Long bettingEventId, Long userId, String selectedExternalTeamId, long amount) {
         if (bettingEventId == null) {
             throw new IllegalArgumentException("배팅 이벤트 ID는 필수입니다.");
@@ -81,6 +83,7 @@ public class UserBet {
         this.status = UserBetStatus.PLACED;
     }
 
+    /** 검증된 사용자 배팅을 신규 등록 상태로 생성한다. */
     public static UserBet place(
             Long bettingEventId,
             Long userId,
@@ -90,18 +93,22 @@ public class UserBet {
         return new UserBet(bettingEventId, userId, selectedExternalTeamId, amount);
     }
 
+    /** 등록 상태의 배팅을 적중 상태로 전환한다. */
     public void win() {
         transitionFromPlaced(UserBetStatus.WON);
     }
 
+    /** 등록 상태의 배팅을 실패 상태로 전환한다. */
     public void lose() {
         transitionFromPlaced(UserBetStatus.LOST);
     }
 
+    /** 등록 상태의 배팅을 환불 상태로 전환한다. */
     public void refund() {
         transitionFromPlaced(UserBetStatus.REFUNDED);
     }
 
+    /** 이미 처리된 결과는 멱등하게 유지하고 다른 완료 상태 간 변경은 차단한다. */
     private void transitionFromPlaced(UserBetStatus targetStatus) {
         if (status == targetStatus) {
             return;

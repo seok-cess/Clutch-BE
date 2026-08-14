@@ -26,6 +26,7 @@ import java.time.LocalDateTime;
         )
 )
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+/** 배팅으로 발생한 포인트 차감·지급·환불 이력을 중복 없이 기록한다. */
 public class BetPointTransaction {
 
     @Id
@@ -47,6 +48,7 @@ public class BetPointTransaction {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    /** 거래 유형과 포인트 증감 방향의 불변식을 검증해 거래를 생성한다. */
     private BetPointTransaction(
             Long userBetId,
             BetPointTransactionType transactionType,
@@ -69,6 +71,7 @@ public class BetPointTransaction {
         this.pointDelta = pointDelta;
     }
 
+    /** 배팅 등록 시 차감된 포인트 거래를 생성한다. */
     public static BetPointTransaction stake(Long userBetId, long amount) {
         if (amount <= 0) {
             throw new IllegalArgumentException("배팅 금액은 양수여야 합니다.");
@@ -76,10 +79,12 @@ public class BetPointTransaction {
         return new BetPointTransaction(userBetId, BetPointTransactionType.STAKE, -amount);
     }
 
+    /** 적중 배팅에 지급할 포인트 거래를 생성한다. */
     public static BetPointTransaction payout(Long userBetId, long amount) {
         return new BetPointTransaction(userBetId, BetPointTransactionType.PAYOUT, amount);
     }
 
+    /** 취소 배팅에 반환할 포인트 거래를 생성한다. */
     public static BetPointTransaction refund(Long userBetId, long amount) {
         return new BetPointTransaction(userBetId, BetPointTransactionType.REFUND, amount);
     }
