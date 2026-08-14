@@ -1,6 +1,5 @@
 package com.clutch.coupon.claim.api;
 
-import com.clutch.coupon.claim.api.dto.CouponClaimCreateRequest;
 import com.clutch.coupon.claim.api.dto.CouponClaimCreateResponse;
 import com.clutch.coupon.claim.domain.ClaimRequestStatus;
 import com.clutch.coupon.claim.exception.CouponClaimException;
@@ -8,7 +7,6 @@ import com.clutch.coupon.claim.service.CouponClaimService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -51,11 +49,6 @@ class CouponClaimControllerTest {
     @Test
     void claimSucceeds() throws Exception {
         // given
-        CouponClaimCreateRequest request =
-                new CouponClaimCreateRequest(
-                        COUPON_EVENT_ITEM_ID
-                );
-
         CouponClaimCreateResponse response =
                 new CouponClaimCreateResponse(
                         100L,
@@ -75,8 +68,7 @@ class CouponClaimControllerTest {
         when(couponClaimService.claim(
                 USER_ID,
                 COUPON_EVENT_ID,
-                COUPON_EVENT_OCCURRENCE_ID,
-                request
+                COUPON_EVENT_OCCURRENCE_ID
         )).thenReturn(response);
 
         // when, then
@@ -88,12 +80,7 @@ class CouponClaimControllerTest {
                                 COUPON_EVENT_OCCURRENCE_ID
                         )
                                 .header("X-User-Id", USER_ID)
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content("""
-                                        {
-                                          "couponEventItemId": 20
-                                        }
-                                        """)
+
                 )
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.claimId").value(100))
@@ -111,32 +98,8 @@ class CouponClaimControllerTest {
         verify(couponClaimService).claim(
                 USER_ID,
                 COUPON_EVENT_ID,
-                COUPON_EVENT_OCCURRENCE_ID,
-                request
+                COUPON_EVENT_OCCURRENCE_ID
         );
-    }
-
-    /**
-     * 쿠폰 이벤트 항목 식별자 누락 응답 검증
-     */
-    @Test
-    void claimFailsWhenEventItemIdIsMissing() throws Exception {
-        mockMvc.perform(
-                        post(
-                                "/api/v1/coupon-events/{couponEventId}"
-                                        + "/occurrences/{occurrenceId}/claims",
-                                COUPON_EVENT_ID,
-                                COUPON_EVENT_OCCURRENCE_ID
-                        )
-                                .header("X-User-Id", USER_ID)
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content("{}")
-                )
-                .andExpect(status().isBadRequest())
-                .andExpect(
-                        jsonPath("$.code")
-                                .value("INVALID_REQUEST")
-                );
     }
 
     /**
@@ -151,12 +114,7 @@ class CouponClaimControllerTest {
                                 COUPON_EVENT_ID,
                                 COUPON_EVENT_OCCURRENCE_ID
                         )
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content("""
-                                        {
-                                          "couponEventItemId": 20
-                                        }
-                                        """)
+
                 )
                 .andExpect(status().isBadRequest())
                 .andExpect(
@@ -170,16 +128,10 @@ class CouponClaimControllerTest {
      */
     @Test
     void claimFailsWhenEventDoesNotExist() throws Exception {
-        CouponClaimCreateRequest request =
-                new CouponClaimCreateRequest(
-                        COUPON_EVENT_ITEM_ID
-                );
-
         when(couponClaimService.claim(
                 USER_ID,
                 COUPON_EVENT_ID,
-                COUPON_EVENT_OCCURRENCE_ID,
-                request
+                COUPON_EVENT_OCCURRENCE_ID
         )).thenThrow(
                 new CouponClaimException(
                         COUPON_EVENT_NOT_FOUND
@@ -194,12 +146,7 @@ class CouponClaimControllerTest {
                                 COUPON_EVENT_OCCURRENCE_ID
                         )
                                 .header("X-User-Id", USER_ID)
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content("""
-                                        {
-                                          "couponEventItemId": 20
-                                        }
-                                        """)
+
                 )
                 .andExpect(status().isNotFound())
                 .andExpect(
@@ -213,16 +160,10 @@ class CouponClaimControllerTest {
      */
     @Test
     void claimFailsWhenStockIsExhausted() throws Exception {
-        CouponClaimCreateRequest request =
-                new CouponClaimCreateRequest(
-                        COUPON_EVENT_ITEM_ID
-                );
-
         when(couponClaimService.claim(
                 USER_ID,
                 COUPON_EVENT_ID,
-                COUPON_EVENT_OCCURRENCE_ID,
-                request
+                COUPON_EVENT_OCCURRENCE_ID
         )).thenThrow(
                 new CouponClaimException(
                         COUPON_STOCK_EXHAUSTED
@@ -237,12 +178,7 @@ class CouponClaimControllerTest {
                                 COUPON_EVENT_OCCURRENCE_ID
                         )
                                 .header("X-User-Id", USER_ID)
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content("""
-                                        {
-                                          "couponEventItemId": 20
-                                        }
-                                        """)
+
                 )
                 .andExpect(status().isConflict())
                 .andExpect(

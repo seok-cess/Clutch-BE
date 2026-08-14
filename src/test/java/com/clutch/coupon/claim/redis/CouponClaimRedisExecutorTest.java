@@ -41,7 +41,8 @@ class CouponClaimRedisExecutorTest {
                         "coupon:event-item:100:stock",
                         "coupon:occurrence:200:claimed-users"
                 ),
-                "300"
+                "300",
+                "CLAIM"
         )).thenReturn(1L);
 
         CouponClaimRedisResult result =
@@ -60,7 +61,8 @@ class CouponClaimRedisExecutorTest {
                         "coupon:event-item:100:stock",
                         "coupon:occurrence:200:claimed-users"
                 ),
-                "300"
+                "300",
+                     "CLAIM"
         );
     }
 
@@ -75,7 +77,8 @@ class CouponClaimRedisExecutorTest {
                         "coupon:event-item:100:stock",
                         "coupon:occurrence:200:claimed-users"
                 ),
-                "300"
+                "300",
+                "CLAIM"
         )).thenReturn(null);
 
         assertThatThrownBy(() ->
@@ -87,5 +90,39 @@ class CouponClaimRedisExecutorTest {
         )
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("쿠폰 발급 Redis 결과 없음");
+    }
+    /**
+     * Redis 발급 보상 Lua 실행 검증
+     */
+    @Test
+    void rollbackExecutesLuaScriptWithKeysAndUserId() {
+        when(stringRedisTemplate.execute(
+                couponClaimScript,
+                List.of(
+                        "coupon:event-item:100:stock",
+                        "coupon:occurrence:200:claimed-users"
+                ),
+                "300",
+                "ROLLBACK"
+        )).thenReturn(1L);
+
+        boolean result =
+                couponClaimRedisExecutor.rollback(
+                        100L,
+                        200L,
+                        300L
+                );
+
+        assertThat(result).isTrue();
+
+        verify(stringRedisTemplate).execute(
+                couponClaimScript,
+                List.of(
+                        "coupon:event-item:100:stock",
+                        "coupon:occurrence:200:claimed-users"
+                ),
+                "300",
+                "ROLLBACK"
+        );
     }
 }

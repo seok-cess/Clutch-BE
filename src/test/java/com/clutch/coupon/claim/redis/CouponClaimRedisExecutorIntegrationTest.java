@@ -289,4 +289,53 @@ class CouponClaimRedisExecutorIntegrationTest {
                 .size(CLAIMED_USERS_KEY))
                 .isEqualTo(stockQuantity);
     }
+    /**
+     * Redis 발급 보상 및 중복 보상 방지 검증
+     */
+    @Test
+    void rollbackRestoresStockAndRemovesUserOnce() {
+        stringRedisTemplate
+                .opsForValue()
+                .set(STOCK_KEY, "2");
+
+        CouponClaimRedisResult claimResult =
+                couponClaimRedisExecutor.claim(
+                        COUPON_EVENT_ITEM_ID,
+                        COUPON_EVENT_OCCURRENCE_ID,
+                        USER_ID
+                );
+
+        boolean firstRollback =
+                couponClaimRedisExecutor.rollback(
+                        COUPON_EVENT_ITEM_ID,
+                        COUPON_EVENT_OCCURRENCE_ID,
+                        USER_ID
+                );
+
+        boolean secondRollback =
+                couponClaimRedisExecutor.rollback(
+                        COUPON_EVENT_ITEM_ID,
+                        COUPON_EVENT_OCCURRENCE_ID,
+                        USER_ID
+                );
+
+        assertThat(claimResult)
+                .isEqualTo(CouponClaimRedisResult.SUCCESS);
+
+        assertThat(firstRollback).isTrue();
+        assertThat(secondRollback).isFalse();
+
+        assertThat(stringRedisTemplate
+                .opsForValue()
+                .get(STOCK_KEY))
+                .isEqualTo("2");
+
+        assertThat(stringRedisTemplate
+                .opsForSet()
+                .isMember(
+                        CLAIMED_USERS_KEY,
+                        String.valueOf(USER_ID)
+                ))
+                .isFalse();
+    }
 }

@@ -20,9 +20,9 @@ public class CouponClaimRedisExecutor {
     /**
      * 쿠폰 발급 실행
      *
-     * @param couponEventItemId 쿠폰 이벤트 항목 식별자
+     * @param couponEventItemId       쿠폰 이벤트 항목 식별자
      * @param couponEventOccurrenceId 쿠폰 이벤트 회차 식별자
-     * @param userId 사용자 식별자
+     * @param userId                  사용자 식별자
      * @return 쿠폰 발급 Redis 실행 결과
      */
     public CouponClaimRedisResult claim(
@@ -42,7 +42,8 @@ public class CouponClaimRedisExecutor {
         Long resultCode = stringRedisTemplate.execute(
                 couponClaimScript,
                 keys,
-                String.valueOf(userId)
+                String.valueOf(userId),
+                "CLAIM"
         );
 
         if (resultCode == null) {
@@ -52,5 +53,43 @@ public class CouponClaimRedisExecutor {
         }
 
         return CouponClaimRedisResult.from(resultCode);
+    }
+
+    /**
+     * 쿠폰 발급 Redis 보상
+     *
+     * @param couponEventItemId       쿠폰 이벤트 항목 식별자
+     * @param couponEventOccurrenceId 쿠폰 이벤트 회차 식별자
+     * @param userId                  사용자 식별자
+     * @return Redis 보상 여부
+     */
+    public boolean rollback(
+            Long couponEventItemId,
+            Long couponEventOccurrenceId,
+            Long userId
+    ) {
+        List<String> keys = List.of(
+                CouponClaimRedisKeys.stock(
+                        couponEventItemId
+                ),
+                CouponClaimRedisKeys.claimedUsers(
+                        couponEventOccurrenceId
+                )
+        );
+
+        Long resultCode = stringRedisTemplate.execute(
+                couponClaimScript,
+                keys,
+                String.valueOf(userId),
+                "ROLLBACK"
+        );
+
+        if (resultCode == null) {
+            throw new IllegalStateException(
+                    "쿠폰 발급 Redis 보상 결과 없음"
+            );
+        }
+
+        return resultCode == 1L;
     }
 }

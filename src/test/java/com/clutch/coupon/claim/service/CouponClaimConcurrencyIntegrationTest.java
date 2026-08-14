@@ -1,6 +1,5 @@
 package com.clutch.coupon.claim.service;
 
-import com.clutch.coupon.claim.api.dto.CouponClaimCreateRequest;
 import com.clutch.coupon.claim.exception.CouponClaimException;
 import com.clutch.lolesports.service.PollingScheduler;
 import org.junit.jupiter.api.AfterEach;
@@ -245,10 +244,6 @@ class CouponClaimConcurrencyIntegrationTest {
         Queue<Throwable> unexpectedErrors =
                 new ConcurrentLinkedQueue<>();
 
-        CouponClaimCreateRequest request =
-                new CouponClaimCreateRequest(
-                        COUPON_EVENT_ITEM_ID
-                );
 
         try {
             for (int requestIndex = 0;
@@ -265,8 +260,7 @@ class CouponClaimConcurrencyIntegrationTest {
                         couponClaimService.claim(
                                 userId,
                                 COUPON_EVENT_ID,
-                                COUPON_EVENT_OCCURRENCE_ID,
-                                request
+                                COUPON_EVENT_OCCURRENCE_ID
                         );
 
                         successResponseCount.incrementAndGet();
