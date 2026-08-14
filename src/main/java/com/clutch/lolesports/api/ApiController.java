@@ -32,17 +32,20 @@ public class ApiController {
     private final com.clutch.lolesports.client.LiveStatsClient liveStats;
     private final com.clutch.lolesports.service.TeamRecordService records;
     private final com.clutch.lolesports.service.GameQueryService gameQuery;
+    private final com.clutch.lolesports.service.SetWinnerTracker setWinners;
 
     public ApiController(DataCacheService cache, HistoricalGameService historical,
                          LolesportsProperties props, com.clutch.lolesports.client.LiveStatsClient liveStats,
                          com.clutch.lolesports.service.TeamRecordService records,
-                         com.clutch.lolesports.service.GameQueryService gameQuery) {
+                         com.clutch.lolesports.service.GameQueryService gameQuery,
+                         com.clutch.lolesports.service.SetWinnerTracker setWinners) {
         this.cache = cache;
         this.historical = historical;
         this.props = props;
         this.liveStats = liveStats;
         this.records = records;
         this.gameQuery = gameQuery;
+        this.setWinners = setWinners;
     }
 
     /**
@@ -165,7 +168,12 @@ public class ApiController {
                         m.startTime(),
                         mapTeams(m.teams()),
                         m.games() == null ? List.of() : m.games().stream()
-                                .map(g -> new ApiDtos.GameItem(g.id(), g.number(), g.state()))
+                                .map(g -> new ApiDtos.GameItem(
+                                        g.id(),
+                                        g.number(),
+                                        g.state(),
+                                        cache.isFeedFinished(g.id()),
+                                        setWinners.winnerOf(m.matchId(), g.id())))
                                 .toList(),
                         m.activeGameId()
                 ))
@@ -195,7 +203,12 @@ public class ApiController {
     public ResponseEntity<List<ApiDtos.GameItem>> matchGames(@PathVariable String matchId) {
         List<EventDetailsResponse.Game> games = historical.getGames(matchId);
         return ResponseEntity.ok(games.stream()
-                .map(g -> new ApiDtos.GameItem(g.id(), g.number(), g.state()))
+                .map(g -> new ApiDtos.GameItem(
+                        g.id(),
+                        g.number(),
+                        g.state(),
+                        cache.isFeedFinished(g.id()),
+                        setWinners.winnerOf(matchId, g.id())))
                 .toList());
     }
 
