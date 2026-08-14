@@ -30,6 +30,23 @@ class WatchSessionTest {
     }
 
     /**
+     * 시청 중인 동일 경기 세션의 외부 키를 최신 화면용 키로 교체하는지 검증한다.
+     */
+    @Test
+    void replacesSessionKeyWhileWatching() {
+        WatchSession session = WatchSession.start(
+                "old-session-key",
+                100L,
+                200L,
+                LocalDateTime.of(2026, 8, 12, 12, 0)
+        );
+
+        session.replaceSessionKey("new-session-key");
+
+        assertThat(session.getSessionKey()).isEqualTo("new-session-key");
+    }
+
+    /**
      * Redis에서 확정한 시청시간을 반영하면 세션이 COMPLETED 상태로 전이되는지 검증한다.
      */
     @Test

@@ -2,8 +2,8 @@ package com.clutch.watch.listener;
 
 import com.clutch.watch.exception.WatchError;
 import com.clutch.watch.exception.WatchException;
-import com.clutch.watch.redis.WatchSessionRedisRepository;
-import com.clutch.watch.redis.WatchSessionSnapshot;
+import com.clutch.watch.redis.session.WatchSessionRedisRepository;
+import com.clutch.watch.redis.session.WatchSessionSnapshot;
 import com.clutch.watch.service.service.WatchRewardService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -44,17 +44,17 @@ class WatchAliveExpirationListenerTest {
     }
 
     /**
-     * Alive TTL 만료 시 포인트 지급 후 active와 session Redis 상태를 순서대로 정리하는지 검증한다.
+     * Alive TTL 만료 시 포인트를 지급하지 않고 세션 완료 후 Redis 상태를 정리하는지 검증한다.
      */
     @Test
-    void rewardsExpiredSessionAndCleansRedisState() {
+    void discardsExpiredSessionAndCleansRedisState() {
         WatchSessionSnapshot snapshot = snapshot();
         when(watchSessionRedisRepository.findSession(SESSION_KEY)).thenReturn(Optional.of(snapshot));
 
         listener.handleExpiredKey("watch:alive:" + USER_ID + ":" + SESSION_KEY);
 
         InOrder inOrder = inOrder(watchRewardService, watchSessionRedisRepository);
-        inOrder.verify(watchRewardService).settle(snapshot);
+        inOrder.verify(watchRewardService).discard(snapshot);
         inOrder.verify(watchSessionRedisRepository).deleteActiveIfMatches(USER_ID, SESSION_KEY);
         inOrder.verify(watchSessionRedisRepository).deleteSession(SESSION_KEY);
     }
@@ -75,7 +75,7 @@ class WatchAliveExpirationListenerTest {
     }
 
     /**
-     * Session Hash가 먼저 사라졌으면 포인트 지급과 추가 Redis 삭제를 수행하지 않는지 검증한다.
+     * Session Hash가 먼저 사라졌으면 세션 종료와 추가 Redis 삭제를 수행하지 않는지 검증한다.
      */
     @Test
     void ignoresExpirationWhenSessionSnapshotIsMissing() {
@@ -89,18 +89,18 @@ class WatchAliveExpirationListenerTest {
     }
 
     /**
-     * 포인트 지급에 실패하면 재확인할 session 및 active Redis 상태를 삭제하지 않는지 검증한다.
+     * 세션 종료 반영에 실패하면 재확인할 session 및 active Redis 상태를 삭제하지 않는지 검증한다.
      */
     @Test
-    void preservesRedisStateWhenRewardFails() {
+    void preservesRedisStateWhenDiscardFails() {
         WatchSessionSnapshot snapshot = snapshot();
         when(watchSessionRedisRepository.findSession(SESSION_KEY)).thenReturn(Optional.of(snapshot));
-        when(watchRewardService.settle(snapshot))
-                .thenThrow(new WatchException(WatchError.POINT_TRANSACTION_NOT_FOUND));
+        org.mockito.Mockito.doThrow(new WatchException(WatchError.WATCH_SESSION_NOT_FOUND))
+                .when(watchRewardService).discard(snapshot);
 
         assertThatThrownBy(() -> listener.handleExpiredKey("watch:alive:" + USER_ID + ":" + SESSION_KEY))
                 .isInstanceOf(WatchException.class)
-                .hasMessage("완료된 시청 세션의 포인트 거래를 찾을 수 없습니다.");
+                .hasMessage("시청 세션을 찾을 수 없습니다.");
 
         verify(watchSessionRedisRepository, never()).deleteActiveIfMatches(USER_ID, SESSION_KEY);
         verify(watchSessionRedisRepository, never()).deleteSession(SESSION_KEY);
@@ -132,7 +132,8 @@ class WatchAliveExpirationListenerTest {
                 1_000L,
                 61_000L,
                 60_000L,
-                2L
+                2L,
+                1L
         );
     }
 }

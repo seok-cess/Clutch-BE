@@ -1,4 +1,4 @@
-package com.clutch.watch.redis;
+package com.clutch.watch.redis.session;
 
 import com.clutch.watch.exception.WatchError;
 import com.clutch.watch.exception.WatchException;
@@ -15,7 +15,8 @@ public record WatchSessionSnapshot(
         long enteredAt,
         long lastSeen,
         long eligibleMilliseconds,
-        long sequence
+        long sequence,
+        long rewardSequence
 ) {
 
     /**
@@ -34,7 +35,8 @@ public record WatchSessionSnapshot(
                 getRequiredLong(fields, "enteredAt"),
                 getRequiredLong(fields, "lastSeen"),
                 getRequiredLong(fields, "eligibleMilliseconds"),
-                getRequiredLong(fields, "sequence")
+                getRequiredLong(fields, "sequence"),
+                getRequiredLong(fields, "rewardSequence")
         );
     }
 
