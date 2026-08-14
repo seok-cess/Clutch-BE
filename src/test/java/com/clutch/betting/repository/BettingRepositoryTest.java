@@ -69,4 +69,19 @@ class BettingRepositoryTest {
                 BetPointTransactionType.STAKE
         )).isTrue();
     }
+
+    @Test
+    void decreasesPointOnlyWhenBalanceIsEnough() {
+        User user = User.create(UserRole.USER, "betting-point-update@example.com");
+        user.changePoint(1_500L);
+        userRepository.saveAndFlush(user);
+
+        int firstUpdate = userRepository.decreasePointIfEnough(user.getId(), 1_000L);
+        int rejectedUpdate = userRepository.decreasePointIfEnough(user.getId(), 1_000L);
+        entityManager.clear();
+
+        assertThat(firstUpdate).isEqualTo(1);
+        assertThat(rejectedUpdate).isZero();
+        assertThat(userRepository.findById(user.getId()).orElseThrow().getPoint()).isEqualTo(500L);
+    }
 }

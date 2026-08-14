@@ -32,6 +32,16 @@ public class LolesportsBettingCacheAdapter implements LiveBettingCache {
                 .toList();
     }
 
+    @Override
+    public boolean isAcceptingBets(String externalMatchId, String externalGameId) {
+        return findLiveMatches().stream()
+                .filter(match -> match.externalMatchId().equals(externalMatchId))
+                .anyMatch(match -> externalGameId == null
+                        || match.sets().stream()
+                                .filter(set -> set.externalGameId().equals(externalGameId))
+                                .anyMatch(set -> !set.finished()));
+    }
+
     private LiveMatchSnapshot toSnapshot(DataCacheService.LiveMatch liveMatch) {
         List<String> teamIds = liveMatch.teams() == null
                 ? List.of()

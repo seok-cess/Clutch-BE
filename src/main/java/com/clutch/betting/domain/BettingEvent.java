@@ -119,6 +119,13 @@ public class BettingEvent {
                 || secondExternalTeamId.equals(externalTeamId);
     }
 
+    public boolean isOpenAt(LocalDateTime now) {
+        if (now == null || status != BettingEventStatus.OPEN) {
+            return false;
+        }
+        return closesAt == null || now.isBefore(closesAt);
+    }
+
     public void attachGame(
             String externalGameId,
             LocalDateTime setStartedAt,
