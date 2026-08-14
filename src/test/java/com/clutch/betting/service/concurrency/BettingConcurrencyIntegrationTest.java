@@ -11,11 +11,9 @@ import com.clutch.betting.repository.BetPointTransactionRepository;
 import com.clutch.betting.repository.BettingEventRepository;
 import com.clutch.betting.repository.UserBetRepository;
 import com.clutch.betting.service.BettingService;
-import com.clutch.betting.scheduler.BetRefundScheduler;
+import com.clutch.betting.scheduler.BettingScheduler;
 import com.clutch.betting.service.BetSettlementService;
 import com.clutch.betting.dto.BetSettlementResult;
-import com.clutch.betting.scheduler.BetSettlementScheduler;
-import com.clutch.betting.scheduler.BettingEventSynchronizationScheduler;
 import com.clutch.lolesports.service.PollingScheduler;
 import com.clutch.user.domain.User;
 import com.clutch.user.domain.UserRole;
@@ -75,13 +73,7 @@ class BettingConcurrencyIntegrationTest {
     private PollingScheduler pollingScheduler;
 
     @MockitoBean
-    private BettingEventSynchronizationScheduler synchronizationScheduler;
-
-    @MockitoBean
-    private BetSettlementScheduler settlementScheduler;
-
-    @MockitoBean
-    private BetRefundScheduler refundScheduler;
+    private BettingScheduler bettingScheduler;
 
     @BeforeEach
     void setUp() {
