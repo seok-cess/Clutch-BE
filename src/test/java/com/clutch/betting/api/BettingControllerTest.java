@@ -2,11 +2,10 @@ package com.clutch.betting.api;
 
 import com.clutch.betting.domain.BettingEventStatus;
 import com.clutch.betting.domain.UserBetStatus;
-import com.clutch.betting.service.placement.BetPlacementResult;
-import com.clutch.betting.service.placement.BetPlacementService;
-import com.clutch.betting.service.query.BetQueryService;
-import com.clutch.betting.service.query.BettingEventView;
-import com.clutch.betting.service.query.UserBetView;
+import com.clutch.betting.dto.BetPlacementResult;
+import com.clutch.betting.dto.BettingEventView;
+import com.clutch.betting.dto.UserBetView;
+import com.clutch.betting.service.BettingService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -29,14 +28,11 @@ class BettingControllerTest {
     private MockMvc mockMvc;
 
     @MockitoBean
-    private BetPlacementService placementService;
-
-    @MockitoBean
-    private BetQueryService queryService;
+    private BettingService bettingService;
 
     @Test
     void getsCurrentBettingEvent() throws Exception {
-        given(queryService.getCurrentEvent("match-1", 10L)).willReturn(new BettingEventView(
+        given(bettingService.getCurrentEvent("match-1", 10L)).willReturn(new BettingEventView(
                 1L,
                 "match-1",
                 "game-1",
@@ -59,7 +55,7 @@ class BettingControllerTest {
 
     @Test
     void placesBet() throws Exception {
-        given(placementService.place(10L, 1L, "team-a", 1_000L)).willReturn(
+        given(bettingService.place(10L, 1L, "team-a", 1_000L)).willReturn(
                 new BetPlacementResult(
                         100L,
                         10L,
@@ -85,7 +81,7 @@ class BettingControllerTest {
 
     @Test
     void getsMyBetResult() throws Exception {
-        given(queryService.getMyBet(1L, 10L)).willReturn(new UserBetView(
+        given(bettingService.getMyBet(1L, 10L)).willReturn(new UserBetView(
                 100L,
                 10L,
                 1L,

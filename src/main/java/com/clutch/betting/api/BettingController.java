@@ -1,11 +1,10 @@
 package com.clutch.betting.api;
 
-import com.clutch.betting.api.request.BetCreateRequest;
-import com.clutch.betting.api.response.BetCreateResponse;
-import com.clutch.betting.api.response.BettingEventResponse;
-import com.clutch.betting.api.response.UserBetResponse;
-import com.clutch.betting.service.placement.BetPlacementService;
-import com.clutch.betting.service.query.BetQueryService;
+import com.clutch.betting.dto.request.BetCreateRequest;
+import com.clutch.betting.dto.response.BetCreateResponse;
+import com.clutch.betting.dto.response.BettingEventResponse;
+import com.clutch.betting.dto.response.UserBetResponse;
+import com.clutch.betting.service.BettingService;
 import com.clutch.wallet.web.CurrentUserId;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -28,8 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api")
 public class BettingController {
 
-    private final BetPlacementService placementService;
-    private final BetQueryService queryService;
+    private final BettingService bettingService;
 
     /**
      * 특정 매치에서 현재 노출할 배팅 이벤트와 내 배팅을 조회한다.
@@ -44,7 +42,7 @@ public class BettingController {
             @PathVariable @NotBlank String externalMatchId
     ) {
         return ResponseEntity.ok(BettingEventResponse.from(
-                queryService.getCurrentEvent(externalMatchId, userId)
+                bettingService.getCurrentEvent(externalMatchId, userId)
         ));
     }
 
@@ -63,7 +61,7 @@ public class BettingController {
             @Valid @RequestBody BetCreateRequest request
     ) {
         return ResponseEntity.status(HttpStatus.CREATED).body(BetCreateResponse.from(
-                placementService.place(
+                bettingService.place(
                         userId,
                         bettingEventId,
                         request.selectedTeamId(),
@@ -85,7 +83,7 @@ public class BettingController {
             @PathVariable @Positive Long bettingEventId
     ) {
         return ResponseEntity.ok(UserBetResponse.from(
-                queryService.getMyBet(bettingEventId, userId)
+                bettingService.getMyBet(bettingEventId, userId)
         ));
     }
 }

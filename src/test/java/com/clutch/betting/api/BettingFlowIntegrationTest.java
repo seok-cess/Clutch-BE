@@ -9,11 +9,11 @@ import com.clutch.betting.live.LiveBettingDataProvider.SetSnapshot;
 import com.clutch.betting.repository.BetPointTransactionRepository;
 import com.clutch.betting.repository.BettingEventRepository;
 import com.clutch.betting.repository.UserBetRepository;
-import com.clutch.betting.service.refund.BetRefundScheduler;
-import com.clutch.betting.service.settlement.BetSettlementProcessor;
-import com.clutch.betting.service.settlement.BetSettlementScheduler;
-import com.clutch.betting.service.synchronization.BettingEventSynchronizationProcessor;
-import com.clutch.betting.service.synchronization.BettingEventSynchronizationScheduler;
+import com.clutch.betting.scheduler.BetRefundScheduler;
+import com.clutch.betting.service.BetSettlementService;
+import com.clutch.betting.scheduler.BetSettlementScheduler;
+import com.clutch.betting.service.BettingEventSynchronizationService;
+import com.clutch.betting.scheduler.BettingEventSynchronizationScheduler;
 import com.clutch.lolesports.service.PollingScheduler;
 import com.clutch.user.domain.User;
 import com.clutch.user.domain.UserRole;
@@ -62,10 +62,10 @@ class BettingFlowIntegrationTest {
     private BetPointTransactionRepository transactionRepository;
 
     @Autowired
-    private BetSettlementProcessor settlementProcessor;
+    private BetSettlementService settlementService;
 
     @Autowired
-    private BettingEventSynchronizationProcessor synchronizationProcessor;
+    private BettingEventSynchronizationService synchronizationService;
 
     @Autowired
     private EntityManager entityManager;
@@ -118,7 +118,7 @@ class BettingFlowIntegrationTest {
 
         eventRepository.findById(event.getId()).orElseThrow().recordWinner("team-a");
         eventRepository.flush();
-        settlementProcessor.settle(event.getId());
+        settlementService.settle(event.getId());
         entityManager.flush();
         entityManager.clear();
 
@@ -158,8 +158,8 @@ class BettingFlowIntegrationTest {
                 false
         );
 
-        synchronizationProcessor.synchronizeMatch(snapshot);
-        synchronizationProcessor.synchronizeMatch(snapshot);
+        synchronizationService.synchronizeMatch(snapshot);
+        synchronizationService.synchronizeMatch(snapshot);
         entityManager.flush();
         entityManager.clear();
 

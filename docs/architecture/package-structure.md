@@ -42,27 +42,26 @@ com.clutch
 
 ## 배팅 패키지 구조
 
-배팅 도메인은 계층 패키지를 유지하되, 클래스가 많은 Service와 API DTO는 역할별 하위 패키지로 나눈다.
+배팅 도메인은 계층 패키지를 유지하되, DTO와 스케줄 실행 책임을 Service에서 분리한다.
 
 ```text
 com.clutch.betting
-├── api
-│   ├── request          # HTTP 요청 DTO
-│   └── response         # HTTP 응답 DTO
+├── api                  # HTTP 요청 처리와 예외 응답 변환
 ├── config
 ├── domain
+├── dto
+│   ├── request          # HTTP 요청 DTO
+│   └── response         # HTTP 응답 DTO
 ├── exception
 ├── live                 # 최신 매치·세트 상태 조회 계약과 lolesports 구현
 ├── repository
-└── service
-    ├── placement        # 배팅 등록과 포인트 차감
-    ├── query            # 배팅 이벤트·사용자 배팅 조회
-    ├── refund           # 취소 이벤트 환불
-    ├── settlement       # 승패 결과 정산
-    └── synchronization  # 라이브 세트 상태와 배팅 이벤트 동기화
+├── scheduler            # 주기 실행과 대상별 실패 격리
+└── service              # 등록·조회, 환불, 정산, 라이브 상태 동기화 유스케이스
 ```
 
 `live`는 외부 시스템 연동 방식보다 배팅 도메인에 제공하는 역할을 기준으로 이름을 정한다. 배팅 Service는 `LiveBettingDataProvider` 계약에 의존하고, lolesports 캐시를 사용하는 구현 세부사항은 `LolesportsLiveBettingDataProvider`가 담당한다.
+
+사용자 요청에서 함께 사용되는 등록과 조회는 `BettingService`가 담당한다. 환불·정산·라이브 상태 동기화는 각각 독립된 트랜잭션 경계를 유지하는 Service가 담당하고, Scheduler는 처리 대상 탐색과 개별 실패 격리만 조율한다. 계층 간 전달 모델과 처리 결과는 `dto`에 모아 Service 패키지에 데이터 전용 클래스를 두지 않는다.
 
 ## 계층별 책임
 

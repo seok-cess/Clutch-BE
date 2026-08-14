@@ -10,12 +10,12 @@ import com.clutch.betting.live.LiveBettingDataProvider;
 import com.clutch.betting.repository.BetPointTransactionRepository;
 import com.clutch.betting.repository.BettingEventRepository;
 import com.clutch.betting.repository.UserBetRepository;
-import com.clutch.betting.service.placement.BetPlacementService;
-import com.clutch.betting.service.refund.BetRefundScheduler;
-import com.clutch.betting.service.settlement.BetSettlementProcessor;
-import com.clutch.betting.service.settlement.BetSettlementResult;
-import com.clutch.betting.service.settlement.BetSettlementScheduler;
-import com.clutch.betting.service.synchronization.BettingEventSynchronizationScheduler;
+import com.clutch.betting.service.BettingService;
+import com.clutch.betting.scheduler.BetRefundScheduler;
+import com.clutch.betting.service.BetSettlementService;
+import com.clutch.betting.dto.BetSettlementResult;
+import com.clutch.betting.scheduler.BetSettlementScheduler;
+import com.clutch.betting.scheduler.BettingEventSynchronizationScheduler;
 import com.clutch.lolesports.service.PollingScheduler;
 import com.clutch.user.domain.User;
 import com.clutch.user.domain.UserRole;
@@ -48,10 +48,10 @@ class BettingConcurrencyIntegrationTest {
     private static final int REQUEST_COUNT = 10;
 
     @Autowired
-    private BetPlacementService placementService;
+    private BettingService bettingService;
 
     @Autowired
-    private BetSettlementProcessor settlementProcessor;
+    private BetSettlementService settlementService;
 
     @Autowired
     private UserRepository userRepository;
@@ -103,7 +103,7 @@ class BettingConcurrencyIntegrationTest {
 
         runConcurrently(REQUEST_COUNT, () -> {
             try {
-                placementService.place(user.getId(), event.getId(), "team-a", 1_000L);
+                bettingService.place(user.getId(), event.getId(), "team-a", 1_000L);
                 successes.incrementAndGet();
             } catch (BettingException exception) {
                 errors.add(exception.getErrorCode());
@@ -137,7 +137,7 @@ class BettingConcurrencyIntegrationTest {
         AtomicInteger processed = new AtomicInteger();
 
         runConcurrently(REQUEST_COUNT, () -> {
-            BetSettlementResult result = settlementProcessor.settle(event.getId());
+            BetSettlementResult result = settlementService.settle(event.getId());
             if (!result.alreadyProcessed()) {
                 processed.incrementAndGet();
             }
@@ -164,7 +164,7 @@ class BettingConcurrencyIntegrationTest {
         runConcurrently(2, () -> {
             Long eventId = eventIds.get(requestIndex.getAndIncrement());
             try {
-                placementService.place(user.getId(), eventId, "team-a", 4_000L);
+                bettingService.place(user.getId(), eventId, "team-a", 4_000L);
                 successes.incrementAndGet();
             } catch (BettingException exception) {
                 errors.add(exception.getErrorCode());
