@@ -2,6 +2,7 @@ package com.clutch.coupon.event.api;
 
 import com.clutch.coupon.event.api.dto.CouponEventCreateRequest;
 import com.clutch.coupon.event.api.dto.CouponEventCreateResponse;
+import com.clutch.coupon.event.api.dto.CouponEventDetailResponse;
 import com.clutch.coupon.event.api.dto.CouponEventItemCreateRequest;
 import com.clutch.coupon.event.api.dto.CouponEventItemCreateResponse;
 import com.clutch.coupon.event.api.dto.CouponEventListResponse;
@@ -39,6 +40,119 @@ class CouponEventAdminControllerTest {
 
     @MockitoBean
     private CouponEventService couponEventService;
+
+    @Test
+    void 쿠폰_이벤트_상세를_조회하면_200을_응답한다() throws Exception {
+        when(couponEventService.findById(1L)).thenReturn(
+                new CouponEventDetailResponse(
+                        1L,
+                        10L,
+                        "펜타킬 이벤트",
+                        CouponEventOpenMode.GAME_TRIGGERED,
+                        CouponIssueMode.PHASED_FIRST_COME,
+                        "PENTA_KILL",
+                        CouponEventStatus.READY,
+                        90,
+                        null,
+                        10_000,
+                        1_000,
+                        9_000,
+                        null,
+                        null,
+                        List.of(),
+                        null
+                )
+        );
+
+        mockMvc.perform(get(
+                        "/api/v1/admin/coupon-events/{eventId}",
+                        1L
+                ))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.couponEventId").value(1))
+                .andExpect(jsonPath("$.totalQuantity").value(10_000))
+                .andExpect(jsonPath("$.remainingQuantity").value(9_000));
+
+        verify(couponEventService).findById(1L);
+    }
+
+    @Test
+    void 진행_중인_쿠폰_이벤트_수정은_409를_응답한다() throws Exception {
+        org.mockito.Mockito.when(couponEventService.update(
+                org.mockito.ArgumentMatchers.eq(1L),
+                org.mockito.ArgumentMatchers.any(CouponEventUpdateRequest.class)
+        )).thenThrow(new CouponEventException(
+                CouponEventErrorCode.COUPON_EVENT_NOT_EDITABLE
+        ));
+
+        mockMvc.perform(patch("/api/v1/admin/coupon-events/{eventId}", 1L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "esportsMatchId": 2,
+                                  "eventName": "진행 이벤트",
+                                  "openMode": "GAME_TRIGGERED",
+                                  "issueMode": "PHASED_FIRST_COME",
+                                  "triggerType": "FIRST_BLOOD",
+                                  "claimWindowSeconds": 60,
+                                  "items": [
+                                    {
+                                      "couponTypeId": 10,
+                                      "quantity": 5000,
+                                      "openOffsetSeconds": 0
+                                    },
+                                    {
+                                      "couponTypeId": 20,
+                                      "quantity": 1000,
+                                      "openOffsetSeconds": 30
+                                    }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code")
+                        .value("COUPON_EVENT_NOT_EDITABLE"));
+    }
+
+    @Test
+    void 존재하지_않는_쿠폰_이벤트_삭제는_404를_응답한다() throws Exception {
+        org.mockito.Mockito.doThrow(new CouponEventException(
+                CouponEventErrorCode.COUPON_EVENT_NOT_FOUND
+        )).when(couponEventService).delete(999L);
+
+        mockMvc.perform(delete(
+                        "/api/v1/admin/coupon-events/{eventId}",
+                        999L
+                ))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code")
+                        .value("COUPON_EVENT_NOT_FOUND"));
+    }
+
+    @Test
+    void 쿠폰_수량이_0이면_등록_요청은_400을_응답한다() throws Exception {
+        mockMvc.perform(post("/api/v1/admin/coupon-events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "eventName": "예약 이벤트",
+                                  "openMode": "SCHEDULED",
+                                  "issueMode": "SINGLE_FIRST_COME",
+                                  "claimWindowSeconds": 60,
+                                  "scheduledOpenAt": "2026-08-20T09:30:00",
+                                  "items": [
+                                    {
+                                      "couponTypeId": 1,
+                                      "quantity": 0,
+                                      "openOffsetSeconds": 0
+                                    }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code")
+                        .value("INVALID_EVENT_CONFIGURATION"));
+    }
 
     @Test
     void 쿠폰_이벤트를_물리_삭제하면_204를_응답한다() throws Exception {

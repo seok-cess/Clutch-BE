@@ -33,6 +33,7 @@ import org.springframework.data.domain.SliceImpl;
 
 import java.util.List;
 import java.util.Optional;
+import java.time.LocalDateTime;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -77,6 +78,178 @@ class CouponEventServiceTest {
                 couponClaimRequestRepository,
                 userCouponRepository
         );
+    }
+
+    @Test
+    void 예약형_일반_선착순_이벤트를_등록한다() {
+        LocalDateTime scheduledOpenAt =
+                LocalDateTime.of(2026, 8, 20, 9, 30);
+        CouponEventCreateRequest request = new CouponEventCreateRequest(
+                null,
+                "오전 선착순 이벤트",
+                CouponEventOpenMode.SCHEDULED,
+                CouponIssueMode.SINGLE_FIRST_COME,
+                null,
+                60,
+                scheduledOpenAt,
+                List.of(new CouponEventItemCreateRequest(
+                        1L,
+                        10_000,
+                        0
+                ))
+        );
+        when(couponEventRepository.save(any(CouponEvent.class)))
+                .thenAnswer(invocation -> withId(invocation.getArgument(0), 1L));
+        when(couponEventItemRepository.save(any(CouponEventItem.class)))
+                .thenAnswer(invocation -> withId(invocation.getArgument(0), 10L));
+        when(couponEventPhaseRepository.save(any(CouponEventPhase.class)))
+                .thenAnswer(invocation -> withId(invocation.getArgument(0), 20L));
+
+        CouponEventCreateResponse response = couponEventService.create(request);
+
+        assertThat(response.openMode())
+                .isEqualTo(CouponEventOpenMode.SCHEDULED);
+        assertThat(response.issueMode())
+                .isEqualTo(CouponIssueMode.SINGLE_FIRST_COME);
+        assertThat(response.scheduledOpenAt()).isEqualTo(scheduledOpenAt);
+        assertThat(response.items()).singleElement()
+                .satisfies(item -> {
+                    assertThat(item.quantity()).isEqualTo(10_000);
+                    assertThat(item.openOffsetSeconds()).isZero();
+                });
+        verify(couponEventRepository, never())
+                .existsByEsportsMatchIdAndTriggerType(any(), any());
+    }
+
+    @Test
+    void 첫_단계가_0초가_아니면_등록할_수_없다() {
+        CouponEventCreateRequest request = new CouponEventCreateRequest(
+                1L,
+                "잘못된 단계 이벤트",
+                CouponEventOpenMode.GAME_TRIGGERED,
+                CouponIssueMode.PHASED_FIRST_COME,
+                "PENTA_KILL",
+                90,
+                null,
+                List.of(
+                        new CouponEventItemCreateRequest(1L, 5_000, 10),
+                        new CouponEventItemCreateRequest(2L, 1_000, 30)
+                )
+        );
+
+        assertThatThrownBy(() -> couponEventService.create(request))
+                .isInstanceOf(CouponEventException.class);
+        verify(couponEventRepository, never()).save(any());
+    }
+
+    @Test
+    void 중복된_쿠폰_종류는_등록할_수_없다() {
+        CouponEventCreateRequest request = new CouponEventCreateRequest(
+                1L,
+                "중복 쿠폰 이벤트",
+                CouponEventOpenMode.GAME_TRIGGERED,
+                CouponIssueMode.PHASED_FIRST_COME,
+                "PENTA_KILL",
+                90,
+                null,
+                List.of(
+                        new CouponEventItemCreateRequest(1L, 5_000, 0),
+                        new CouponEventItemCreateRequest(1L, 1_000, 30)
+                )
+        );
+
+        assertThatThrownBy(() -> couponEventService.create(request))
+                .isInstanceOf(CouponEventException.class);
+        verify(couponEventRepository, never()).save(any());
+    }
+
+    @Test
+    void 목록_커서가_0_이하면_조회할_수_없다() {
+        assertThatThrownBy(() -> couponEventService.findAll(null, 0L, 20))
+                .isInstanceOf(CouponEventException.class)
+                .hasMessage("커서는 양수여야 합니다.");
+    }
+
+    @Test
+    void 목록_크기가_허용_범위를_벗어나면_조회할_수_없다() {
+        assertThatThrownBy(() -> couponEventService.findAll(null, null, 101))
+                .isInstanceOf(CouponEventException.class)
+                .hasMessage("목록 크기는 1개 이상 100개 이하여야 합니다.");
+    }
+
+    @Test
+    void 수정한_경기와_트리거가_다른_이벤트와_중복되면_수정할_수_없다() {
+        CouponEvent event = withId(gameTriggeredEvent("기존 이벤트"), 1L);
+        when(couponEventRepository.findById(1L))
+                .thenReturn(Optional.of(event));
+        when(couponEventRepository
+                .existsByEsportsMatchIdAndTriggerTypeAndIdNot(
+                        2L,
+                        "FIRST_BLOOD",
+                        1L
+                )).thenReturn(true);
+
+        assertThatThrownBy(() -> couponEventService.update(
+                1L,
+                updateRequest()
+        )).isInstanceOfSatisfying(
+                CouponEventException.class,
+                exception -> assertThat(exception.getErrorCode())
+                        .isEqualTo(CouponEventErrorCode.COUPON_EVENT_DUPLICATED)
+        );
+        verify(couponEventPhaseRepository, never())
+                .deleteAllByCouponEventId(any());
+    }
+
+    @Test
+    void 발급_요청_이력이_있는_이벤트는_삭제할_수_없다() {
+        CouponEvent event = withId(gameTriggeredEvent("요청 이력 이벤트"), 1L);
+        when(couponEventRepository.findById(1L))
+                .thenReturn(Optional.of(event));
+        when(couponEventOccurrenceRepository.existsByCouponEventId(1L))
+                .thenReturn(false);
+        when(couponClaimRequestRepository.existsByCouponEventId(1L))
+                .thenReturn(true);
+
+        assertThatThrownBy(() -> couponEventService.delete(1L))
+                .isInstanceOfSatisfying(
+                        CouponEventException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(CouponEventErrorCode.COUPON_EVENT_NOT_DELETABLE)
+                );
+        verify(userCouponRepository, never()).existsByCouponEventId(any());
+        verify(couponEventRepository, never()).delete(any());
+    }
+
+    @Test
+    void 사용자_쿠폰_이력이_있는_이벤트는_삭제할_수_없다() {
+        CouponEvent event = withId(gameTriggeredEvent("발급 이력 이벤트"), 1L);
+        when(couponEventRepository.findById(1L))
+                .thenReturn(Optional.of(event));
+        when(couponEventOccurrenceRepository.existsByCouponEventId(1L))
+                .thenReturn(false);
+        when(couponClaimRequestRepository.existsByCouponEventId(1L))
+                .thenReturn(false);
+        when(userCouponRepository.existsByCouponEventId(1L))
+                .thenReturn(true);
+
+        assertThatThrownBy(() -> couponEventService.delete(1L))
+                .isInstanceOf(CouponEventException.class);
+        verify(couponEventRepository, never()).delete(any());
+    }
+
+    @Test
+    void 존재하지_않는_이벤트는_삭제할_수_없다() {
+        when(couponEventRepository.findById(999L))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> couponEventService.delete(999L))
+                .isInstanceOfSatisfying(
+                        CouponEventException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(CouponEventErrorCode.COUPON_EVENT_NOT_FOUND)
+                );
+        verify(couponEventRepository, never()).delete(any());
     }
 
     @Test
