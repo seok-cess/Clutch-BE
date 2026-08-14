@@ -34,6 +34,7 @@ Notion의 논의가 구현 결정으로 확정되면 관련 코드와 함께 `do
 - 쿠폰 발급 도메인 규칙: `docs/domain/coupon.md`
 - 시청 포인트 지급 규칙: `docs/domain/viewing-point.md`
 - 승패 배팅 규칙: `docs/domain/betting.md`
+- 매치·세트 상태와 결과 데이터 계약: `docs/domain/match-set-result.md`
 - 데이터베이스 규칙: `docs/conventions/database-convention.md`
 - 파일 인코딩과 줄바꿈 규칙: `docs/conventions/file-convention.md`
 - Git과 브랜치 규칙: `docs/conventions/git-convention.md`

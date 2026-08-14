@@ -58,6 +58,7 @@ public class GamePersistService {
     private final GameTimelinePointRepository timelineRepo;
     private final LolesportsProperties props;
     private final ObjectMapper objectMapper;
+    private final SetWinnerTracker setWinners;
 
     public GamePersistService(DataCacheService cache,
                               EsportsMatchRepository matchRepo,
@@ -66,7 +67,8 @@ public class GamePersistService {
                               GamePlayerStatRepository playerStatRepo,
                               GameTimelinePointRepository timelineRepo,
                               LolesportsProperties props,
-                              ObjectMapper objectMapper) {
+                              ObjectMapper objectMapper,
+                              SetWinnerTracker setWinners) {
         this.cache = cache;
         this.matchRepo = matchRepo;
         this.matchTeamRepo = matchTeamRepo;
@@ -75,6 +77,7 @@ public class GamePersistService {
         this.timelineRepo = timelineRepo;
         this.props = props;
         this.objectMapper = objectMapper;
+        this.setWinners = setWinners;
     }
 
     /**
@@ -233,7 +236,38 @@ public class GamePersistService {
         }
 
         game.updateObjectives(buildObjectivesJson(externalGameId, start));
+        applyWinner(game, ctx, teamsByExternalId);
         return game;
+    }
+
+    /**
+     * 세트 승자를 기록한다.
+     *
+     * 승자는 {@link SetWinnerTracker} 가 라이브 폴링 중 gameWins 증가분으로 판정해 둔 값이다.
+     * 세트 종료보다 약 5분 늦게 확정되므로, 적재 시점에 아직 미확정일 수 있다.
+     * 그 경우 컬럼을 비워 두고(정산이 신뢰하지 않도록) 이후 재적재에서 채운다.
+     *
+     * 진영 매핑(blue/red match_team)이 없으면 승자를 세트에 귀속할 수 없어 저장하지 않는다.
+     */
+    private void applyWinner(EsportsGame game, MatchContext ctx,
+                             Map<String, MatchTeam> teamsByExternalId) {
+        if (game.isWinnerDecided()) {
+            return;   // 이미 확정된 값은 덮어쓰지 않는다
+        }
+        String winnerExternalTeamId = setWinners.winnerOf(ctx.matchId(), game.getExternalGameId());
+        if (winnerExternalTeamId == null) {
+            return;   // 아직 gameWins 가 오르지 않았다 — 다음 기회에 채운다
+        }
+        MatchTeam winner = teamsByExternalId.get(winnerExternalTeamId);
+        if (winner == null) {
+            log.warn("세트 승자({})를 match_team 과 매칭하지 못했다 (gameId={})",
+                    winnerExternalTeamId, game.getExternalGameId());
+            return;
+        }
+        if (!game.decideWinner(winner.getId(), LocalDateTime.now(ZoneOffset.UTC))) {
+            log.warn("세트 승자({})가 이 세트의 진영에 없다 (gameId={}) — 진영 매핑 확인 필요",
+                    winnerExternalTeamId, game.getExternalGameId());
+        }
     }
 
     /**
@@ -528,8 +562,35 @@ public class GamePersistService {
                     }
                 }
             }
+            List<ScheduleResponse.Team> teams = m.teams() != null ? m.teams() : List.of();
             return new MatchContext(m.matchId(), m.leagueName(), m.blockName(), m.startTime(),
-                    "completed", bestOf, number, m.teams() != null ? m.teams() : List.of());
+                    matchStateOf(teams, bestOf), bestOf, number, teams);
+        }
+
+        /**
+         * 매치 상태를 세트 득점으로 판정한다.
+         *
+         * 이 팩터리는 "세트 하나가 끝날 때"마다 호출된다. 예전에는 여기서 매치 상태를
+         * "completed" 로 고정해, Bo3 의 1세트만 끝나도 매치 전체가 종료로 저장됐다.
+         * 그 값을 시청 세션 입장 검사(WatchSessionService)가 읽고 있어 2·3세트
+         * 입장이 막혔다.
+         *
+         * 매치 종료는 "최종 승리 팀이 결정된 시점" 이므로, 어느 팀이든 과반
+         * (bestOf/2 + 1) 세트를 가져갔을 때만 completed 로 본다. 그 전까지는
+         * 다음 세트를 기다리는 중이라도 inProgress 다.
+         *
+         * gameWins 는 세트 종료보다 약 5분 늦게 오르므로(2026-08-13 실측) 매치 종료
+         * 판정도 그만큼 늦다. 소스 제약이라 우회할 수 없다.
+         */
+        private static String matchStateOf(List<ScheduleResponse.Team> teams, Integer bestOf) {
+            int needed = (bestOf == null ? 1 : bestOf) / 2 + 1;
+            for (ScheduleResponse.Team t : teams) {
+                if (t.result() != null && t.result().gameWins() != null
+                        && t.result().gameWins() >= needed) {
+                    return "completed";
+                }
+            }
+            return "inProgress";
         }
     }
 }
