@@ -35,4 +35,26 @@ class CouponEventItemTest {
         assertThat(couponEventItem.isAvailableAt(10))
                 .isFalse();
     }
+    /**
+     * 잔여 수량 계산 검증
+     */
+    @Test
+    void remainingStockIsQuantityMinusSuccessCount() {
+        CouponEventItem couponEventItem =
+                new CouponEventItem();
+
+        ReflectionTestUtils.setField(
+                couponEventItem,
+                "quantity",
+                100
+        );
+        ReflectionTestUtils.setField(
+                couponEventItem,
+                "successCount",
+                20
+        );
+
+        assertThat(couponEventItem.remainingStock())
+                .isEqualTo(80);
+    }
 }
