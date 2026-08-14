@@ -103,6 +103,36 @@ class BettingDomainTest {
     }
 
     @Test
+    void keepsFirstConfirmedWinnerAndTerminalSnapshot() {
+        BettingEvent event = BettingEvent.open(
+                "match-1",
+                1,
+                "team-a",
+                "team-b",
+                LocalDateTime.of(2026, 8, 14, 10, 0)
+        );
+        event.attachGame(
+                "game-1",
+                LocalDateTime.of(2026, 8, 14, 10, 1),
+                Duration.ofMinutes(2)
+        );
+        event.recordWinner("team-a");
+        event.recordWinner("team-b");
+        event.cancel();
+        event.settle();
+        event.attachGame(
+                "game-changed",
+                LocalDateTime.of(2026, 8, 14, 10, 5),
+                Duration.ofMinutes(2)
+        );
+
+        assertThat(event.getWinnerExternalTeamId()).isEqualTo("team-a");
+        assertThat(event.getStatus()).isEqualTo(BettingEventStatus.SETTLED);
+        assertThat(event.getExternalGameId()).isEqualTo("game-1");
+        assertThat(event.getClosesAt()).isEqualTo(LocalDateTime.of(2026, 8, 14, 10, 3));
+    }
+
+    @Test
     void settlesEventAndUserBets() {
         BettingEvent event = BettingEvent.open(
                 "match-1",

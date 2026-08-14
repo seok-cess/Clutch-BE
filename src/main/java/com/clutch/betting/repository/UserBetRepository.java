@@ -25,7 +25,7 @@ public interface UserBetRepository extends JpaRepository<UserBet, Long> {
             from UserBet bet
             where bet.bettingEventId = :bettingEventId
               and bet.status = :status
-            order by bet.id
+            order by bet.userId, bet.id
             """)
     List<UserBet> findAllByBettingEventIdAndStatusForUpdate(
             Long bettingEventId,

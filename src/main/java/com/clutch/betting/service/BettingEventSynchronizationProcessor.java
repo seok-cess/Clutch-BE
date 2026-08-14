@@ -52,7 +52,10 @@ public class BettingEventSynchronizationProcessor {
         LocalDateTime now = LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC);
         for (SetSnapshot set : sets) {
             var existingEvent = bettingEventRepository
-                    .findByExternalMatchIdAndSetNumber(liveMatch.externalMatchId(), set.setNumber());
+                    .findByExternalMatchIdAndSetNumberForUpdate(
+                            liveMatch.externalMatchId(),
+                            set.setNumber()
+                    );
             if (existingEvent.isEmpty() && !set.active() && !set.finished()) {
                 continue;
             }
@@ -66,22 +69,25 @@ public class BettingEventSynchronizationProcessor {
             event.closeIfExpired(now);
             if (set.finished()) {
                 event.close();
-                openNextEventIfMissing(liveMatch, set.setNumber() + 1, now);
+                if (!liveMatch.matchFinished()) {
+                    openNextEventIfMissing(liveMatch, set.setNumber() + 1, now);
+                }
             }
             if (set.winnerExternalTeamId() != null) {
                 event.recordWinner(set.winnerExternalTeamId());
             }
         }
         if (liveMatch.matchFinished()) {
-            int lastFinishedSetNumber = sets.stream()
+            sets.stream()
                     .filter(SetSnapshot::finished)
                     .mapToInt(SetSnapshot::setNumber)
                     .max()
-                    .orElse(0);
-            bettingEventRepository.findAllFutureEventsForUpdate(
-                    liveMatch.externalMatchId(),
-                    lastFinishedSetNumber
-            ).forEach(BettingEvent::cancel);
+                    .ifPresent(lastFinishedSetNumber -> bettingEventRepository
+                            .findAllFutureEventsForUpdate(
+                                    liveMatch.externalMatchId(),
+                                    lastFinishedSetNumber
+                            )
+                            .forEach(BettingEvent::cancel));
         }
     }
 

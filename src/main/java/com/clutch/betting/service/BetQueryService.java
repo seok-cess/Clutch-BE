@@ -8,7 +8,6 @@ import com.clutch.betting.exception.BettingException;
 import com.clutch.betting.integration.lolesports.LiveBettingCache;
 import com.clutch.betting.repository.BettingEventRepository;
 import com.clutch.betting.repository.UserBetRepository;
-import com.clutch.user.domain.User;
 import com.clutch.user.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -72,7 +71,8 @@ public class BetQueryService {
                 .orElse(null);
         boolean liveAvailable = liveBettingCache.isAcceptingBets(
                 event.getExternalMatchId(),
-                event.getExternalGameId()
+                event.getExternalGameId(),
+                event.getSetNumber()
         );
         return new BettingEventView(
                 event.getId(),
@@ -93,7 +93,7 @@ public class BetQueryService {
         UserBet userBet = userBetRepository
                 .findByBettingEventIdAndUserId(bettingEventId, userId)
                 .orElseThrow(() -> new BettingException(BettingErrorCode.BET_NOT_FOUND));
-        User user = userRepository.findById(userId)
+        long currentPoint = userRepository.findPointById(userId)
                 .orElseThrow(() -> new BettingException(BettingErrorCode.USER_NOT_FOUND));
         return new UserBetView(
                 userBet.getId(),
@@ -101,7 +101,7 @@ public class BetQueryService {
                 userBet.getSelectedExternalTeamId(),
                 userBet.getAmount(),
                 userBet.getStatus(),
-                user.getPoint()
+                currentPoint
         );
     }
 

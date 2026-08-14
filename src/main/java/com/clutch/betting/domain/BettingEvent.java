@@ -15,8 +15,8 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
-import java.time.LocalDateTime;
 import java.time.Duration;
+import java.time.LocalDateTime;
 
 @Getter
 @Entity
@@ -131,6 +131,9 @@ public class BettingEvent {
             LocalDateTime setStartedAt,
             Duration bettingDurationAfterStart
     ) {
+        if (status == BettingEventStatus.SETTLED || status == BettingEventStatus.CANCELLED) {
+            return;
+        }
         String normalizedGameId = requireText(externalGameId, "외부 세트 ID는 필수입니다.");
         if (this.externalGameId != null && !this.externalGameId.equals(normalizedGameId)) {
             throw new IllegalStateException("이미 다른 세트 ID가 연결된 배팅 이벤트입니다.");
@@ -174,6 +177,9 @@ public class BettingEvent {
         if (status == BettingEventStatus.SETTLED || status == BettingEventStatus.CANCELLED) {
             return;
         }
+        if (winnerExternalTeamId != null) {
+            return;
+        }
         this.winnerExternalTeamId = winnerTeamId;
         close();
     }
@@ -189,7 +195,9 @@ public class BettingEvent {
     }
 
     public void cancel() {
-        if (status == BettingEventStatus.SETTLED || status == BettingEventStatus.CANCELLED) {
+        if (status == BettingEventStatus.SETTLED
+                || status == BettingEventStatus.CANCELLED
+                || winnerExternalTeamId != null) {
             return;
         }
         winnerExternalTeamId = null;

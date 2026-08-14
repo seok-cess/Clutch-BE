@@ -117,4 +117,12 @@ class BettingControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
     }
+
+    @Test
+    void rejectsNonPositiveCurrentUserHeader() throws Exception {
+        mockMvc.perform(get("/api/matches/match-1/betting-events/current")
+                        .header("X-User-Id", "0"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+    }
 }

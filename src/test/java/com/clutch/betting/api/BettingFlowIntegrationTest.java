@@ -34,6 +34,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -101,7 +102,7 @@ class BettingFlowIntegrationTest {
         );
         event.attachGame("bet-flow-game-1", null, java.time.Duration.ofMinutes(2));
         eventRepository.saveAndFlush(event);
-        given(liveBettingCache.isAcceptingBets(any(), any())).willReturn(true);
+        given(liveBettingCache.isAcceptingBets(any(), any(), anyInt())).willReturn(true);
     }
 
     @Test

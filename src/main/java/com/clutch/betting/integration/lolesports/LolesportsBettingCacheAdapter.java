@@ -33,13 +33,16 @@ public class LolesportsBettingCacheAdapter implements LiveBettingCache {
     }
 
     @Override
-    public boolean isAcceptingBets(String externalMatchId, String externalGameId) {
+    public boolean isAcceptingBets(
+            String externalMatchId,
+            String externalGameId,
+            int setNumber
+    ) {
         return findLiveMatches().stream()
                 .filter(match -> match.externalMatchId().equals(externalMatchId))
-                .anyMatch(match -> externalGameId == null
-                        || match.sets().stream()
-                                .filter(set -> set.externalGameId().equals(externalGameId))
-                                .anyMatch(set -> !set.finished()));
+                .filter(match -> !match.matchFinished())
+                .filter(match -> match.externalTeamIds().size() == 2)
+                .anyMatch(match -> isSetAcceptingBets(match, externalGameId, setNumber));
     }
 
     private LiveMatchSnapshot toSnapshot(DataCacheService.LiveMatch liveMatch) {
@@ -84,11 +87,43 @@ public class LolesportsBettingCacheAdapter implements LiveBettingCache {
     }
 
     private boolean isMatchFinished(DataCacheService.LiveMatch liveMatch) {
-        int bestOf = liveMatch.bestOf() == null ? 1 : liveMatch.bestOf();
+        if (liveMatch.bestOf() == null || liveMatch.bestOf() < 1) {
+            return false;
+        }
+        int bestOf = liveMatch.bestOf();
         int requiredWins = bestOf / 2 + 1;
         return liveMatch.teams() != null && liveMatch.teams().stream()
                 .map(team -> team.result())
                 .filter(result -> result != null && result.gameWins() != null)
                 .anyMatch(result -> result.gameWins() >= requiredWins);
+    }
+
+    private boolean isSetAcceptingBets(
+            LiveMatchSnapshot match,
+            String externalGameId,
+            int setNumber
+    ) {
+        if (match.sets().isEmpty()) {
+            return false;
+        }
+        boolean previousSetFinished = setNumber == 1 || match.sets().stream()
+                .filter(set -> set.setNumber() == setNumber - 1)
+                .anyMatch(SetSnapshot::finished);
+        if (!previousSetFinished) {
+            return false;
+        }
+        if (externalGameId != null) {
+            return match.sets().stream()
+                    .filter(set -> set.setNumber() == setNumber)
+                    .filter(set -> set.externalGameId().equals(externalGameId))
+                    .anyMatch(set -> !set.finished());
+        }
+        List<SetSnapshot> targetSets = match.sets().stream()
+                .filter(set -> set.setNumber() == setNumber)
+                .toList();
+        if (!targetSets.isEmpty()) {
+            return targetSets.stream().anyMatch(set -> !set.finished());
+        }
+        return setNumber > 1;
     }
 }

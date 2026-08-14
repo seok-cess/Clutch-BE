@@ -21,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 class BettingEventSynchronizationServiceTest {
@@ -48,7 +49,7 @@ class BettingEventSynchronizationServiceTest {
                 )),
                 false
         );
-        given(repository.findByExternalMatchIdAndSetNumber("match-1", 1))
+        given(repository.findByExternalMatchIdAndSetNumberForUpdate("match-1", 1))
                 .willReturn(Optional.empty());
         given(repository.save(any(BettingEvent.class)))
                 .willAnswer(invocation -> invocation.getArgument(0));
@@ -71,7 +72,7 @@ class BettingEventSynchronizationServiceTest {
                 "team-b",
                 LocalDateTime.of(2026, 8, 14, 9, 59)
         );
-        given(repository.findByExternalMatchIdAndSetNumber("match-1", 1))
+        given(repository.findByExternalMatchIdAndSetNumberForUpdate("match-1", 1))
                 .willReturn(Optional.of(current));
         given(repository.findByExternalMatchIdAndSetNumber("match-1", 2))
                 .willReturn(Optional.empty());
@@ -92,7 +93,7 @@ class BettingEventSynchronizationServiceTest {
 
     @Test
     void doesNotOpenFutureSetBeforePreviousSetFinishes() {
-        given(repository.findByExternalMatchIdAndSetNumber("match-1", 2))
+        given(repository.findByExternalMatchIdAndSetNumberForUpdate("match-1", 2))
                 .willReturn(Optional.empty());
 
         service.synchronizeMatch(new LiveMatchSnapshot(
@@ -122,10 +123,8 @@ class BettingEventSynchronizationServiceTest {
                 "team-b",
                 LocalDateTime.of(2026, 8, 14, 10, 1)
         );
-        given(repository.findByExternalMatchIdAndSetNumber("match-1", 2))
+        given(repository.findByExternalMatchIdAndSetNumberForUpdate("match-1", 2))
                 .willReturn(Optional.of(current));
-        given(repository.findByExternalMatchIdAndSetNumber("match-1", 3))
-                .willReturn(Optional.of(speculativeNext));
         given(repository.findAllFutureEventsForUpdate("match-1", 2))
                 .willReturn(List.of(speculativeNext));
 
@@ -137,6 +136,32 @@ class BettingEventSynchronizationServiceTest {
         ));
 
         assertThat(speculativeNext.getStatus()).isEqualTo(BettingEventStatus.CANCELLED);
+    }
+
+    @Test
+    void doesNotCreateSpeculativeNextSetWhenMatchIsAlreadyFinished() {
+        BettingEvent current = BettingEvent.open(
+                "match-1",
+                2,
+                "team-a",
+                "team-b",
+                LocalDateTime.of(2026, 8, 14, 9, 59)
+        );
+        given(repository.findByExternalMatchIdAndSetNumberForUpdate("match-1", 2))
+                .willReturn(Optional.of(current));
+        given(repository.findAllFutureEventsForUpdate("match-1", 2))
+                .willReturn(List.of());
+
+        service.synchronizeMatch(new LiveMatchSnapshot(
+                "match-1",
+                List.of("team-a", "team-b"),
+                List.of(new SetSnapshot("game-2", 2, null, false, true, "team-a")),
+                true
+        ));
+
+        verify(repository, never())
+                .findByExternalMatchIdAndSetNumber("match-1", 3);
+        verify(repository, never()).save(any(BettingEvent.class));
     }
 
     private BettingEvent captureSavedEvent() {

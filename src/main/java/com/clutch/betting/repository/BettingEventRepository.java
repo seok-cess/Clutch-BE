@@ -28,6 +28,18 @@ public interface BettingEventRepository extends JpaRepository<BettingEvent, Long
     @Query("select event from BettingEvent event where event.id = :id")
     Optional<BettingEvent> findByIdForUpdate(Long id);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select event
+            from BettingEvent event
+            where event.externalMatchId = :externalMatchId
+              and event.setNumber = :setNumber
+            """)
+    Optional<BettingEvent> findByExternalMatchIdAndSetNumberForUpdate(
+            String externalMatchId,
+            int setNumber
+    );
+
     @Query("""
             select event.id
             from BettingEvent event

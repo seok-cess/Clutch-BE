@@ -23,7 +23,11 @@ public class CurrentUserIdArgumentResolver implements HandlerMethodArgumentResol
             throw new MissingUserIdHeaderException();
         }
         try{
-            return Long.valueOf(value);
+            Long userId = Long.valueOf(value);
+            if (userId < 1L) {
+                throw new MissingUserIdHeaderException();
+            }
+            return userId;
         }catch(NumberFormatException e){
             throw new MissingUserIdHeaderException();
         }

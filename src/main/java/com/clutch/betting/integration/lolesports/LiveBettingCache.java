@@ -7,7 +7,7 @@ public interface LiveBettingCache {
 
     List<LiveMatchSnapshot> findLiveMatches();
 
-    boolean isAcceptingBets(String externalMatchId, String externalGameId);
+    boolean isAcceptingBets(String externalMatchId, String externalGameId, int setNumber);
 
     record LiveMatchSnapshot(
             String externalMatchId,

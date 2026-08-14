@@ -78,7 +78,8 @@ public class BetPlacementService {
         }
         if (!liveBettingCache.isAcceptingBets(
                 event.getExternalMatchId(),
-                event.getExternalGameId()
+                event.getExternalGameId(),
+                event.getSetNumber()
         )) {
             throw new BettingException(BettingErrorCode.LIVE_DATA_UNAVAILABLE);
         }

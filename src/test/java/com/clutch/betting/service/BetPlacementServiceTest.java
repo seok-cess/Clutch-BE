@@ -47,7 +47,7 @@ class BetPlacementServiceTest {
     void placesBetAndStoresStakeTransaction() {
         BettingEvent event = openEvent();
         given(eventRepository.findByIdForUpdate(10L)).willReturn(Optional.of(event));
-        given(liveBettingCache.isAcceptingBets("match-1", "game-1")).willReturn(true);
+        given(liveBettingCache.isAcceptingBets("match-1", "game-1", 1)).willReturn(true);
         given(userRepository.decreasePointIfEnough(20L, 1_000L)).willReturn(1);
         given(userBetRepository.saveAndFlush(any(UserBet.class))).willAnswer(invocation -> {
             UserBet bet = invocation.getArgument(0);
@@ -81,7 +81,7 @@ class BetPlacementServiceTest {
     void rejectsBetWhenLiveCacheIsUnavailable() {
         BettingEvent event = openEvent();
         given(eventRepository.findByIdForUpdate(10L)).willReturn(Optional.of(event));
-        given(liveBettingCache.isAcceptingBets("match-1", "game-1")).willReturn(false);
+        given(liveBettingCache.isAcceptingBets("match-1", "game-1", 1)).willReturn(false);
 
         assertBettingError(
                 () -> service.place(20L, 10L, "team-a", 1_000L),
@@ -93,7 +93,7 @@ class BetPlacementServiceTest {
     void rejectsInsufficientPoint() {
         BettingEvent event = openEvent();
         given(eventRepository.findByIdForUpdate(10L)).willReturn(Optional.of(event));
-        given(liveBettingCache.isAcceptingBets("match-1", "game-1")).willReturn(true);
+        given(liveBettingCache.isAcceptingBets("match-1", "game-1", 1)).willReturn(true);
         given(userRepository.decreasePointIfEnough(20L, 1_000L)).willReturn(0);
         given(userRepository.existsById(20L)).willReturn(true);
 

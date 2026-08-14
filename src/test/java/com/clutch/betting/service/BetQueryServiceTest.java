@@ -57,7 +57,7 @@ class BetQueryServiceTest {
         )).willReturn(Optional.of(event));
         given(userBetRepository.findByBettingEventIdAndUserId(1L, 10L))
                 .willReturn(Optional.empty());
-        given(liveBettingCache.isAcceptingBets("match-1", "game-1")).willReturn(true);
+        given(liveBettingCache.isAcceptingBets("match-1", "game-1", 1)).willReturn(true);
 
         BettingEventView view = service.getCurrentEvent("match-1", 10L);
 
@@ -84,7 +84,7 @@ class BetQueryServiceTest {
         )).willReturn(Optional.of(event));
         given(userBetRepository.findByBettingEventIdAndUserId(2L, 10L))
                 .willReturn(Optional.of(userBet));
-        given(liveBettingCache.isAcceptingBets("match-1", null)).willReturn(true);
+        given(liveBettingCache.isAcceptingBets("match-1", null, 2)).willReturn(true);
 
         BettingEventView view = service.getCurrentEvent("match-1", 10L);
 

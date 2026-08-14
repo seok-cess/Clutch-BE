@@ -33,6 +33,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.BDDMockito.given;
 
 @SpringBootTest(properties = "spring.datasource.hikari.maximum-pool-size=20")
@@ -79,7 +80,7 @@ class BettingConcurrencyIntegrationTest {
     @BeforeEach
     void setUp() {
         cleanUp();
-        given(liveBettingCache.isAcceptingBets(any(), any())).willReturn(true);
+        given(liveBettingCache.isAcceptingBets(any(), any(), anyInt())).willReturn(true);
     }
 
     @AfterEach
