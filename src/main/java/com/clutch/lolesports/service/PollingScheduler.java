@@ -40,6 +40,7 @@ public class PollingScheduler {
     private final DataCacheService cache;
     private final PentakillDetector pentakillDetector;
     private final GamePersistService persistService;
+    private final SetWinnerTracker setWinners;
 
     private final Backoff liveBackoff;
     private final Backoff inGameBackoff;
@@ -71,12 +72,14 @@ public class PollingScheduler {
                             DataCacheService cache,
                             PentakillDetector pentakillDetector,
                             GamePersistService persistService,
+                            SetWinnerTracker setWinners,
                             LolesportsProperties props) {
         this.api = api;
         this.liveStats = liveStats;
         this.cache = cache;
         this.pentakillDetector = pentakillDetector;
         this.persistService = persistService;
+        this.setWinners = setWinners;
         long base = props.poll().backoffBaseMs();
         long max = props.poll().backoffMaxMs();
         this.liveBackoff = new Backoff(base, max);
@@ -142,6 +145,9 @@ public class PollingScheduler {
             // 매치 하나 실패해도 나머지 라이브 매치 처리는 계속한다
             log.warn("getEventDetails 실패 (matchId={}): {}", matchId, e.toString());
         }
+
+        // gameWins 증가분으로 세트 승자를 확정한다 (세트별 승패를 주는 필드가 없다)
+        setWinners.observe(matchId, event.match().teams(), games);
 
         return new DataCacheService.LiveMatch(
                 matchId,

@@ -88,7 +88,24 @@ public final class ApiDtos {
     ) {
     }
 
-    public record GameItem(String gameId, Integer number, String state) {
+    /**
+     * 세트 하나.
+     *
+     * state 는 esports-api 기준이라 실제 종료보다 약 5분 늦다 (2026-08-13 실측:
+     * 피드 finished 17:39:34 → state=completed 17:44:43). 그동안 화면이 멈춘 것처럼
+     * 보이므로, 피드가 먼저 알려주는 종료 여부를 feedFinished 로 함께 내린다.
+     *
+     * @param feedFinished livestats 가 이 세트를 finished 로 준 상태 (즉시 갱신)
+     * @param winnerTeamId 세트 승리 팀 id — gameWins 증가분으로 판정하므로 state=completed
+     *                     이후에만 채워진다 (약 5분 지연). 미확정이면 null
+     */
+    public record GameItem(
+            String gameId,
+            Integer number,
+            String state,
+            boolean feedFinished,
+            String winnerTeamId
+    ) {
     }
 
     // ---- /api/live/{gameId}/scoreboard ----
