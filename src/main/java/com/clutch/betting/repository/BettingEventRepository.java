@@ -19,6 +19,11 @@ public interface BettingEventRepository extends JpaRepository<BettingEvent, Long
 
     List<BettingEvent> findAllByStatus(BettingEventStatus status);
 
+    Optional<BettingEvent> findFirstByExternalMatchIdAndStatusInOrderBySetNumberDesc(
+            String externalMatchId,
+            List<BettingEventStatus> statuses
+    );
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select event from BettingEvent event where event.id = :id")
     Optional<BettingEvent> findByIdForUpdate(Long id);
