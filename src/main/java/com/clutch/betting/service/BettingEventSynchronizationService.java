@@ -5,7 +5,7 @@ import com.clutch.betting.domain.BettingEvent;
 import com.clutch.betting.live.LiveBettingDataProvider.LiveMatchSnapshot;
 import com.clutch.betting.live.LiveBettingDataProvider.SetSnapshot;
 import com.clutch.betting.repository.BettingEventRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,42 +16,12 @@ import java.util.List;
 
 /** 한 라이브 매치의 세트 스냅샷을 배팅 이벤트 생명주기에 반영한다. */
 @Service
+@RequiredArgsConstructor
 public class BettingEventSynchronizationService {
 
     private final BettingEventRepository bettingEventRepository;
     private final BettingProperties bettingProperties;
     private final Clock clock;
-
-    /**
-     * 운영 환경에서 UTC 시스템 시계를 사용하는 동기화 처리기를 구성한다.
-     *
-     * @param bettingEventRepository 배팅 이벤트 저장소
-     * @param bettingProperties 배팅 시간 설정
-     */
-    @Autowired
-    public BettingEventSynchronizationService(
-            BettingEventRepository bettingEventRepository,
-            BettingProperties bettingProperties
-    ) {
-        this(bettingEventRepository, bettingProperties, Clock.systemUTC());
-    }
-
-    /**
-     * 테스트에서 현재 시각을 고정할 수 있도록 동기화 처리기를 구성한다.
-     *
-     * @param bettingEventRepository 배팅 이벤트 저장소
-     * @param bettingProperties 배팅 시간 설정
-     * @param clock 현재 시각을 제공할 시계
-     */
-    BettingEventSynchronizationService(
-            BettingEventRepository bettingEventRepository,
-            BettingProperties bettingProperties,
-            Clock clock
-    ) {
-        this.bettingEventRepository = bettingEventRepository;
-        this.bettingProperties = bettingProperties;
-        this.clock = clock;
-    }
 
     /**
      * 세트 시작·마감·종료·승자를 동기화하고 경기 종료 시 후속 이벤트를 취소한다.

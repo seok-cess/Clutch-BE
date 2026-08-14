@@ -14,7 +14,7 @@ import com.clutch.betting.repository.BetPointTransactionRepository;
 import com.clutch.betting.repository.BettingEventRepository;
 import com.clutch.betting.repository.UserBetRepository;
 import com.clutch.user.repository.UserRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +27,7 @@ import java.util.List;
 
 /** 사용자 배팅 등록과 현재 이벤트·내 배팅 조회 유스케이스를 제공한다. */
 @Service
+@RequiredArgsConstructor
 public class BettingService {
 
     private static final List<BettingEventStatus> CURRENT_STATUSES = List.of(
@@ -40,59 +41,6 @@ public class BettingService {
     private final UserRepository userRepository;
     private final LiveBettingDataProvider liveBettingDataProvider;
     private final Clock clock;
-
-    /**
-     * 운영 환경에서 UTC 시스템 시계를 사용하는 사용자 배팅 서비스를 구성한다.
-     *
-     * @param bettingEventRepository 배팅 이벤트 저장소
-     * @param userBetRepository 사용자 배팅 저장소
-     * @param transactionRepository 배팅 포인트 거래 저장소
-     * @param userRepository 사용자 저장소
-     * @param liveBettingDataProvider 라이브 배팅 데이터 제공자
-     */
-    @Autowired
-    public BettingService(
-            BettingEventRepository bettingEventRepository,
-            UserBetRepository userBetRepository,
-            BetPointTransactionRepository transactionRepository,
-            UserRepository userRepository,
-            LiveBettingDataProvider liveBettingDataProvider
-    ) {
-        this(
-                bettingEventRepository,
-                userBetRepository,
-                transactionRepository,
-                userRepository,
-                liveBettingDataProvider,
-                Clock.systemUTC()
-        );
-    }
-
-    /**
-     * 테스트에서 결정적인 현재 시각을 주입할 수 있도록 사용자 배팅 서비스를 구성한다.
-     *
-     * @param bettingEventRepository 배팅 이벤트 저장소
-     * @param userBetRepository 사용자 배팅 저장소
-     * @param transactionRepository 배팅 포인트 거래 저장소
-     * @param userRepository 사용자 저장소
-     * @param liveBettingDataProvider 라이브 배팅 데이터 제공자
-     * @param clock 현재 시각을 제공할 시계
-     */
-    BettingService(
-            BettingEventRepository bettingEventRepository,
-            UserBetRepository userBetRepository,
-            BetPointTransactionRepository transactionRepository,
-            UserRepository userRepository,
-            LiveBettingDataProvider liveBettingDataProvider,
-            Clock clock
-    ) {
-        this.bettingEventRepository = bettingEventRepository;
-        this.userBetRepository = userBetRepository;
-        this.transactionRepository = transactionRepository;
-        this.userRepository = userRepository;
-        this.liveBettingDataProvider = liveBettingDataProvider;
-        this.clock = clock;
-    }
 
     /**
      * 이벤트 행을 잠근 뒤 중복·라이브 상태·포인트를 검증하고 배팅을 등록한다.

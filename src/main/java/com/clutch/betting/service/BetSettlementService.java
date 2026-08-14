@@ -12,6 +12,7 @@ import com.clutch.betting.repository.BetPointTransactionRepository;
 import com.clutch.betting.repository.BettingEventRepository;
 import com.clutch.betting.repository.UserBetRepository;
 import com.clutch.user.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,6 +20,7 @@ import java.util.List;
 
 /** 승자가 확정된 이벤트의 사용자 배팅과 포인트 지급을 한 트랜잭션으로 정산한다. */
 @Service
+@RequiredArgsConstructor
 public class BetSettlementService {
 
     private static final long PAYOUT_MULTIPLIER = 2L;
@@ -27,26 +29,6 @@ public class BetSettlementService {
     private final UserBetRepository userBetRepository;
     private final BetPointTransactionRepository transactionRepository;
     private final UserRepository userRepository;
-
-    /**
-     * 정산에 필요한 이벤트·배팅·원장·사용자 저장소를 주입받는다.
-     *
-     * @param eventRepository 배팅 이벤트 저장소
-     * @param userBetRepository 사용자 배팅 저장소
-     * @param transactionRepository 배팅 포인트 거래 저장소
-     * @param userRepository 사용자 저장소
-     */
-    public BetSettlementService(
-            BettingEventRepository eventRepository,
-            UserBetRepository userBetRepository,
-            BetPointTransactionRepository transactionRepository,
-            UserRepository userRepository
-    ) {
-        this.eventRepository = eventRepository;
-        this.userBetRepository = userBetRepository;
-        this.transactionRepository = transactionRepository;
-        this.userRepository = userRepository;
-    }
 
     /**
      * 이벤트와 배팅을 잠근 뒤 적중에는 2배 지급, 실패에는 몰수 결과를 기록한다.

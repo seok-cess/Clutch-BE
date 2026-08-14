@@ -3,6 +3,7 @@ package com.clutch.betting.live;
 import com.clutch.lolesports.dto.external.EventDetailsResponse;
 import com.clutch.lolesports.service.DataCacheService;
 import com.clutch.lolesports.service.SetWinnerTracker;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
@@ -13,24 +14,11 @@ import java.util.List;
 
 /** lolesports 캐시를 배팅 도메인의 라이브 데이터 계약으로 제공한다. */
 @Component
+@RequiredArgsConstructor
 public class LolesportsLiveBettingDataProvider implements LiveBettingDataProvider {
 
     private final DataCacheService dataCacheService;
     private final SetWinnerTracker setWinnerTracker;
-
-    /**
-     * 라이브 매치 캐시와 세트 승자 추적기를 주입받는다.
-     *
-     * @param dataCacheService lolesports 라이브 데이터 캐시
-     * @param setWinnerTracker 세트별 승자 추적기
-     */
-    public LolesportsLiveBettingDataProvider(
-            DataCacheService dataCacheService,
-            SetWinnerTracker setWinnerTracker
-    ) {
-        this.dataCacheService = dataCacheService;
-        this.setWinnerTracker = setWinnerTracker;
-    }
 
     /**
      * 캐시된 모든 라이브 매치를 배팅용 스냅샷으로 변환한다.

@@ -12,6 +12,7 @@ import com.clutch.betting.repository.BetPointTransactionRepository;
 import com.clutch.betting.repository.BettingEventRepository;
 import com.clutch.betting.repository.UserBetRepository;
 import com.clutch.user.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,32 +20,13 @@ import java.util.List;
 
 /** 취소 이벤트의 등록 배팅을 잠그고 포인트 환불과 원장 기록을 원자적으로 처리한다. */
 @Service
+@RequiredArgsConstructor
 public class BetRefundService {
 
     private final BettingEventRepository eventRepository;
     private final UserBetRepository userBetRepository;
     private final BetPointTransactionRepository transactionRepository;
     private final UserRepository userRepository;
-
-    /**
-     * 환불에 필요한 이벤트·배팅·원장·사용자 저장소를 주입받는다.
-     *
-     * @param eventRepository 배팅 이벤트 저장소
-     * @param userBetRepository 사용자 배팅 저장소
-     * @param transactionRepository 배팅 포인트 거래 저장소
-     * @param userRepository 사용자 저장소
-     */
-    public BetRefundService(
-            BettingEventRepository eventRepository,
-            UserBetRepository userBetRepository,
-            BetPointTransactionRepository transactionRepository,
-            UserRepository userRepository
-    ) {
-        this.eventRepository = eventRepository;
-        this.userBetRepository = userBetRepository;
-        this.transactionRepository = transactionRepository;
-        this.userRepository = userRepository;
-    }
 
     /**
      * 취소 이벤트의 미처리 배팅을 환불하며 반복 호출은 처리 완료 결과로 응답한다.
