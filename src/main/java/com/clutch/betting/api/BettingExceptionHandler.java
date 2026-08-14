@@ -1,6 +1,6 @@
 package com.clutch.betting.api;
 
-import com.clutch.betting.api.dto.BettingErrorResponse;
+import com.clutch.betting.api.response.BettingErrorResponse;
 import com.clutch.betting.exception.BettingErrorCode;
 import com.clutch.betting.exception.BettingException;
 import com.clutch.wallet.web.MissingUserIdHeaderException;

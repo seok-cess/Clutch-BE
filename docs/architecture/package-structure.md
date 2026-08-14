@@ -40,6 +40,30 @@ com.clutch
 
 공통 API 응답과 전역 예외의 구체적인 형식 및 패키지는 아직 확정하지 않는다.
 
+## 배팅 패키지 구조
+
+배팅 도메인은 계층 패키지를 유지하되, 클래스가 많은 Service와 API DTO는 역할별 하위 패키지로 나눈다.
+
+```text
+com.clutch.betting
+├── api
+│   ├── request          # HTTP 요청 DTO
+│   └── response         # HTTP 응답 DTO
+├── config
+├── domain
+├── exception
+├── live                 # 최신 매치·세트 상태 조회 계약과 lolesports 구현
+├── repository
+└── service
+    ├── placement        # 배팅 등록과 포인트 차감
+    ├── query            # 배팅 이벤트·사용자 배팅 조회
+    ├── refund           # 취소 이벤트 환불
+    ├── settlement       # 승패 결과 정산
+    └── synchronization  # 라이브 세트 상태와 배팅 이벤트 동기화
+```
+
+`live`는 외부 시스템 연동 방식보다 배팅 도메인에 제공하는 역할을 기준으로 이름을 정한다. 배팅 Service는 `LiveBettingDataProvider` 계약에 의존하고, lolesports 캐시를 사용하는 구현 세부사항은 `LolesportsLiveBettingDataProvider`가 담당한다.
+
 ## 계층별 책임
 
 ### Controller

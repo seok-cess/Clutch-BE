@@ -1,11 +1,11 @@
 package com.clutch.betting.api;
 
-import com.clutch.betting.api.dto.BetCreateRequest;
-import com.clutch.betting.api.dto.BetCreateResponse;
-import com.clutch.betting.api.dto.BettingEventResponse;
-import com.clutch.betting.api.dto.UserBetResponse;
-import com.clutch.betting.service.BetPlacementService;
-import com.clutch.betting.service.BetQueryService;
+import com.clutch.betting.api.request.BetCreateRequest;
+import com.clutch.betting.api.response.BetCreateResponse;
+import com.clutch.betting.api.response.BettingEventResponse;
+import com.clutch.betting.api.response.UserBetResponse;
+import com.clutch.betting.service.placement.BetPlacementService;
+import com.clutch.betting.service.query.BetQueryService;
 import com.clutch.wallet.web.CurrentUserId;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;

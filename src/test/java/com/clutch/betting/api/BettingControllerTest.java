@@ -2,11 +2,11 @@ package com.clutch.betting.api;
 
 import com.clutch.betting.domain.BettingEventStatus;
 import com.clutch.betting.domain.UserBetStatus;
-import com.clutch.betting.service.BetPlacementResult;
-import com.clutch.betting.service.BetPlacementService;
-import com.clutch.betting.service.BetQueryService;
-import com.clutch.betting.service.BettingEventView;
-import com.clutch.betting.service.UserBetView;
+import com.clutch.betting.service.placement.BetPlacementResult;
+import com.clutch.betting.service.placement.BetPlacementService;
+import com.clutch.betting.service.query.BetQueryService;
+import com.clutch.betting.service.query.BettingEventView;
+import com.clutch.betting.service.query.UserBetView;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;

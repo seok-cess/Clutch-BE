@@ -3,17 +3,17 @@ package com.clutch.betting.api;
 import com.clutch.betting.domain.BetPointTransactionType;
 import com.clutch.betting.domain.BettingEvent;
 import com.clutch.betting.domain.BettingEventStatus;
-import com.clutch.betting.integration.lolesports.LiveBettingCache;
-import com.clutch.betting.integration.lolesports.LiveBettingCache.LiveMatchSnapshot;
-import com.clutch.betting.integration.lolesports.LiveBettingCache.SetSnapshot;
+import com.clutch.betting.live.LiveBettingDataProvider;
+import com.clutch.betting.live.LiveBettingDataProvider.LiveMatchSnapshot;
+import com.clutch.betting.live.LiveBettingDataProvider.SetSnapshot;
 import com.clutch.betting.repository.BetPointTransactionRepository;
 import com.clutch.betting.repository.BettingEventRepository;
 import com.clutch.betting.repository.UserBetRepository;
-import com.clutch.betting.service.BetRefundScheduler;
-import com.clutch.betting.service.BetSettlementProcessor;
-import com.clutch.betting.service.BetSettlementScheduler;
-import com.clutch.betting.service.BettingEventSynchronizationProcessor;
-import com.clutch.betting.service.BettingEventSynchronizationScheduler;
+import com.clutch.betting.service.refund.BetRefundScheduler;
+import com.clutch.betting.service.settlement.BetSettlementProcessor;
+import com.clutch.betting.service.settlement.BetSettlementScheduler;
+import com.clutch.betting.service.synchronization.BettingEventSynchronizationProcessor;
+import com.clutch.betting.service.synchronization.BettingEventSynchronizationScheduler;
 import com.clutch.lolesports.service.PollingScheduler;
 import com.clutch.user.domain.User;
 import com.clutch.user.domain.UserRole;
@@ -71,7 +71,7 @@ class BettingFlowIntegrationTest {
     private EntityManager entityManager;
 
     @MockitoBean
-    private LiveBettingCache liveBettingCache;
+    private LiveBettingDataProvider liveBettingDataProvider;
 
     @MockitoBean
     private PollingScheduler pollingScheduler;
@@ -102,7 +102,7 @@ class BettingFlowIntegrationTest {
         );
         event.attachGame("bet-flow-game-1", null, java.time.Duration.ofMinutes(2));
         eventRepository.saveAndFlush(event);
-        given(liveBettingCache.isAcceptingBets(any(), any(), anyInt())).willReturn(true);
+        given(liveBettingDataProvider.isAcceptingBets(any(), any(), anyInt())).willReturn(true);
     }
 
     @Test
