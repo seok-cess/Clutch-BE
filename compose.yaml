@@ -37,6 +37,10 @@ services:
       - redis-server
       - --appendonly
       - "yes"
+      - --appendfsync
+      - everysec
+      - --notify-keyspace-events
+      - Ex
       - --requirepass
       - ${REDIS_PASSWORD:-clutch_local_password}
     ports:
