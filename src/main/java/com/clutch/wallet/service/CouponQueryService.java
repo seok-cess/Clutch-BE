@@ -3,7 +3,7 @@ package com.clutch.wallet.service;
 import com.clutch.wallet.domain.UserCoupon;
 import com.clutch.wallet.domain.UserCouponStatus;
 import com.clutch.wallet.repository.UserCouponRepository;
-import com.clutch.wallet.web.CouponNotFoundException;
+import com.clutch.wallet.web.exception.CouponNotFoundException;
 import com.clutch.wallet.web.dto.CouponPageResponse;
 import com.clutch.wallet.web.dto.CouponResponse;
 import org.springframework.data.domain.PageRequest;

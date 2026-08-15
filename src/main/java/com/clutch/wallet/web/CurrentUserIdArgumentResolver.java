@@ -1,5 +1,6 @@
 package com.clutch.wallet.web;
 
+import com.clutch.wallet.web.exception.MissingUserIdHeaderException;
 import org.springframework.core.MethodParameter;
 import org.springframework.web.bind.support.WebDataBinderFactory;
 import org.springframework.web.context.request.NativeWebRequest;
