@@ -4,6 +4,7 @@ import com.clutch.wallet.domain.UserCoupon;
 import com.clutch.wallet.domain.UserCouponStatus;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -37,4 +38,17 @@ public interface UserCouponRepository extends JpaRepository<UserCoupon, Long> {
                               @Param("cursorId") Long cursorId,
                               Pageable pageable
                               );
+
+    @Modifying(clearAutomatically = true)
+    @Query("""
+        UPDATE UserCoupon c
+        SET c.status = com.clutch.wallet.domain.UserCouponStatus.USED, c.usedAt = :usedAt
+        WHERE c.id = :id
+        AND c.userId = :userId
+        AND c.status = com.clutch.wallet.domain.UserCouponStatus.ISSUED
+        AND c.expiresAt > :usedAt
+    """)
+    int markAsUsed(@Param("id") Long id,
+                   @Param("userId") Long userId,
+                   @Param("usedAt") Instant usedAt);
 }
