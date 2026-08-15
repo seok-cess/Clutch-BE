@@ -4,18 +4,19 @@ import com.clutch.wallet.domain.UserCouponStatus;
 import com.clutch.wallet.service.CouponQueryService;
 import com.clutch.wallet.web.dto.CouponPageResponse;
 import com.clutch.wallet.web.dto.CouponResponse;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import com.clutch.wallet.service.CouponUseService;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 public class MyCouponController {
 
     private final CouponQueryService couponQueryService;
+    private final CouponUseService couponUseService;
 
-    public MyCouponController(CouponQueryService couponQueryService){
+    public MyCouponController(CouponQueryService couponQueryService,
+                              CouponUseService couponUseService){
         this.couponQueryService = couponQueryService;
+        this.couponUseService = couponUseService;
     }
 
     @GetMapping("/api/users/me/coupons")
@@ -34,4 +35,8 @@ public class MyCouponController {
         return couponQueryService.getMyCoupon(userId, couponId);
     }
 
+    @PostMapping("/api/users/me/coupons/{couponId}/use")
+    public CouponResponse useCoupon(@CurrentUserId Long userId, @PathVariable Long couponId){
+        return couponUseService.use(userId, couponId);
+    }
 }
