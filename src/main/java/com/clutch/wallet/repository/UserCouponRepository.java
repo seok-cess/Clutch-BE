@@ -17,10 +17,8 @@ public interface UserCouponRepository extends JpaRepository<UserCoupon, Long> {
 
     Optional<UserCoupon> findByClaimId(Long claimId);
 
-<<<<<<< Updated upstream
     boolean existsByCouponEventId(Long couponEventId);
 
-=======
     Optional<UserCoupon> findByIdAndUserId(Long id, Long userId);
 
     @Query("""
@@ -39,5 +37,4 @@ public interface UserCouponRepository extends JpaRepository<UserCoupon, Long> {
                               @Param("cursorId") Long cursorId,
                               Pageable pageable
                               );
->>>>>>> Stashed changes
 }
