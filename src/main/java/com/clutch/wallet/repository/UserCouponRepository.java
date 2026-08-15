@@ -51,4 +51,17 @@ public interface UserCouponRepository extends JpaRepository<UserCoupon, Long> {
     int markAsUsed(@Param("id") Long id,
                    @Param("userId") Long userId,
                    @Param("usedAt") Instant usedAt);
+
+    @Modifying(clearAutomatically = true)
+    @Query("""
+        UPDATE UserCoupon c
+        SET c.status = com.clutch.wallet.domain.UserCouponStatus.CANCELLED,
+            c.cancelledAt = :cancelledAt,
+            c.cancelReason = :reason
+        WHERE c.id = :id
+        AND c.status = com.clutch.wallet.domain.UserCouponStatus.ISSUED
+""")
+int cancel(@Param("id") Long id,
+           @Param("cancelledAt") Instant cancelledAt,
+           @Param("reason") String reason);
 }
