@@ -5,7 +5,7 @@ import com.clutch.watch.exception.WatchError;
 import com.clutch.watch.exception.WatchException;
 import com.clutch.watch.redis.heartbeat.HeartbeatProcessingResult;
 import com.clutch.watch.redis.reward.RewardClaimCompletionResult;
-import com.clutch.watch.redis.reward.RewardClaimCompletionStatus;
+import com.clutch.watch.redis.reward.RewardClaimStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Repository;
@@ -21,7 +21,18 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class WatchSessionRedisRepository {
 
+    private static final String ACTIVE_KEY_PREFIX = "watch:active:";
+    private static final String ALIVE_KEY_PREFIX = "watch:alive:";
+    private static final String SESSION_KEY_PREFIX = "watch:session:";
+    private static final String SWITCH_LOCK_KEY_PREFIX = "watch:switch-lock:";
     private static final String ALIVE_VALUE = "1";
+    private static final String FIELD_USER_ID = "userId";
+    private static final String FIELD_MATCH_ID = "matchId";
+    private static final String FIELD_ENTERED_AT = "enteredAt";
+    private static final String FIELD_LAST_SEEN = "lastSeen";
+    private static final String FIELD_ELIGIBLE_MILLISECONDS = "eligibleMilliseconds";
+    private static final String FIELD_SEQUENCE = "sequence";
+    private static final String FIELD_REWARD_SEQUENCE = "rewardSequence";
 
     private final StringRedisTemplate redisTemplate;
     private final WatchRewardProperties properties;
@@ -37,13 +48,13 @@ public class WatchSessionRedisRepository {
     public void initialize(long userId, long matchId, String sessionKey, long enteredAt) {
         String sessionRedisKey = redisSessionKey(sessionKey);
         redisTemplate.opsForHash().putAll(sessionRedisKey, Map.of(
-                "userId", Long.toString(userId),
-                "matchId", Long.toString(matchId),
-                "enteredAt", Long.toString(enteredAt),
-                "lastSeen", Long.toString(enteredAt),
-                "eligibleMilliseconds", "0",
-                "sequence", "0",
-                "rewardSequence", "1"
+                FIELD_USER_ID, Long.toString(userId),
+                FIELD_MATCH_ID, Long.toString(matchId),
+                FIELD_ENTERED_AT, Long.toString(enteredAt),
+                FIELD_LAST_SEEN, Long.toString(enteredAt),
+                FIELD_ELIGIBLE_MILLISECONDS, "0",
+                FIELD_SEQUENCE, "0",
+                FIELD_REWARD_SEQUENCE, "1"
         ));
         redisTemplate.expire(sessionRedisKey, properties.sessionTtl());
         redisTemplate.opsForValue().set(
@@ -99,6 +110,26 @@ public class WatchSessionRedisRepository {
             long sequence,
             long nowMillis
     ) {
+        return heartbeat(userId, sessionKey, sequence, nowMillis, true);
+    }
+
+    /**
+     * 세션을 유지하면서 현재 세트 진행 여부에 따라 시청시간 누적 여부를 제어한다.
+     *
+     * @param userId heartbeat를 보낸 사용자 ID
+     * @param sessionKey heartbeat 대상 시청 세션 외부 식별자
+     * @param sequence 프론트엔드가 증가시킨 heartbeat 순번
+     * @param nowMillis 서버가 확정한 heartbeat 수신 시각(epoch milliseconds)
+     * @param canAccumulate 현재 진행 중인 세트가 있어 시간을 적립할 수 있는지 여부
+     * @return heartbeat 처리 결과
+     */
+    public HeartbeatProcessingResult heartbeat(
+            long userId,
+            String sessionKey,
+            long sequence,
+            long nowMillis,
+            boolean canAccumulate
+    ) {
         String result = redisTemplate.execute(
                 WatchRedisScripts.HEARTBEAT,
                 List.of(
@@ -115,7 +146,8 @@ public class WatchSessionRedisRepository {
                 Long.toString(properties.claimInterval().toMillis()),
                 Long.toString(properties.aliveTtl().toMillis()),
                 Long.toString(properties.activeTtl().toMillis()),
-                Long.toString(properties.sessionTtl().toMillis())
+                Long.toString(properties.sessionTtl().toMillis()),
+                canAccumulate ? "1" : "0"
         );
         if (result == null) {
             throw new WatchException(WatchError.HEARTBEAT_RESULT_MISSING);
@@ -193,7 +225,7 @@ public class WatchSessionRedisRepository {
     /**
      * DB 지급 직전에 Redis 수령 자격을 확인하고 처리 중 만료되지 않도록 TTL을 갱신한다.
      */
-    public RewardClaimCompletionStatus prepareRewardClaim(
+    public RewardClaimStatus prepareRewardClaim(
             long userId,
             String sessionKey,
             long rewardSequence
@@ -217,7 +249,7 @@ public class WatchSessionRedisRepository {
             throw new WatchException(WatchError.REWARD_CLAIM_RESULT_MISSING);
         }
         try {
-            return RewardClaimCompletionStatus.valueOf(result);
+            return RewardClaimStatus.valueOf(result);
         } catch (IllegalArgumentException exception) {
             throw new WatchException(WatchError.REWARD_CLAIM_RESULT_UNKNOWN, exception);
         }
@@ -303,7 +335,7 @@ public class WatchSessionRedisRepository {
      * @return {@code watch:active:{userId}} 형식의 Redis 키
      */
     private static String activeKey(long userId) {
-        return "watch:active:" + userId;
+        return ACTIVE_KEY_PREFIX + userId;
     }
 
     /**
@@ -314,7 +346,7 @@ public class WatchSessionRedisRepository {
      * @return {@code watch:alive:{userId}:{sessionKey}} 형식의 Redis 키
      */
     private static String aliveKey(long userId, String sessionKey) {
-        return "watch:alive:" + userId + ":" + sessionKey;
+        return ALIVE_KEY_PREFIX + userId + ":" + sessionKey;
     }
 
     /**
@@ -324,7 +356,7 @@ public class WatchSessionRedisRepository {
      * @return {@code watch:session:{sessionKey}} 형식의 Redis 키
      */
     private static String redisSessionKey(String sessionKey) {
-        return "watch:session:" + sessionKey;
+        return SESSION_KEY_PREFIX + sessionKey;
     }
 
     /**
@@ -334,6 +366,6 @@ public class WatchSessionRedisRepository {
      * @return {@code watch:switch-lock:{userId}} 형식의 Redis 키
      */
     private static String switchLockKey(long userId) {
-        return "watch:switch-lock:" + userId;
+        return SWITCH_LOCK_KEY_PREFIX + userId;
     }
 }

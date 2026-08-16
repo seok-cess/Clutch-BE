@@ -146,6 +146,15 @@ public class SetWinnerTracker {
         return winners.getOrDefault(matchId, Map.of()).get(gameId);
     }
 
+    /** DB에 저장된 세트 승자를 재시작된 메모리 추적기에 복원한다. */
+    public void restoreWinner(String matchId, String gameId, String winnerTeamId) {
+        if (matchId == null || gameId == null || winnerTeamId == null) {
+            return;
+        }
+        winners.computeIfAbsent(matchId, key -> new ConcurrentHashMap<>())
+                .putIfAbsent(gameId, winnerTeamId);
+    }
+
     /** 매치의 확정된 세트 승자 전체 (gameId → teamId) */
     public Map<String, String> winnersOf(String matchId) {
         return Map.copyOf(winners.getOrDefault(matchId, Map.of()));

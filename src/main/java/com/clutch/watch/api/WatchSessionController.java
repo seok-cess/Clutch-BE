@@ -1,15 +1,16 @@
 package com.clutch.watch.api;
 
-import com.clutch.watch.api.dto.HeartbeatRequest;
-import com.clutch.watch.api.dto.HeartbeatResponse;
-import com.clutch.watch.api.dto.WatchSessionStartResponse;
-import com.clutch.watch.api.dto.WatchPointClaimRequest;
-import com.clutch.watch.api.dto.WatchPointClaimResponse;
-import com.clutch.watch.service.service.WatchPointClaimService;
-import com.clutch.watch.service.service.WatchSessionService;
-import com.clutch.watch.service.dto.WatchHeartbeatResult;
-import com.clutch.watch.service.dto.WatchSessionStartResult;
+import com.clutch.watch.dto.WatchHeartbeatResult;
+import com.clutch.watch.dto.WatchSessionStartResult;
+import com.clutch.watch.dto.request.HeartbeatRequest;
+import com.clutch.watch.dto.request.WatchPointClaimRequest;
+import com.clutch.watch.dto.response.HeartbeatResponse;
+import com.clutch.watch.dto.response.WatchPointClaimResponse;
+import com.clutch.watch.dto.response.WatchSessionStartResponse;
+import com.clutch.watch.service.WatchPointClaimService;
+import com.clutch.watch.service.WatchSessionService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -42,7 +43,7 @@ public class WatchSessionController {
     @PostMapping("/matches/{matchId}/watch-sessions")
     public ResponseEntity<WatchSessionStartResponse> start(
             @PathVariable @Positive(message = "사용자 ID는 1 이상이어야 합니다.") long userId,
-            @PathVariable @Positive(message = "경기 ID는 1 이상이어야 합니다.") long matchId
+            @PathVariable @NotBlank(message = "경기 ID는 필수입니다.") String matchId
     ) {
         WatchSessionStartResult result = watchSessionService.start(userId, matchId);
         return ResponseEntity.ok(WatchSessionStartResponse.from(result));
@@ -72,6 +73,11 @@ public class WatchSessionController {
 
     /**
      * 5분 누적을 완료한 현재 회차의 시청 포인트를 수령한다.
+     *
+     * @param userId 포인트를 수령할 사용자 ID
+     * @param sessionKey 포인트 수령 대상 시청 세션 외부 식별자
+     * @param request 수령할 포인트 회차를 담은 요청
+     * @return 지급 포인트, 지급 후 총포인트와 다음 수령 회차
      */
     @PostMapping("/watch-sessions/{sessionKey}/point-claims")
     public ResponseEntity<WatchPointClaimResponse> claimPoint(

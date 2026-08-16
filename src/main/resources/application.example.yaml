@@ -52,6 +52,13 @@ watch:
     claim-interval: ${WATCH_REWARD_CLAIM_INTERVAL:5m}
     points-per-claim: ${WATCH_REWARD_POINTS_PER_CLAIM:100}
 
+# ---- 세트별 승패 배팅 ----
+betting:
+  first-set-open-before-start: ${BETTING_FIRST_SET_OPEN_BEFORE_START:20m}
+  first-set-close-after-start: ${BETTING_FIRST_SET_CLOSE_AFTER_START:1m}
+  next-set-betting-duration: ${BETTING_NEXT_SET_BETTING_DURATION:20m}
+  synchronization-interval: ${BETTING_SYNCHRONIZATION_INTERVAL:1s}
+
 # ---- lolesports 비공식 피드 연동 ----
 lolesports:
   # lolesports.com 프론트엔드에 공개된 공용 키
