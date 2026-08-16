@@ -166,18 +166,16 @@ class BettingConcurrencyIntegrationTest {
     }
 
     private BettingEvent event(String externalMatchId) {
+        LocalDateTime now = LocalDateTime.now(java.time.Clock.systemUTC());
         BettingEvent event = BettingEvent.open(
                 externalMatchId,
                 1,
                 "team-a",
                 "team-b",
-                LocalDateTime.now().minusMinutes(1)
+                now.minusMinutes(1),
+                now.plusMinutes(19)
         );
-        event.attachGame(
-                externalMatchId.replace("bet-concurrency-", "") + "-game",
-                null,
-                java.time.Duration.ofMinutes(2)
-        );
+        event.attachGame(externalMatchId.replace("bet-concurrency-", "") + "-game");
         return eventRepository.saveAndFlush(event);
     }
 

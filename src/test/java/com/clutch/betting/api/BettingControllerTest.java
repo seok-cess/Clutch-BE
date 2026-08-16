@@ -17,7 +17,9 @@ import java.time.LocalDateTime;
 
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -124,5 +126,29 @@ class BettingControllerTest {
                         .header("X-User-Id", "0"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+    }
+
+    @Test
+    void allowsVitePreflightForBetPlacement() throws Exception {
+        mockMvc.perform(options("/api/betting-events/1/bets")
+                        .header("Origin", "http://localhost:5173")
+                        .header("Access-Control-Request-Method", "POST")
+                        .header(
+                                "Access-Control-Request-Headers",
+                                "Content-Type, X-User-Id"
+                        ))
+                .andExpect(status().isOk())
+                .andExpect(header().string(
+                        "Access-Control-Allow-Origin",
+                        "http://localhost:5173"
+                ))
+                .andExpect(header().string(
+                        "Access-Control-Allow-Methods",
+                        org.hamcrest.Matchers.containsString("POST")
+                ))
+                .andExpect(header().string(
+                        "Access-Control-Allow-Headers",
+                        org.hamcrest.Matchers.containsString("X-User-Id")
+                ));
     }
 }

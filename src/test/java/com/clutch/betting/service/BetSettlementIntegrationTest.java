@@ -67,7 +67,8 @@ class BetSettlementIntegrationTest {
                 1,
                 "team-a",
                 "team-b",
-                LocalDateTime.of(2026, 8, 14, 10, 0)
+                LocalDateTime.of(2026, 8, 14, 10, 0),
+                LocalDateTime.of(2026, 8, 14, 10, 20)
         );
         event.recordWinner("team-a");
         eventRepository.saveAndFlush(event);
@@ -113,7 +114,8 @@ class BetSettlementIntegrationTest {
                 3,
                 "team-a",
                 "team-b",
-                LocalDateTime.of(2026, 8, 14, 10, 0)
+                LocalDateTime.of(2026, 8, 14, 10, 0),
+                LocalDateTime.of(2026, 8, 14, 10, 20)
         );
         event.cancel();
         eventRepository.saveAndFlush(event);

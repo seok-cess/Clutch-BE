@@ -5,7 +5,6 @@ import com.clutch.betting.exception.BettingException;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
-import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -16,7 +15,9 @@ class BettingDomainTest {
     void opensSetBettingEvent() {
         LocalDateTime openedAt = LocalDateTime.of(2026, 8, 14, 10, 0);
 
-        BettingEvent event = BettingEvent.open("match-1", 1, "team-a", "team-b", openedAt);
+        BettingEvent event = BettingEvent.open(
+                "match-1", 1, "team-a", "team-b", openedAt, openedAt.plusMinutes(20)
+        );
 
         assertThat(event.getExternalMatchId()).isEqualTo("match-1");
         assertThat(event.getSetNumber()).isEqualTo(1);
@@ -30,12 +31,52 @@ class BettingDomainTest {
     void rejectsInvalidBettingEventParticipants() {
         LocalDateTime openedAt = LocalDateTime.of(2026, 8, 14, 10, 0);
 
-        assertThatThrownBy(() -> BettingEvent.open("match-1", 0, "team-a", "team-b", openedAt))
+        LocalDateTime closesAt = openedAt.plusMinutes(20);
+
+        assertThatThrownBy(() -> BettingEvent.open(
+                "match-1", 0, "team-a", "team-b", openedAt, closesAt
+        ))
                 .isInstanceOfSatisfying(BettingException.class, exception -> assertThat(exception.getErrorCode())
                         .isEqualTo(BettingErrorCode.INVALID_SET_NUMBER));
-        assertThatThrownBy(() -> BettingEvent.open("match-1", 1, "team-a", "team-a", openedAt))
+        assertThatThrownBy(() -> BettingEvent.open(
+                "match-1", 1, "team-a", "team-a", openedAt, closesAt
+        ))
                 .isInstanceOfSatisfying(BettingException.class, exception -> assertThat(exception.getErrorCode())
                         .isEqualTo(BettingErrorCode.DUPLICATE_TEAM_OPTIONS));
+    }
+
+    @Test
+    void acceptsBetsOnlyInsideHalfOpenPeriod() {
+        LocalDateTime openedAt = LocalDateTime.of(2026, 8, 14, 9, 40);
+        LocalDateTime closesAt = LocalDateTime.of(2026, 8, 14, 10, 1);
+        BettingEvent event = BettingEvent.open(
+                "match-1", 1, "team-a", "team-b", openedAt, closesAt
+        );
+
+        assertThat(event.isOpenAt(openedAt.minusNanos(1))).isFalse();
+        assertThat(event.isOpenAt(openedAt)).isTrue();
+        assertThat(event.isOpenAt(closesAt.minusNanos(1))).isTrue();
+        assertThat(event.isOpenAt(closesAt)).isFalse();
+    }
+
+    @Test
+    void rejectsEventWithoutValidBettingPeriod() {
+        LocalDateTime openedAt = LocalDateTime.of(2026, 8, 14, 9, 40);
+
+        assertThatThrownBy(() -> BettingEvent.open(
+                "match-1", 1, "team-a", "team-b", openedAt, null
+        )).isInstanceOfSatisfying(
+                BettingException.class,
+                exception -> assertThat(exception.getErrorCode())
+                        .isEqualTo(BettingErrorCode.EVENT_CLOSES_AT_REQUIRED)
+        );
+        assertThatThrownBy(() -> BettingEvent.open(
+                "match-1", 1, "team-a", "team-b", openedAt, openedAt
+        )).isInstanceOfSatisfying(
+                BettingException.class,
+                exception -> assertThat(exception.getErrorCode())
+                        .isEqualTo(BettingErrorCode.INVALID_BETTING_PERIOD)
+        );
     }
 
     @Test
@@ -69,24 +110,21 @@ class BettingDomainTest {
     }
 
     @Test
-    void attachesSetAndClosesTwoMinutesAfterStart() {
+    void attachesSetWithoutChangingFixedBettingPeriod() {
         BettingEvent event = BettingEvent.open(
                 "match-1",
                 1,
                 "team-a",
                 "team-b",
-                LocalDateTime.of(2026, 8, 14, 10, 0)
+                LocalDateTime.of(2026, 8, 14, 10, 0),
+                LocalDateTime.of(2026, 8, 14, 10, 20)
         );
 
-        event.attachGame(
-                "game-1",
-                LocalDateTime.of(2026, 8, 14, 10, 1),
-                Duration.ofMinutes(2)
-        );
+        event.attachGame("game-1");
 
         assertThat(event.getExternalGameId()).isEqualTo("game-1");
-        assertThat(event.getClosesAt()).isEqualTo(LocalDateTime.of(2026, 8, 14, 10, 3));
-        assertThat(event.closeIfExpired(LocalDateTime.of(2026, 8, 14, 10, 3))).isTrue();
+        assertThat(event.getClosesAt()).isEqualTo(LocalDateTime.of(2026, 8, 14, 10, 20));
+        assertThat(event.closeIfExpired(LocalDateTime.of(2026, 8, 14, 10, 20))).isTrue();
         assertThat(event.getStatus()).isEqualTo(BettingEventStatus.CLOSED);
     }
 
@@ -97,7 +135,8 @@ class BettingDomainTest {
                 1,
                 "team-a",
                 "team-b",
-                LocalDateTime.of(2026, 8, 14, 10, 0)
+                LocalDateTime.of(2026, 8, 14, 10, 0),
+                LocalDateTime.of(2026, 8, 14, 10, 20)
         );
 
         event.recordWinner("team-a");
@@ -116,27 +155,20 @@ class BettingDomainTest {
                 1,
                 "team-a",
                 "team-b",
-                LocalDateTime.of(2026, 8, 14, 10, 0)
+                LocalDateTime.of(2026, 8, 14, 10, 0),
+                LocalDateTime.of(2026, 8, 14, 10, 20)
         );
-        event.attachGame(
-                "game-1",
-                LocalDateTime.of(2026, 8, 14, 10, 1),
-                Duration.ofMinutes(2)
-        );
+        event.attachGame("game-1");
         event.recordWinner("team-a");
         event.recordWinner("team-b");
         event.cancel();
         event.settle();
-        event.attachGame(
-                "game-changed",
-                LocalDateTime.of(2026, 8, 14, 10, 5),
-                Duration.ofMinutes(2)
-        );
+        event.attachGame("game-changed");
 
         assertThat(event.getWinnerExternalTeamId()).isEqualTo("team-a");
         assertThat(event.getStatus()).isEqualTo(BettingEventStatus.SETTLED);
         assertThat(event.getExternalGameId()).isEqualTo("game-1");
-        assertThat(event.getClosesAt()).isEqualTo(LocalDateTime.of(2026, 8, 14, 10, 3));
+        assertThat(event.getClosesAt()).isEqualTo(LocalDateTime.of(2026, 8, 14, 10, 20));
     }
 
     @Test
@@ -146,7 +178,8 @@ class BettingDomainTest {
                 1,
                 "team-a",
                 "team-b",
-                LocalDateTime.of(2026, 8, 14, 10, 0)
+                LocalDateTime.of(2026, 8, 14, 10, 0),
+                LocalDateTime.of(2026, 8, 14, 10, 20)
         );
         UserBet wonBet = UserBet.place(1L, 10L, "team-a", 1_000L);
         UserBet lostBet = UserBet.place(1L, 20L, "team-b", 1_000L);

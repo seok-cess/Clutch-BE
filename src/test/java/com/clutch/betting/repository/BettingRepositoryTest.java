@@ -47,7 +47,8 @@ class BettingRepositoryTest {
                         1,
                         "external-team-a",
                         "external-team-b",
-                        LocalDateTime.of(2026, 8, 14, 10, 0)
+                        LocalDateTime.of(2026, 8, 14, 10, 0),
+                        LocalDateTime.of(2026, 8, 14, 10, 20)
                 )
         );
         UserBet bet = userBetRepository.saveAndFlush(

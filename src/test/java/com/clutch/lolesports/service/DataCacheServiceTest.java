@@ -99,4 +99,40 @@ class DataCacheServiceTest {
         assertNotNull(cache.getWindowFrameAt(GAME, T0));
         assertEquals(150L, cache.getWindowFrameAt(GAME, T0).blueTeam().totalGold());
     }
+
+    @Test
+    void 최초_finished_프레임_시각을_버퍼_해제_후에도_보존한다() {
+        DataCacheService cache = new DataCacheService();
+        WindowResponse.Frame finished = new WindowResponse.Frame(
+                T0.plusSeconds(10).toString(),
+                "finished",
+                null,
+                null
+        );
+
+        cache.addWindowFrames(GAME, null, List.of(finished));
+        cache.evictGame(GAME);
+
+        assertEquals(T0.plusSeconds(10), cache.getFeedFinishedAt(GAME));
+    }
+
+    @Test
+    void 라이브_화면과_배팅_후보_캐시는_분리한다() {
+        DataCacheService cache = new DataCacheService();
+        DataCacheService.LiveMatch upcoming = new DataCacheService.LiveMatch(
+                "match-1",
+                "1주 차",
+                "LCK",
+                T0.plusSeconds(60).toString(),
+                List.of(),
+                List.of(),
+                3,
+                null
+        );
+
+        cache.putBettingMatches(List.of(upcoming));
+
+        assertEquals(List.of(), cache.getLiveMatches());
+        assertEquals(List.of(upcoming), cache.getBettingMatches());
+    }
 }

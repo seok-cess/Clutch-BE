@@ -82,6 +82,7 @@ class BettingFlowIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        LocalDateTime now = LocalDateTime.now(java.time.Clock.systemUTC());
         user = User.create(UserRole.USER, "betting-flow@example.com");
         user.changePoint(5_000L);
         userRepository.saveAndFlush(user);
@@ -90,9 +91,10 @@ class BettingFlowIntegrationTest {
                 1,
                 "team-a",
                 "team-b",
-                LocalDateTime.now().minusMinutes(1)
+                now.minusMinutes(1),
+                now.plusMinutes(19)
         );
-        event.attachGame("bet-flow-game-1", null, java.time.Duration.ofMinutes(2));
+        event.attachGame("bet-flow-game-1");
         eventRepository.saveAndFlush(event);
         given(liveBettingDataProvider.isAcceptingBets(any(), any(), anyInt())).willReturn(true);
     }
@@ -136,8 +138,10 @@ class BettingFlowIntegrationTest {
 
     @Test
     void finishedSetOpensOnlyOneNextSetEvent() {
+        LocalDateTime now = LocalDateTime.now(java.time.Clock.systemUTC());
         LiveMatchSnapshot snapshot = new LiveMatchSnapshot(
                 "bet-flow-match",
+                now,
                 List.of("team-a", "team-b"),
                 List.of(new SetSnapshot(
                         "bet-flow-game-1",
@@ -145,6 +149,7 @@ class BettingFlowIntegrationTest {
                         null,
                         false,
                         true,
+                        now,
                         "team-a"
                 )),
                 false

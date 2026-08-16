@@ -75,7 +75,8 @@ class BetSettlementServiceTest {
                 1,
                 "team-a",
                 "team-b",
-                LocalDateTime.of(2026, 8, 14, 10, 0)
+                LocalDateTime.of(2026, 8, 14, 10, 0),
+                LocalDateTime.of(2026, 8, 14, 10, 20)
         );
         ReflectionTestUtils.setField(event, "id", 1L);
         event.recordWinner("team-a");

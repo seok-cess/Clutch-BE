@@ -83,6 +83,7 @@ class BettingSchedulerTest {
     private LiveMatchSnapshot snapshot(String externalMatchId) {
         return new LiveMatchSnapshot(
                 externalMatchId,
+                java.time.LocalDateTime.of(2026, 8, 14, 10, 0),
                 List.of("team-a", "team-b"),
                 List.of(),
                 false

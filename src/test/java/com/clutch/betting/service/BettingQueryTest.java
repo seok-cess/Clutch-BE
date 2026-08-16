@@ -14,7 +14,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Clock;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -49,14 +48,11 @@ class BettingQueryTest {
                 1,
                 "team-a",
                 "team-b",
-                LocalDateTime.of(2026, 8, 14, 10, 0)
+                LocalDateTime.of(2026, 8, 14, 10, 0),
+                LocalDateTime.of(2026, 8, 14, 10, 2)
         );
         ReflectionTestUtils.setField(event, "id", 1L);
-        event.attachGame(
-                "game-1",
-                LocalDateTime.of(2026, 8, 14, 10, 0),
-                Duration.ofMinutes(2)
-        );
+        event.attachGame("game-1");
         given(eventRepository.findFirstByExternalMatchIdAndStatusInOrderBySetNumberDesc(
                 "match-1",
                 List.of(BettingEventStatus.OPEN, BettingEventStatus.CLOSED)
@@ -79,7 +75,8 @@ class BettingQueryTest {
                 2,
                 "team-a",
                 "team-b",
-                LocalDateTime.of(2026, 8, 14, 10, 0)
+                LocalDateTime.of(2026, 8, 14, 10, 0),
+                LocalDateTime.of(2026, 8, 14, 10, 2)
         );
         ReflectionTestUtils.setField(event, "id", 2L);
         UserBet userBet = UserBet.place(2L, 10L, "team-a", 1_000L);

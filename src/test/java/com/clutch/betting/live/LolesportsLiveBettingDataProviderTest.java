@@ -2,6 +2,7 @@ package com.clutch.betting.live;
 
 import com.clutch.lolesports.dto.external.EventDetailsResponse;
 import com.clutch.lolesports.dto.external.ScheduleResponse;
+import com.clutch.lolesports.dto.external.WindowResponse;
 import com.clutch.lolesports.service.DataCacheService;
 import com.clutch.lolesports.service.SetWinnerTracker;
 import org.junit.jupiter.api.Test;
@@ -20,7 +21,7 @@ class LolesportsLiveBettingDataProviderTest {
 
     @Test
     void doesNotFinishMatchWhenBestOfIsUnknown() {
-        dataCacheService.putLiveMatches(List.of(liveMatch(
+        dataCacheService.putBettingMatches(List.of(liveMatch(
                 null,
                 1,
                 List.of(completedSet(1))
@@ -32,21 +33,22 @@ class LolesportsLiveBettingDataProviderTest {
     }
 
     @Test
-    void rejectsBetWhenSetCacheIsEmpty() {
-        dataCacheService.putLiveMatches(List.of(liveMatch(3, 0, List.of())));
+    void acceptsScheduledFirstSetBeforeGameListIsAvailable() {
+        dataCacheService.putBettingMatches(List.of(liveMatch(3, 0, List.of())));
 
         boolean accepting = provider.isAcceptingBets("match-1", null, 1);
 
-        assertThat(accepting).isFalse();
+        assertThat(accepting).isTrue();
     }
 
     @Test
     void acceptsSpeculativeNextSetOnlyAfterPreviousSetFinishes() {
-        dataCacheService.putLiveMatches(List.of(liveMatch(
+        dataCacheService.putBettingMatches(List.of(liveMatch(
                 3,
                 1,
                 List.of(completedSet(1))
         )));
+        recordFinished("game-1", "2026-08-14T10:20:00Z");
 
         assertThat(provider.isAcceptingBets("match-1", null, 2)).isTrue();
         assertThat(provider.isAcceptingBets("match-1", null, 3)).isFalse();
@@ -54,7 +56,7 @@ class LolesportsLiveBettingDataProviderTest {
 
     @Test
     void rejectsAllBetsAfterMatchWinnerIsDecided() {
-        dataCacheService.putLiveMatches(List.of(liveMatch(
+        dataCacheService.putBettingMatches(List.of(liveMatch(
                 3,
                 2,
                 List.of(completedSet(1), completedSet(2))
@@ -65,7 +67,7 @@ class LolesportsLiveBettingDataProviderTest {
 
     @Test
     void rejectsKnownFutureSetUntilPreviousSetFinishes() {
-        dataCacheService.putLiveMatches(List.of(liveMatch(
+        dataCacheService.putBettingMatches(List.of(liveMatch(
                 3,
                 0,
                 List.of(
@@ -79,7 +81,7 @@ class LolesportsLiveBettingDataProviderTest {
 
     @Test
     void rejectsKnownFinishedSetWhenEventGameIdIsNotAttachedYet() {
-        dataCacheService.putLiveMatches(List.of(liveMatch(
+        dataCacheService.putBettingMatches(List.of(liveMatch(
                 3,
                 1,
                 List.of(completedSet(1), completedSet(2))
@@ -143,6 +145,14 @@ class LolesportsLiveBettingDataProviderTest {
                 setNumber,
                 "unstarted",
                 List.of()
+        );
+    }
+
+    private void recordFinished(String gameId, String finishedAt) {
+        dataCacheService.addWindowFrames(
+                gameId,
+                null,
+                List.of(new WindowResponse.Frame(finishedAt, "finished", null, null))
         );
     }
 }
