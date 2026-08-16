@@ -15,7 +15,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.time.LocalDateTime;
 
 /**
- * 쿠폰 이벤트 항목 엔티티
+ * 쿠폰 이벤트에서 발급할 쿠폰 종류와 재고를 관리하는 항목.
  */
 @Getter
 @Entity
@@ -89,6 +89,15 @@ public class CouponEventItem {
         this.successCount = 0;
     }
 
+    /**
+     * 발급 이력이 없는 쿠폰 이벤트 항목을 생성한다.
+     *
+     * @param couponEventId 소속 쿠폰 이벤트 ID
+     * @param couponTypeId 발급할 쿠폰 종류 ID
+     * @param quantity 발급 가능한 전체 수량
+     * @return 생성된 쿠폰 이벤트 항목
+     * @throws IllegalArgumentException ID 또는 수량이 유효하지 않은 경우
+     */
     public static CouponEventItem create(
             Long couponEventId,
             Long couponTypeId,

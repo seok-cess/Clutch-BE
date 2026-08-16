@@ -2,6 +2,9 @@ package com.clutch.coupon.event.exception;
 
 import org.springframework.http.HttpStatus;
 
+/**
+ * 쿠폰 이벤트 API에서 사용하는 비즈니스 오류 코드와 HTTP 상태 매핑.
+ */
 public enum CouponEventErrorCode {
     COUPON_EVENT_NOT_FOUND(
             HttpStatus.NOT_FOUND,
@@ -32,10 +35,20 @@ public enum CouponEventErrorCode {
         this.message = message;
     }
 
+    /**
+     * 오류에 대응하는 HTTP 상태를 반환한다.
+     *
+     * @return HTTP 상태
+     */
     public HttpStatus getHttpStatus() {
         return httpStatus;
     }
 
+    /**
+     * 오류의 기본 사용자 메시지를 반환한다.
+     *
+     * @return 기본 오류 메시지
+     */
     public String getMessage() {
         return message;
     }

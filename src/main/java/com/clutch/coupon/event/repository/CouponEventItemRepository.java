@@ -38,10 +38,11 @@ public interface CouponEventItemRepository
     );
 
     /**
-     * 쿠폰 발급 성공 수량 원자적 증가
+     /**
+     * 쿠폰 발급 성공 수량을 재고 범위 안에서 원자적으로 증가시킨다.
      *
-     * @param couponEventItemId 쿠폰 이벤트 항목 식별자
-     * @return 변경 행 수
+     * @param couponEventItemId 쿠폰 이벤트 항목 ID
+     * @return 증가에 성공하면 1, 재고가 소진되어 증가하지 못하면 0
      */
     @Modifying(flushAutomatically = true)
     @Query("""
@@ -54,9 +55,20 @@ public interface CouponEventItemRepository
             @Param("couponEventItemId") Long couponEventItemId
     );
 
+    /**
+     * 여러 이벤트의 쿠폰 항목을 한 번에 조회한다.
+     *
+     * @param couponEventIds 쿠폰 이벤트 ID 목록
+     * @return 해당 이벤트들에 속한 쿠폰 항목 목록
+     */
     List<CouponEventItem> findAllByCouponEventIdIn(
             List<Long> couponEventIds
     );
 
+    /**
+     * 이벤트에 속한 모든 쿠폰 항목을 물리 삭제한다.
+     *
+     * @param couponEventId 삭제할 쿠폰 이벤트 ID
+     */
     void deleteAllByCouponEventId(Long couponEventId);
 }

@@ -10,6 +10,16 @@ import jakarta.validation.constraints.Size;
 
 import java.util.List;
 
+/**
+ * 관리자 쿠폰 이벤트 설정 수정 요청.
+ *
+ * @param esportsMatchId 변경할 경기 ID
+ * @param eventName 변경할 이벤트 이름
+ * @param issueMode 변경할 쿠폰 발급 방식
+ * @param triggerType 변경할 경기 트리거 종류
+ * @param claimWindowSeconds 변경할 쿠폰 신청 가능 시간(초)
+ * @param items 교체할 쿠폰 종류, 수량 및 단계 설정
+ */
 public record CouponEventUpdateRequest(
         @NotNull(message = "경기 ID는 필수입니다.")
         @Positive(message = "경기 ID는 양수여야 합니다.")
@@ -34,6 +44,11 @@ public record CouponEventUpdateRequest(
                 @Valid CouponEventItemCreateRequest> items
 ) {
 
+    /**
+     * 등록과 동일한 설정 검증을 재사용할 수 있도록 등록 요청 형태로 변환한다.
+     *
+     * @return 현재 수정 요청의 값을 담은 등록 요청 객체
+     */
     public CouponEventCreateRequest toCreateRequest() {
         return new CouponEventCreateRequest(
                 esportsMatchId,

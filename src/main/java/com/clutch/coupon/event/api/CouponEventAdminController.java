@@ -22,6 +22,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * 관리자 쿠폰 이벤트 CRUD API를 제공하는 컨트롤러.
+ *
+ * <p>경기 트리거 기반 쿠폰 이벤트의 등록, 목록·상세 조회,
+ * 설정 수정 및 물리 삭제 요청을 처리한다.</p>
+ */
 @RestController
 @RequestMapping("/api/v1/admin/coupon-events")
 @RequiredArgsConstructor
@@ -29,6 +35,12 @@ public class CouponEventAdminController {
 
     private final CouponEventService couponEventService;
 
+    /**
+     * 새로운 쿠폰 이벤트를 등록한다.
+     *
+     * @param request 이벤트 및 쿠폰 단계 설정
+     * @return 등록된 쿠폰 이벤트 정보와 HTTP 201 응답
+     */
     @PostMapping
     public ResponseEntity<CouponEventCreateResponse> create(
             @Valid @RequestBody CouponEventCreateRequest request
@@ -38,6 +50,14 @@ public class CouponEventAdminController {
                 .body(couponEventService.create(request));
     }
 
+    /**
+     * 쿠폰 이벤트 목록을 최신순으로 조회한다.
+     *
+     * @param status 조회할 이벤트 상태, 전체 조회 시 {@code null}
+     * @param cursor 이전 페이지의 마지막 이벤트 ID, 첫 조회 시 {@code null}
+     * @param size 한 번에 조회할 이벤트 수
+     * @return 이벤트 목록과 다음 커서 정보
+     */
     @GetMapping
     public CouponEventListResponse findAll(
             @RequestParam(required = false) CouponEventStatus status,
@@ -47,6 +67,12 @@ public class CouponEventAdminController {
         return couponEventService.findAll(status, cursor, size);
     }
 
+    /**
+     * 쿠폰 이벤트의 설정, 단계별 재고 및 최근 발생 회차를 조회한다.
+     *
+     * @param couponEventId 조회할 쿠폰 이벤트 ID
+     * @return 쿠폰 이벤트 상세 정보
+     */
     @GetMapping("/{couponEventId}")
     public CouponEventDetailResponse findById(
             @PathVariable Long couponEventId
@@ -54,6 +80,13 @@ public class CouponEventAdminController {
         return couponEventService.findById(couponEventId);
     }
 
+    /**
+     * 대기 상태인 쿠폰 이벤트의 설정과 쿠폰 단계를 수정한다.
+     *
+     * @param couponEventId 수정할 쿠폰 이벤트 ID
+     * @param request 변경할 이벤트 및 쿠폰 단계 설정
+     * @return 수정된 쿠폰 이벤트 정보
+     */
     @PatchMapping("/{couponEventId}")
     public CouponEventUpdateResponse update(
             @PathVariable Long couponEventId,
@@ -62,6 +95,12 @@ public class CouponEventAdminController {
         return couponEventService.update(couponEventId, request);
     }
 
+    /**
+     * 발생·발급 이력이 없는 대기 상태의 쿠폰 이벤트를 물리 삭제한다.
+     *
+     * @param couponEventId 삭제할 쿠폰 이벤트 ID
+     * @return HTTP 204 응답
+     */
     @DeleteMapping("/{couponEventId}")
     public ResponseEntity<Void> delete(
             @PathVariable Long couponEventId

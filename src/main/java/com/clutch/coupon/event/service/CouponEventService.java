@@ -41,6 +41,12 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+/**
+ * 관리자 쿠폰 이벤트의 등록, 조회, 수정 및 삭제 유스케이스를 처리한다.
+ *
+ * <p>일반 선착순과 차등 혜택의 구성 규칙을 검증하고 이벤트, 쿠폰 항목,
+ * 쿠폰 단계를 하나의 트랜잭션 경계에서 관리한다.</p>
+ */
 @Service
 @RequiredArgsConstructor
 public class CouponEventService {
@@ -52,6 +58,14 @@ public class CouponEventService {
     private final CouponClaimRequestRepository couponClaimRequestRepository;
     private final UserCouponRepository userCouponRepository;
 
+    /**
+     * 경기와 트리거에 연결된 쿠폰 이벤트를 등록한다.
+     *
+     * @param request 이벤트 및 쿠폰 단계 설정
+     * @return 등록된 이벤트와 단계 정보
+     * @throws CouponEventException 설정이 유효하지 않거나 같은 경기·트리거가
+     *                              이미 등록된 경우
+     */
     @Transactional
     public CouponEventCreateResponse create(CouponEventCreateRequest request) {
         validateRequest(request);
@@ -82,6 +96,15 @@ public class CouponEventService {
         );
     }
 
+    /**
+     * 대기 상태인 쿠폰 이벤트의 설정과 쿠폰 단계를 교체한다.
+     *
+     * @param couponEventId 수정할 이벤트 ID
+     * @param updateRequest 변경할 이벤트 및 쿠폰 단계 설정
+     * @return 수정된 이벤트와 단계 정보
+     * @throws CouponEventException 이벤트가 없거나 수정할 수 없는 상태이거나
+     *                              변경 설정이 유효하지 않은 경우
+     */
     @Transactional
     public CouponEventUpdateResponse update(
             Long couponEventId,
@@ -127,6 +150,14 @@ public class CouponEventService {
         );
     }
 
+    /**
+     * 발생·발급 이력이 없는 대기 상태의 이벤트를 물리 삭제한다.
+     *
+     * <p>참조 무결성을 위해 단계, 쿠폰 항목, 이벤트 순서로 삭제한다.</p>
+     *
+     * @param couponEventId 삭제할 이벤트 ID
+     * @throws CouponEventException 이벤트가 없거나 삭제할 수 없는 경우
+     */
     @Transactional
     public void delete(Long couponEventId) {
         CouponEvent event = couponEventRepository.findById(couponEventId)
@@ -164,6 +195,15 @@ public class CouponEventService {
         couponEventItemRepository.flush();
     }
 
+    /**
+     * 상태와 ID 커서를 기준으로 쿠폰 이벤트 목록을 조회한다.
+     *
+     * @param status 조회할 이벤트 상태, 전체 조회 시 {@code null}
+     * @param cursor 이 값보다 작은 ID를 조회하며 첫 조회 시 {@code null}
+     * @param size 조회할 이벤트 수, 1 이상 100 이하
+     * @return 이벤트 요약 목록과 다음 커서 정보
+     * @throws CouponEventException 커서 또는 목록 크기가 유효하지 않은 경우
+     */
     @Transactional(readOnly = true)
     public CouponEventListResponse findAll(
             CouponEventStatus status,
@@ -198,6 +238,13 @@ public class CouponEventService {
         );
     }
 
+    /**
+     * 쿠폰 이벤트의 설정, 단계별 재고와 최근 발생 회차를 조회한다.
+     *
+     * @param couponEventId 조회할 이벤트 ID
+     * @return 이벤트 상세 정보
+     * @throws CouponEventException 이벤트가 존재하지 않는 경우
+     */
     @Transactional(readOnly = true)
     public CouponEventDetailResponse findById(Long couponEventId) {
         CouponEvent event = couponEventRepository.findById(couponEventId)
