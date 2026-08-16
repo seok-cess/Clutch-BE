@@ -22,6 +22,11 @@ public enum CouponClaimErrorCode {
             "존재하지 않는 쿠폰 이벤트 회차입니다."
     ),
 
+    COUPON_EVENT_ITEM_NOT_AVAILABLE(
+            HttpStatus.CONFLICT,
+            "현재 발급 가능한 쿠폰 혜택이 없습니다."
+    ),
+
     COUPON_EVENT_NOT_OPEN(
             HttpStatus.CONFLICT,
             "진행 중인 쿠폰 이벤트가 아닙니다."
@@ -35,7 +40,12 @@ public enum CouponClaimErrorCode {
     COUPON_STOCK_EXHAUSTED(
             HttpStatus.CONFLICT,
             "쿠폰 재고가 소진되었습니다."
+    ),
+    COUPON_STOCK_NOT_INITIALIZED(
+            HttpStatus.SERVICE_UNAVAILABLE,
+        "쿠폰 재고가 준비되지 않았습니다."
     );
+
 
     private final HttpStatus httpStatus;
     private final String message;

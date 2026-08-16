@@ -1,28 +1,27 @@
 package com.clutch.coupon.claim.service;
 
-import com.clutch.coupon.claim.api.dto.CouponClaimCreateRequest;
 import com.clutch.coupon.claim.exception.CouponClaimException;
+import com.clutch.coupon.claim.redis.CouponClaimRedisKeys;
 import com.clutch.lolesports.service.PollingScheduler;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Queue;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static com.clutch.coupon.claim.exception.CouponClaimErrorCode.COUPON_STOCK_EXHAUSTED;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -60,6 +59,12 @@ class CouponClaimConcurrencyIntegrationTest {
     private JdbcTemplate jdbcTemplate;
 
     /**
+     * Redis 실행기
+     */
+    @Autowired
+    private StringRedisTemplate stringRedisTemplate;
+
+    /**
      * 경기 데이터 수집 스케줄러 모의 객체
      */
     @MockitoBean
@@ -72,21 +77,22 @@ class CouponClaimConcurrencyIntegrationTest {
     void setUp() {
         cleanUpTestData();
 
+
         LocalDateTime currentTime =
                 LocalDateTime.now(ZoneOffset.UTC);
 
         jdbcTemplate.update(
                 """
-                INSERT INTO esports_match (
-                    esports_match_id,
-                    external_match_id,
-                    league_external_id,
-                    season_key,
-                    scheduled_at,
-                    lifecycle_status
-                )
-                VALUES (?, ?, ?, ?, ?, ?)
-                """,
+                        INSERT INTO esports_match (
+                            esports_match_id,
+                            external_match_id,
+                            league_external_id,
+                            season_key,
+                            scheduled_at,
+                            lifecycle_status
+                        )
+                        VALUES (?, ?, ?, ?, ?, ?)
+                        """,
                 ESPORTS_MATCH_ID,
                 "claim-concurrency-match",
                 "claim-test-league",
@@ -97,16 +103,16 @@ class CouponClaimConcurrencyIntegrationTest {
 
         jdbcTemplate.update(
                 """
-                INSERT INTO coupon_event (
-                    coupon_event_id,
-                    esports_match_id,
-                    event_name,
-                    trigger_type,
-                    event_status,
-                    claim_window_seconds
-                )
-                VALUES (?, ?, ?, ?, ?, ?)
-                """,
+                        INSERT INTO coupon_event (
+                            coupon_event_id,
+                            esports_match_id,
+                            event_name,
+                            trigger_type,
+                            event_status,
+                            claim_window_seconds
+                        )
+                        VALUES (?, ?, ?, ?, ?, ?)
+                        """,
                 COUPON_EVENT_ID,
                 ESPORTS_MATCH_ID,
                 "동시성 테스트 쿠폰 이벤트",
@@ -117,17 +123,17 @@ class CouponClaimConcurrencyIntegrationTest {
 
         jdbcTemplate.update(
                 """
-                INSERT INTO coupon_event_occurrence (
-                    coupon_event_occurrence_id,
-                    coupon_event_id,
-                    source_event_key,
-                    detected_at,
-                    opened_at,
-                    expires_at,
-                    occurrence_status
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                """,
+                        INSERT INTO coupon_event_occurrence (
+                            coupon_event_occurrence_id,
+                            coupon_event_id,
+                            source_event_key,
+                            detected_at,
+                            opened_at,
+                            expires_at,
+                            occurrence_status
+                        )
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                        """,
                 COUPON_EVENT_OCCURRENCE_ID,
                 COUPON_EVENT_ID,
                 "claim-concurrency-occurrence",
@@ -139,14 +145,14 @@ class CouponClaimConcurrencyIntegrationTest {
 
         jdbcTemplate.update(
                 """
-                INSERT INTO coupon_type (
-                    coupon_type_id,
-                    coupon_name,
-                    discount_value,
-                    status
-                )
-                VALUES (?, ?, ?, ?)
-                """,
+                        INSERT INTO coupon_type (
+                            coupon_type_id,
+                            coupon_name,
+                            discount_value,
+                            status
+                        )
+                        VALUES (?, ?, ?, ?)
+                        """,
                 COUPON_TYPE_ID,
                 "동시성 테스트 쿠폰",
                 10,
@@ -155,19 +161,35 @@ class CouponClaimConcurrencyIntegrationTest {
 
         jdbcTemplate.update(
                 """
-                INSERT INTO coupon_event_item (
-                    coupon_event_item_id,
-                    coupon_event_id,
-                    coupon_type_id,
-                    quantity,
-                    success_count
-                )
-                VALUES (?, ?, ?, ?, ?)
-                """,
+                        INSERT INTO coupon_event_item (
+                            coupon_event_item_id,
+                            coupon_event_id,
+                            coupon_type_id,
+                            quantity,
+                            success_count
+                        )
+                        VALUES (?, ?, ?, ?, ?)
+                        """,
                 COUPON_EVENT_ITEM_ID,
                 COUPON_EVENT_ID,
                 COUPON_TYPE_ID,
                 STOCK_QUANTITY,
+                0
+        );
+
+        jdbcTemplate.update(
+                """
+                        INSERT INTO coupon_event_phase (
+                            coupon_event_id,
+                            coupon_event_item_id,
+                            phase_sequence,
+                            open_offset_seconds
+                        )
+                        VALUES (?, ?, ?, ?)
+                        """,
+                COUPON_EVENT_ID,
+                COUPON_EVENT_ITEM_ID,
+                1,
                 0
         );
     }
@@ -187,33 +209,34 @@ class CouponClaimConcurrencyIntegrationTest {
     void concurrencyTestDataIsPrepared() {
         Integer quantity = jdbcTemplate.queryForObject(
                 """
-                SELECT quantity
-                FROM coupon_event_item
-                WHERE coupon_event_item_id = ?
-                """,
+                        SELECT quantity
+                        FROM coupon_event_item
+                        WHERE coupon_event_item_id = ?
+                        """,
                 Integer.class,
                 COUPON_EVENT_ITEM_ID
         );
 
         Integer successCount = jdbcTemplate.queryForObject(
                 """
-                SELECT success_count
-                FROM coupon_event_item
-                WHERE coupon_event_item_id = ?
-                """,
+                        SELECT success_count
+                        FROM coupon_event_item
+                        WHERE coupon_event_item_id = ?
+                        """,
                 Integer.class,
                 COUPON_EVENT_ITEM_ID
         );
+
 
         assertThat(quantity).isEqualTo(STOCK_QUANTITY);
         assertThat(successCount).isZero();
 
         String occurrenceStatus = jdbcTemplate.queryForObject(
                 """
-                SELECT occurrence_status
-                FROM coupon_event_occurrence
-                WHERE coupon_event_occurrence_id = ?
-                """,
+                        SELECT occurrence_status
+                        FROM coupon_event_occurrence
+                        WHERE coupon_event_occurrence_id = ?
+                        """,
                 String.class,
                 COUPON_EVENT_OCCURRENCE_ID
         );
@@ -222,10 +245,10 @@ class CouponClaimConcurrencyIntegrationTest {
     }
 
     /**
-     * 기본 DB 방식 재고 정합성 문제 재현
+     * Redis 기반 쿠폰 발급 동시성 제어 검증
      */
     @Test
-    void databaseClaimExposesStockConsistencyViolation()
+    void concurrentClaimsDoNotExceedStock()
             throws InterruptedException {
         // given
         ExecutorService executorService =
@@ -245,10 +268,6 @@ class CouponClaimConcurrencyIntegrationTest {
         Queue<Throwable> unexpectedErrors =
                 new ConcurrentLinkedQueue<>();
 
-        CouponClaimCreateRequest request =
-                new CouponClaimCreateRequest(
-                        COUPON_EVENT_ITEM_ID
-                );
 
         try {
             for (int requestIndex = 0;
@@ -265,13 +284,17 @@ class CouponClaimConcurrencyIntegrationTest {
                         couponClaimService.claim(
                                 userId,
                                 COUPON_EVENT_ID,
-                                COUPON_EVENT_OCCURRENCE_ID,
-                                request
+                                COUPON_EVENT_OCCURRENCE_ID
                         );
 
                         successResponseCount.incrementAndGet();
                     } catch (CouponClaimException exception) {
-                        failureResponseCount.incrementAndGet();
+                        if (exception.getErrorCode()
+                                == COUPON_STOCK_EXHAUSTED) {
+                            failureResponseCount.incrementAndGet();
+                        } else {
+                            unexpectedErrors.add(exception);
+                        }
                     } catch (Throwable throwable) {
                         unexpectedErrors.add(throwable);
                     } finally {
@@ -299,97 +322,153 @@ class CouponClaimConcurrencyIntegrationTest {
         // then
         Integer succeededClaimCount = jdbcTemplate.queryForObject(
                 """
-                SELECT COUNT(*)
-                FROM coupon_claim_request
-                WHERE coupon_event_occurrence_id = ?
-                  AND request_status = 'SUCCEEDED'
-                """,
+                        SELECT COUNT(*)
+                        FROM coupon_claim_request
+                        WHERE coupon_event_occurrence_id = ?
+                          AND request_status = 'SUCCEEDED'
+                        """,
                 Integer.class,
                 COUPON_EVENT_OCCURRENCE_ID
         );
 
         Integer successCount = jdbcTemplate.queryForObject(
                 """
-                SELECT success_count
-                FROM coupon_event_item
-                WHERE coupon_event_item_id = ?
-                """,
+                        SELECT success_count
+                        FROM coupon_event_item
+                        WHERE coupon_event_item_id = ?
+                        """,
                 Integer.class,
                 COUPON_EVENT_ITEM_ID
         );
+        String remainingRedisStock =
+                stringRedisTemplate
+                        .opsForValue()
+                        .get(
+                                CouponClaimRedisKeys.stock(
+                                        COUPON_EVENT_ITEM_ID
+                                )
+                        );
+
+        Long claimedUserCount =
+                stringRedisTemplate
+                        .opsForSet()
+                        .size(
+                                CouponClaimRedisKeys.claimedUsers(
+                                        COUPON_EVENT_OCCURRENCE_ID
+                                )
+                        );
+
 
         log.info(
-                "기본 DB 동시성 결과 - 요청: {}, 성공 응답: {}, "
-                        + "실패 응답: {}, DB 성공 요청: {}, DB 성공 수량: {}",
+                "Redis 동시성 결과 - 요청: {}, 성공 응답: {}, "
+                        + "재고 소진 응답: {}, DB 발급: {}, "
+                        + "DB 성공 수량: {}, Redis 재고: {}, "
+                        + "Redis 당첨자: {}",
                 REQUEST_COUNT,
                 successResponseCount.get(),
                 failureResponseCount.get(),
                 succeededClaimCount,
-                successCount
+                successCount,
+                remainingRedisStock,
+                claimedUserCount
         );
-
         assertThat(unexpectedErrors).isEmpty();
+
+        assertThat(successResponseCount.get())
+                .isEqualTo(STOCK_QUANTITY);
+
+        assertThat(failureResponseCount.get())
+                .isEqualTo(
+                        REQUEST_COUNT - STOCK_QUANTITY
+                );
+
         assertThat(
                 successResponseCount.get()
                         + failureResponseCount.get()
         ).isEqualTo(REQUEST_COUNT);
+
         assertThat(succeededClaimCount)
-                .isEqualTo(successResponseCount.get());
-        assertThat(succeededClaimCount)
-                .isGreaterThan(STOCK_QUANTITY);
+                .isEqualTo(STOCK_QUANTITY);
+
         assertThat(successCount)
-                .isLessThan(succeededClaimCount);
+                .isEqualTo(STOCK_QUANTITY);
+
+        assertThat(remainingRedisStock)
+                .isEqualTo("0");
+
+        assertThat(claimedUserCount)
+                .isEqualTo((long)
+                        STOCK_QUANTITY);
     }
 
     /**
      * 동시성 테스트 데이터 삭제
      */
     private void cleanUpTestData() {
+        stringRedisTemplate.delete(
+                List.of(
+                        CouponClaimRedisKeys.stock(
+                                COUPON_EVENT_ITEM_ID
+                        ),
+                        CouponClaimRedisKeys.claimedUsers(
+                                COUPON_EVENT_OCCURRENCE_ID
+                        )
+                )
+        );
+
         jdbcTemplate.update(
                 """
-                DELETE FROM coupon_claim_request
-                WHERE coupon_event_item_id = ?
-                """,
+                        DELETE FROM coupon_claim_request
+                        WHERE coupon_event_item_id = ?
+                        """,
                 COUPON_EVENT_ITEM_ID
         );
 
         jdbcTemplate.update(
                 """
-                DELETE FROM coupon_event_item
-                WHERE coupon_event_item_id = ?
-                """,
+                        DELETE FROM coupon_event_phase
+                        WHERE coupon_event_item_id = ?
+                        """,
                 COUPON_EVENT_ITEM_ID
         );
 
         jdbcTemplate.update(
                 """
-                DELETE FROM coupon_event_occurrence
-                WHERE coupon_event_occurrence_id = ?
-                """,
+                        DELETE FROM coupon_event_item
+                        WHERE coupon_event_item_id = ?
+                        """,
+                COUPON_EVENT_ITEM_ID
+        );
+
+        jdbcTemplate.update(
+                """
+                        DELETE FROM coupon_event_occurrence
+                        WHERE coupon_event_occurrence_id = ?
+                        """,
                 COUPON_EVENT_OCCURRENCE_ID
         );
 
         jdbcTemplate.update(
                 """
-                DELETE FROM coupon_event
-                WHERE coupon_event_id = ?
-                """,
+                        DELETE FROM coupon_event
+                        WHERE coupon_event_id = ?
+                        """,
                 COUPON_EVENT_ID
         );
 
         jdbcTemplate.update(
                 """
-                DELETE FROM coupon_type
-                WHERE coupon_type_id = ?
-                """,
+                        DELETE FROM coupon_type
+                        WHERE coupon_type_id = ?
+                        """,
                 COUPON_TYPE_ID
         );
 
         jdbcTemplate.update(
                 """
-                DELETE FROM esports_match
-                WHERE esports_match_id = ?
-                """,
+                        DELETE FROM esports_match
+                        WHERE esports_match_id = ?
+                        """,
                 ESPORTS_MATCH_ID
         );
     }
