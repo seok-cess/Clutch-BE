@@ -3,7 +3,7 @@ package com.clutch.betting.api;
 import com.clutch.betting.dto.response.BettingErrorResponse;
 import com.clutch.betting.exception.BettingErrorCode;
 import com.clutch.betting.exception.BettingException;
-import com.clutch.wallet.web.MissingUserIdHeaderException;
+import com.clutch.wallet.web.exception.MissingUserIdHeaderException;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

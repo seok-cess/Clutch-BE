@@ -2,7 +2,7 @@ package com.clutch.user.api;
 
 import com.clutch.user.dto.response.UserErrorResponse;
 import com.clutch.user.exception.UserNotFoundException;
-import com.clutch.wallet.web.MissingUserIdHeaderException;
+import com.clutch.wallet.web.exception.MissingUserIdHeaderException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;

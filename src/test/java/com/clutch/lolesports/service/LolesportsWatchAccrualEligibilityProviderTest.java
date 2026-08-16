@@ -87,9 +87,9 @@ class LolesportsWatchAccrualEligibilityProviderTest {
                 "block",
                 "league",
                 "2026-08-16T12:00:00Z",
-                List.of(),
-                List.of(),
                 3,
+                List.of(),
+                List.of(),
                 activeGameId
         );
     }

@@ -139,9 +139,9 @@ class DataCacheServiceTest {
                 "1주 차",
                 "LCK",
                 T0.plusSeconds(60).toString(),
-                List.of(),
-                List.of(),
                 3,
+                List.of(),
+                List.of(),
                 null
         );
 

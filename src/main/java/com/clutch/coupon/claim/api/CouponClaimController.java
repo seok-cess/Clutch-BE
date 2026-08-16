@@ -1,15 +1,12 @@
 package com.clutch.coupon.claim.api;
 
-import com.clutch.coupon.claim.api.dto.CouponClaimCreateRequest;
 import com.clutch.coupon.claim.api.dto.CouponClaimCreateResponse;
 import com.clutch.coupon.claim.service.CouponClaimService;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -30,7 +27,6 @@ public class CouponClaimController {
      * @param userId 사용자 식별자
      * @param couponEventId 쿠폰 이벤트 식별자
      * @param couponEventOccurrenceId 쿠폰 이벤트 회차 식별자
-     * @param request 쿠폰 발급 요청 DTO
      * @return 쿠폰 발급 요청 생성 응답
      */
     @PostMapping(
@@ -45,18 +41,13 @@ public class CouponClaimController {
             Long couponEventId,
 
             @PathVariable
-            Long couponEventOccurrenceId,
-
-            @Valid
-            @RequestBody
-            CouponClaimCreateRequest request
+            Long couponEventOccurrenceId
     ) {
         CouponClaimCreateResponse response =
                 couponClaimService.claim(
                         userId,
                         couponEventId,
-                        couponEventOccurrenceId,
-                        request
+                        couponEventOccurrenceId
                 );
 
         return ResponseEntity

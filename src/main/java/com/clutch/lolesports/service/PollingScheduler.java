@@ -46,6 +46,10 @@ public class PollingScheduler {
     private final PentakillDetector pentakillDetector;
     private final GamePersistService persistService;
     private final SetWinnerTracker setWinners;
+    private final LolesportsProperties props;
+
+    /** matchId → 종료로 판정한 시각(epoch ms). 유지 시간이 지나면 라이브에서 뺀다 */
+    private final Map<String, Long> finishedAt = new ConcurrentHashMap<>();
 
     private final Backoff liveBackoff;
     private final Backoff inGameBackoff;
@@ -85,6 +89,7 @@ public class PollingScheduler {
         this.pentakillDetector = pentakillDetector;
         this.persistService = persistService;
         this.setWinners = setWinners;
+        this.props = props;
         long base = props.poll().backoffBaseMs();
         long max = props.poll().backoffMaxMs();
         this.liveBackoff = new Backoff(base, max);
@@ -115,6 +120,7 @@ public class PollingScheduler {
             }
 
             persistLiveMatches(matches);
+            matches = dropLongFinished(matches);
             cache.putLiveMatches(matches);
             cache.putBettingMatches(resolveBettingMatches(matches));
             rememberActiveMatches(matches);
@@ -195,6 +201,47 @@ public class PollingScheduler {
     }
 
     /**
+     * 종료된 지 오래된 매치를 라이브 목록에서 뺀다.
+     *
+     * 소스의 getLive 는 경기가 끝나도 언제 내려갈지 예측할 수 없다 (2026-08-14 OME vs DOG:
+     * 3세트 종료·outcome 확정 후 4.8분이 지나도 잔류). 그래서 소스를 기다리지 않고,
+     * 우리가 종료로 판정한 시각부터 세어 유지 시간이 지나면 제거한다.
+     *
+     * 종료 직후 바로 빼지 않는 이유는 사용자가 최종 스코어를 확인할 시간이 필요해서다.
+     */
+    List<DataCacheService.LiveMatch> dropLongFinished(List<DataCacheService.LiveMatch> matches) {
+        long now = System.currentTimeMillis();
+        long retainMs = props.liveRetainAfterFinishSeconds() * 1000L;
+        List<DataCacheService.LiveMatch> kept = new ArrayList<>(matches.size());
+
+        for (DataCacheService.LiveMatch m : matches) {
+            if (!m.isFinished()) {
+                finishedAt.remove(m.matchId());   // 아직 진행중 — 타이머를 걸어두지 않는다
+                kept.add(m);
+                continue;
+            }
+            // 처음 종료로 판정한 시각을 기준으로 삼는다 (소스의 종료 시각이 아니다)
+            long since = finishedAt.computeIfAbsent(m.matchId(), k -> {
+                log.info("매치 {} 종료 판정 — {}초 뒤 라이브에서 내린다",
+                        k, props.liveRetainAfterFinishSeconds());
+                return now;
+            });
+            if (now - since < retainMs) {
+                kept.add(m);
+            } else {
+                log.info("매치 {} 라이브 목록에서 제거 (종료 후 {}초 경과)",
+                        m.matchId(), (now - since) / 1000);
+                setWinners.clearMatch(m.matchId());
+            }
+        }
+
+        // 소스에서 이미 사라진 매치의 타이머는 정리한다
+        finishedAt.keySet().removeIf(id ->
+                matches.stream().noneMatch(m -> m.matchId().equals(id)));
+        return kept;
+    }
+
+    /**
      * getEventDetails로 진행 중 게임과 팀을 결합하고 배팅 종료 판단 정보까지 LiveMatch로 조립한다.
      *
      * @param event getLive 또는 일정 캐시에서 조회한 매치 이벤트
@@ -205,6 +252,7 @@ public class PollingScheduler {
         List<EventDetailsResponse.Game> games = List.of();
         List<ScheduleResponse.Team> detailTeams = List.of();
         String activeGameId = null;
+        Integer bestOf = null;
 
         try {
             EventDetailsResponse details = api.getEventDetails(matchId);
@@ -213,6 +261,9 @@ public class PollingScheduler {
                 EventDetailsResponse.Match m = details.data().event().match();
                 if (m.teams() != null) {
                     detailTeams = m.teams();
+                }
+                if (m.strategy() != null) {
+                    bestOf = m.strategy().count();
                 }
                 if (m.games() != null) {
                     games = m.games();
@@ -239,9 +290,9 @@ public class PollingScheduler {
                 event.blockName(),
                 event.league() != null ? event.league().name() : null,
                 event.startTime(),
+                bestOf != null ? bestOf : bestOfFromSchedule(matchId),
                 teams,
                 games,
-                event.match().strategy() != null ? event.match().strategy().count() : null,
                 activeGameId
         );
     }

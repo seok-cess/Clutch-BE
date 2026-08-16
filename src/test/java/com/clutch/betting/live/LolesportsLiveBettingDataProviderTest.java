@@ -144,12 +144,12 @@ class LolesportsLiveBettingDataProviderTest {
                 "1주 차",
                 "LCK",
                 "2026-08-14T10:00:00Z",
+                bestOf,
                 List.of(
                         team("team-a", firstTeamWins),
                         team("team-b", 0)
                 ),
                 games,
-                bestOf,
                 activeGameId
         );
     }

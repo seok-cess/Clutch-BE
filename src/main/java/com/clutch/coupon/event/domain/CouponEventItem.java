@@ -98,6 +98,15 @@ public class CouponEventItem {
     }
 
     /**
+     * 잔여 수량
+     *
+     * @return 잔여 수량
+     */
+    public int remainingStock() {
+        return quantity - successCount;
+    }
+
+    /**
      * 잔여 수량 존재 여부
      *
      * @return 잔여 수량 존재 여부
