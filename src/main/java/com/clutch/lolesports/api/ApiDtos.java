@@ -57,6 +57,54 @@ public final class ApiDtos {
     ) {
     }
 
+    // ---- /api/stats/* (시즌 누적 집계) ----
+
+    /**
+     * 시즌 누적 KDA 순위.
+     *
+     * @param seasonKey  집계 대상 시즌. 적재된 시즌이 없으면 null
+     * @param totalGames 집계에 쓰인 완료 세트 수
+     */
+    public record PlayerKdaBoard(String seasonKey, int totalGames, List<PlayerKdaRow> players) {
+    }
+
+    /**
+     * @param teamCode 팀 이동이 있으면 팀별로 행이 나뉜다
+     * @param kda      (킬 + 어시스트) / 데스. 데스가 0이면 1로 나눈다
+     */
+    public record PlayerKdaRow(
+            int rank,
+            String summonerName,
+            String teamCode,
+            int games,
+            int kills,
+            int deaths,
+            int assists,
+            double kda
+    ) {
+    }
+
+    /** 시즌 챔피언 픽률과 승률. 밴 데이터는 수집하지 않아 밴픽률은 제공하지 않는다 */
+    public record ChampionBoard(String seasonKey, int totalGames, List<ChampionRow> champions) {
+    }
+
+    /**
+     * @param pickRate     picks / totalGames (0~1). 완료 세트가 없으면 null
+     * @param wins         승자가 확정된 픽 중 승리 수. 확정된 픽이 없으면 null
+     * @param decidedPicks 세트 승자가 확정된 픽 수. 승자는 종료 약 5분 뒤 확정된다
+     * @param winRate      wins / decidedPicks (0~1). 확정된 픽이 없으면 null
+     */
+    public record ChampionRow(
+            int rank,
+            String championId,
+            int picks,
+            Double pickRate,
+            Integer wins,
+            int decidedPicks,
+            Double winRate
+    ) {
+    }
+
     // ---- /api/standings ----
 
     public record StandingsSection(
