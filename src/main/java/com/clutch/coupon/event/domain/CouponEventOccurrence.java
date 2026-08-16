@@ -17,7 +17,10 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.time.LocalDateTime;
 
 /**
- * 쿠폰 이벤트 회차 엔티티
+ * 경기 트리거가 감지되어 실제로 열린 쿠폰 이벤트의 발생 회차.
+ *
+ * <p>외부 경기 이벤트의 식별 정보와 감지·오픈·만료 시각을 보관하여
+ * 중복 트리거를 방지하고 현재 신청 가능 여부를 판단한다.</p>
  */
 @Getter
 @Entity
@@ -115,10 +118,10 @@ public class CouponEventOccurrence {
     private LocalDateTime updatedAt;
 
     /**
-     * 쿠폰 발급 요청 가능 여부
+     * 주어진 시각에 이 발생 회차가 쿠폰 신청을 받을 수 있는지 확인한다.
      *
-     * @param currentTime 현재 시각
-     * @return 쿠폰 발급 요청 가능 여부
+     * @param currentTime 신청 가능 여부를 판단할 현재 시각
+     * @return 상태가 열림이고 오픈 시각 이상, 만료 시각 미만이면 {@code true}
      */
     public boolean isOpenAt(LocalDateTime currentTime) {
         return occurrenceStatus == CouponEventOccurrenceStatus.OPEN

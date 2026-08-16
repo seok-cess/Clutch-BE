@@ -21,5 +21,11 @@ public interface CouponClaimRequestRepository
             Long couponEventOccurrenceId
     );
 
+    /**
+     * 쿠폰 이벤트에 발급 요청 이력이 있는지 확인한다.
+     *
+     * @param couponEventId 쿠폰 이벤트 ID
+     * @return 발급 요청 이력이 있으면 {@code true}
+     */
     boolean existsByCouponEventId(Long couponEventId);
 }

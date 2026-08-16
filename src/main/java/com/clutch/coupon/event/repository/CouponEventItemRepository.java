@@ -24,11 +24,28 @@ public interface CouponEventItemRepository
             Long couponEventItemId
     );
 
+    /**
+     * 이벤트에 속한 모든 쿠폰 항목을 조회한다.
+     *
+     * @param couponEventId 쿠폰 이벤트 ID
+     * @return 쿠폰 이벤트 항목 목록
+     */
     List<CouponEventItem> findAllByCouponEventId(Long couponEventId);
 
+    /**
+     * 여러 이벤트의 쿠폰 항목을 한 번에 조회한다.
+     *
+     * @param couponEventIds 쿠폰 이벤트 ID 목록
+     * @return 해당 이벤트들에 속한 쿠폰 항목 목록
+     */
     List<CouponEventItem> findAllByCouponEventIdIn(
             List<Long> couponEventIds
     );
 
+    /**
+     * 이벤트에 속한 모든 쿠폰 항목을 물리 삭제한다.
+     *
+     * @param couponEventId 삭제할 쿠폰 이벤트 ID
+     */
     void deleteAllByCouponEventId(Long couponEventId);
 }
