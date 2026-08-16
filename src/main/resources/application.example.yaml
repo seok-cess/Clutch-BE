@@ -54,7 +54,9 @@ watch:
 
 # ---- 세트별 승패 배팅 ----
 betting:
-  close-after-set-start: ${BETTING_CLOSE_AFTER_SET_START:2m}
+  first-set-open-before-start: ${BETTING_FIRST_SET_OPEN_BEFORE_START:20m}
+  first-set-close-after-start: ${BETTING_FIRST_SET_CLOSE_AFTER_START:1m}
+  next-set-betting-duration: ${BETTING_NEXT_SET_BETTING_DURATION:20m}
   synchronization-interval: ${BETTING_SYNCHRONIZATION_INTERVAL:1s}
 
 # ---- lolesports 비공식 피드 연동 ----

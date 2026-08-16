@@ -2,6 +2,7 @@ package com.clutch.betting.service;
 
 import com.clutch.betting.config.BettingProperties;
 import com.clutch.betting.domain.BettingEvent;
+import com.clutch.betting.domain.BettingEventStatus;
 import com.clutch.betting.live.LiveBettingDataProvider.LiveMatchSnapshot;
 import com.clutch.betting.live.LiveBettingDataProvider.SetSnapshot;
 import com.clutch.betting.repository.BettingEventRepository;
@@ -34,36 +35,52 @@ public class BettingEventSynchronizationService {
             return;
         }
         List<SetSnapshot> sets = liveMatch.sets();
-        if (sets == null || sets.isEmpty()) {
+        if (sets == null) {
             return;
         }
 
         LocalDateTime now = LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC);
+        if (sets.isEmpty()) {
+            openScheduledFirstSetIfAvailable(liveMatch, now);
+            return;
+        }
         for (SetSnapshot set : sets) {
             var existingEvent = bettingEventRepository
                     .findByExternalMatchIdAndSetNumberForUpdate(
                             liveMatch.externalMatchId(),
                             set.setNumber()
                     );
-            if (existingEvent.isEmpty() && !set.active() && !set.finished()) {
+            BettingPeriod period = periodOf(liveMatch, set.setNumber());
+            if (period == null) {
+                if (set.finished()) {
+                    existingEvent.ifPresent(event -> finishEvent(event, set));
+                    openNextEventAfterFinishedSet(liveMatch, set);
+                } else {
+                    existingEvent.ifPresent(BettingEvent::cancel);
+                }
+                continue;
+            }
+            if (now.isBefore(period.openedAt())) {
+                existingEvent
+                        .filter(event -> event.getStatus() == BettingEventStatus.OPEN)
+                        .ifPresent(event -> event.definePeriod(
+                                period.openedAt(),
+                                period.closesAt()
+                        ));
                 continue;
             }
             BettingEvent event = existingEvent
-                    .orElseGet(() -> openEvent(liveMatch, set.setNumber(), now));
-            event.attachGame(
-                    set.externalGameId(),
-                    set.startedAt(),
-                    bettingProperties.closeAfterSetStart()
-            );
+                    .orElseGet(() -> openEvent(liveMatch, set.setNumber(), period));
+            if (event.getStatus() == BettingEventStatus.OPEN) {
+                event.definePeriod(period.openedAt(), period.closesAt());
+            }
+            if (set.externalGameId() != null && !set.externalGameId().isBlank()) {
+                event.attachGame(set.externalGameId());
+            }
             event.closeIfExpired(now);
             if (set.finished()) {
-                event.close();
-                if (!liveMatch.matchFinished()) {
-                    openNextEventIfMissing(liveMatch, set.setNumber() + 1, now);
-                }
-            }
-            if (set.winnerExternalTeamId() != null) {
-                event.recordWinner(set.winnerExternalTeamId());
+                finishEvent(event, set);
+                openNextEventAfterFinishedSet(liveMatch, set);
             }
         }
         if (liveMatch.matchFinished()) {
@@ -99,20 +116,21 @@ public class BettingEventSynchronizationService {
      *
      * @param liveMatch 라이브 매치 스냅샷
      * @param setNumber 생성할 세트 번호
-     * @param openedAt 이벤트 오픈 시각
+     * @param period 이벤트 오픈·마감 기간
      * @return 저장된 배팅 이벤트
      */
     private BettingEvent openEvent(
             LiveMatchSnapshot liveMatch,
             int setNumber,
-            LocalDateTime openedAt
+            BettingPeriod period
     ) {
         BettingEvent event = BettingEvent.open(
                 liveMatch.externalMatchId(),
                 setNumber,
                 liveMatch.externalTeamIds().get(0),
                 liveMatch.externalTeamIds().get(1),
-                openedAt
+                period.openedAt(),
+                period.closesAt()
         );
         return bettingEventRepository.save(event);
     }
@@ -122,17 +140,136 @@ public class BettingEventSynchronizationService {
      *
      * @param liveMatch 라이브 매치 스냅샷
      * @param nextSetNumber 선개설할 다음 세트 번호
-     * @param openedAt 이벤트 오픈 시각
+     * @param period 다음 세트 배팅 기간
      */
     private void openNextEventIfMissing(
             LiveMatchSnapshot liveMatch,
             int nextSetNumber,
-            LocalDateTime openedAt
+            BettingPeriod period
     ) {
         if (bettingEventRepository
                 .findByExternalMatchIdAndSetNumber(liveMatch.externalMatchId(), nextSetNumber)
                 .isEmpty()) {
-            openEvent(liveMatch, nextSetNumber, openedAt);
+            openEvent(liveMatch, nextSetNumber, period);
         }
+    }
+
+    /**
+     * 세트 종료 시각이 있으면 직후부터 다음 세트 배팅 이벤트를 선개설한다.
+     *
+     * @param liveMatch 종료 세트가 속한 매치 스냅샷
+     * @param finishedSet 종료된 세트 스냅샷
+     */
+    private void openNextEventAfterFinishedSet(
+            LiveMatchSnapshot liveMatch,
+            SetSnapshot finishedSet
+    ) {
+        if (liveMatch.matchFinished() || finishedSet.finishedAt() == null) {
+            return;
+        }
+        openNextEventIfMissing(
+                liveMatch,
+                finishedSet.setNumber() + 1,
+                new BettingPeriod(
+                        finishedSet.finishedAt(),
+                        finishedSet.finishedAt().plus(bettingProperties.nextSetBettingDuration())
+                )
+        );
+    }
+
+    /**
+     * 기간 정보를 복구할 수 없는 경우에도 종료된 기존 이벤트의 게임과 승자 정보는 보존한다.
+     *
+     * @param event 종료 처리할 기존 배팅 이벤트
+     * @param finishedSet 종료된 세트 스냅샷
+     */
+    private void finishEvent(BettingEvent event, SetSnapshot finishedSet) {
+        if (finishedSet.externalGameId() != null && !finishedSet.externalGameId().isBlank()) {
+            event.attachGame(finishedSet.externalGameId());
+        }
+        event.close();
+        if (finishedSet.winnerExternalTeamId() != null) {
+            event.recordWinner(finishedSet.winnerExternalTeamId());
+        }
+    }
+
+    /**
+     * 외부 게임 목록이 아직 없어도 공식 일정과 팀이 준비되면 첫 세트 이벤트를 선개설한다.
+     *
+     * @param liveMatch 예정 매치 스냅샷
+     * @param now 현재 UTC 시각
+     */
+    private void openScheduledFirstSetIfAvailable(
+            LiveMatchSnapshot liveMatch,
+            LocalDateTime now
+    ) {
+        BettingPeriod period = periodOf(liveMatch, 1);
+        var existingEvent = bettingEventRepository
+                .findByExternalMatchIdAndSetNumberForUpdate(liveMatch.externalMatchId(), 1);
+        if (period == null) {
+            existingEvent.ifPresent(BettingEvent::cancel);
+            return;
+        }
+        if (now.isBefore(period.openedAt())) {
+            existingEvent
+                    .filter(event -> event.getStatus() == BettingEventStatus.OPEN)
+                    .ifPresent(event -> event.definePeriod(
+                            period.openedAt(),
+                            period.closesAt()
+                    ));
+            return;
+        }
+        existingEvent.ifPresentOrElse(
+                event -> {
+                    if (event.getStatus() == BettingEventStatus.OPEN) {
+                        event.definePeriod(period.openedAt(), period.closesAt());
+                        event.closeIfExpired(now);
+                    }
+                },
+                () -> {
+                    BettingEvent event = openEvent(liveMatch, 1, period);
+                    event.closeIfExpired(now);
+                }
+        );
+    }
+
+    /**
+     * 첫 세트는 공식 일정, 이후 세트는 직전 세트의 피드 종료 시각으로 기간을 계산한다.
+     *
+     * @param liveMatch 라이브 매치 스냅샷
+     * @param setNumber 배팅 기간을 계산할 세트 번호
+     * @return 확정된 배팅 기간 또는 필수 시각이 없으면 null
+     */
+    private BettingPeriod periodOf(LiveMatchSnapshot liveMatch, int setNumber) {
+        if (setNumber == 1) {
+            if (liveMatch.scheduledStartAt() == null) {
+                return null;
+            }
+            return new BettingPeriod(
+                    liveMatch.scheduledStartAt()
+                            .minus(bettingProperties.firstSetOpenBeforeStart()),
+                    liveMatch.scheduledStartAt()
+                            .plus(bettingProperties.firstSetCloseAfterStart())
+            );
+        }
+        return liveMatch.sets().stream()
+                .filter(set -> set.setNumber() == setNumber - 1)
+                .map(SetSnapshot::finishedAt)
+                .filter(java.util.Objects::nonNull)
+                .findFirst()
+                .map(finishedAt -> new BettingPeriod(
+                        finishedAt,
+                        finishedAt.plus(bettingProperties.nextSetBettingDuration())
+                ))
+                .orElse(null);
+    }
+
+    /**
+     * 이벤트 생성과 복구에 공통으로 적용할 배팅 기간이다.
+     *
+     * @param openedAt 이벤트 오픈 시각
+     * @param closesAt 이벤트 마감 시각
+     */
+    private record BettingPeriod(LocalDateTime openedAt, LocalDateTime closesAt) {
     }
 }

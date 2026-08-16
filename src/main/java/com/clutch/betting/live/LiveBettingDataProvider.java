@@ -9,7 +9,7 @@ public interface LiveBettingDataProvider {
     /**
      * 현재 라이브 중인 매치를 배팅 동기화용 스냅샷으로 조회한다.
      *
-     * @return 현재 라이브 매치 스냅샷 목록
+     * @return 현재 배팅 후보 매치 스냅샷 목록
      */
     List<LiveMatchSnapshot> findLiveMatches();
 
@@ -27,12 +27,14 @@ public interface LiveBettingDataProvider {
      * 팀·세트·종료 여부를 묶은 매치 단위 불변 스냅샷이다.
      *
      * @param externalMatchId 외부 매치 ID
+     * @param scheduledStartAt 공식 매치 시작 시각
      * @param externalTeamIds 참가 팀 외부 ID 목록
      * @param sets 세트 상태 목록
      * @param matchFinished 매치 승부 확정 여부
      */
     record LiveMatchSnapshot(
             String externalMatchId,
+            LocalDateTime scheduledStartAt,
             List<String> externalTeamIds,
             List<SetSnapshot> sets,
             boolean matchFinished
@@ -47,6 +49,7 @@ public interface LiveBettingDataProvider {
      * @param startedAt 세트 시작 시각
      * @param active 현재 진행 세트 여부
      * @param finished 세트 종료 여부
+     * @param finishedAt livestats 피드가 세트 종료를 알린 시각
      * @param winnerExternalTeamId 승리 팀 외부 ID 또는 미확정이면 null
      */
     record SetSnapshot(
@@ -55,6 +58,7 @@ public interface LiveBettingDataProvider {
             LocalDateTime startedAt,
             boolean active,
             boolean finished,
+            LocalDateTime finishedAt,
             String winnerExternalTeamId
     ) {
     }

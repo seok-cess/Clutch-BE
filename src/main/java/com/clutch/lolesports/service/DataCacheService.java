@@ -76,9 +76,11 @@ public class DataCacheService {
     private final AtomicReference<ScheduleResponse> schedule = new AtomicReference<>();
     private final AtomicReference<StandingsResponse> standings = new AtomicReference<>();
     private final AtomicReference<List<LiveMatch>> liveMatches = new AtomicReference<>(List.of());
+    private final AtomicReference<List<LiveMatch>> bettingMatches = new AtomicReference<>(List.of());
 
     private final Map<String, WindowBuffer> windows = new ConcurrentHashMap<>();
     private final Map<String, DetailsBuffer> details = new ConcurrentHashMap<>();
+    private final Map<String, Instant> feedFinishedAt = new ConcurrentHashMap<>();
 
     // ---- 일정/순위 ----
 
@@ -108,6 +110,24 @@ public class DataCacheService {
         return liveMatches.get();
     }
 
+    /**
+     * 라이브 경기와 가까운 예정 경기를 합친 배팅 전용 매치 캐시를 교체한다.
+     *
+     * @param matches 배팅 이벤트 동기화에 사용할 매치 목록
+     */
+    public void putBettingMatches(List<LiveMatch> matches) {
+        bettingMatches.set(List.copyOf(matches));
+    }
+
+    /**
+     * 사용자 요청에서 외부 API를 호출하지 않도록 준비된 배팅 전용 매치를 반환한다.
+     *
+     * @return 배팅 후보 매치 목록
+     */
+    public List<LiveMatch> getBettingMatches() {
+        return bettingMatches.get();
+    }
+
     /** 현재 인게임 폴링 대상 gameId 목록 */
     public List<String> getActiveGameIds() {
         return liveMatches.get().stream()
@@ -135,6 +155,9 @@ public class DataCacheService {
             Instant ts = parseTs(f.rfc460Timestamp());
             if (ts != null && buf.frames.putIfAbsent(ts, f) == null) {
                 added.add(f);
+                if ("finished".equalsIgnoreCase(f.gameState())) {
+                    feedFinishedAt.putIfAbsent(gameId, ts);
+                }
             }
         }
         pruneOld(buf.frames);
@@ -210,8 +233,17 @@ public class DataCacheService {
      * 표시는 이 값을 쓴다. 세트 승패는 여기서 알 수 없다 — 그건 gameWins 로 판정한다.
      */
     public boolean isFeedFinished(String gameId) {
-        WindowResponse.Frame last = getNewestWindowFrame(gameId);
-        return last != null && "finished".equalsIgnoreCase(last.gameState());
+        return feedFinishedAt.containsKey(gameId);
+    }
+
+    /**
+     * livestats 피드가 처음 finished 상태를 알린 시각을 반환한다.
+     *
+     * @param gameId 외부 게임 ID
+     * @return 최초 종료 프레임 시각 또는 아직 종료되지 않았으면 null
+     */
+    public Instant getFeedFinishedAt(String gameId) {
+        return feedFinishedAt.get(gameId);
     }
 
     // ---- details 프레임 버퍼 ----
@@ -331,6 +363,7 @@ public class DataCacheService {
         out.put("scheduleCached", schedule.get() != null);
         out.put("standingsCached", standings.get() != null);
         out.put("liveMatches", liveMatches.get());
+        out.put("bettingMatches", bettingMatches.get());
         out.put("activeGameIds", getActiveGameIds());
 
         Map<String, Object> windowInfo = new LinkedHashMap<>();

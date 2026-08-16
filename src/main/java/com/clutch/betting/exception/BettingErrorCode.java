@@ -16,12 +16,14 @@ public enum BettingErrorCode {
     DUPLICATE_TEAM_OPTIONS(Message.DUPLICATE_TEAM_OPTIONS),
     /** 배팅 이벤트 오픈 시각이 전달되지 않았다. */
     EVENT_OPENED_AT_REQUIRED(Message.EVENT_OPENED_AT_REQUIRED),
+    /** 배팅 이벤트 마감 시각이 전달되지 않았다. */
+    EVENT_CLOSES_AT_REQUIRED(Message.EVENT_CLOSES_AT_REQUIRED),
+    /** 배팅 이벤트 오픈·마감 시각의 순서가 올바르지 않다. */
+    INVALID_BETTING_PERIOD(Message.INVALID_BETTING_PERIOD),
     /** 외부 세트 ID가 전달되지 않았다. */
     EXTERNAL_GAME_ID_REQUIRED(Message.EXTERNAL_GAME_ID_REQUIRED),
     /** 이벤트에 기존 값과 다른 외부 세트 ID를 연결하려 했다. */
     EVENT_GAME_ALREADY_ATTACHED(Message.EVENT_GAME_ALREADY_ATTACHED),
-    /** 세트 시작 후 배팅 가능 시간이 양수가 아니다. */
-    INVALID_BETTING_DURATION(Message.INVALID_BETTING_DURATION),
     /** 상태 판단에 필요한 현재 시각이 전달되지 않았다. */
     CURRENT_TIME_REQUIRED(Message.CURRENT_TIME_REQUIRED),
     /** 승리 팀 ID가 전달되지 않았다. */
@@ -104,9 +106,10 @@ public enum BettingErrorCode {
         public static final String SECOND_TEAM_ID_REQUIRED = "두 번째 팀 ID는 필수입니다.";
         public static final String DUPLICATE_TEAM_OPTIONS = "배팅 선택지의 두 팀은 서로 달라야 합니다.";
         public static final String EVENT_OPENED_AT_REQUIRED = "배팅 오픈 시각은 필수입니다.";
+        public static final String EVENT_CLOSES_AT_REQUIRED = "배팅 마감 시각은 필수입니다.";
+        public static final String INVALID_BETTING_PERIOD = "배팅 마감 시각은 오픈 시각보다 늦어야 합니다.";
         public static final String EXTERNAL_GAME_ID_REQUIRED = "외부 세트 ID는 필수입니다.";
         public static final String EVENT_GAME_ALREADY_ATTACHED = "이미 다른 세트 ID가 연결된 배팅 이벤트입니다.";
-        public static final String INVALID_BETTING_DURATION = "세트 시작 후 배팅 가능 시간은 양수여야 합니다.";
         public static final String CURRENT_TIME_REQUIRED = "현재 시각은 필수입니다.";
         public static final String WINNER_TEAM_ID_REQUIRED = "승리 팀 ID는 필수입니다.";
         public static final String WINNER_NOT_PARTICIPANT = "승리 팀은 배팅 이벤트 참가 팀이어야 합니다.";

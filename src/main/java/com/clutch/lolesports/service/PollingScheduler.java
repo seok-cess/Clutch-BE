@@ -14,6 +14,8 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -35,6 +37,8 @@ import java.util.concurrent.ConcurrentHashMap;
 public class PollingScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(PollingScheduler.class);
+    private static final Duration BETTING_PREWARM_BEFORE_START = Duration.ofMinutes(30);
+    private static final Duration BETTING_PREWARM_AFTER_START = Duration.ofMinutes(5);
 
     private final LolesportsApiClient api;
     private final LiveStatsClient liveStats;
@@ -111,6 +115,7 @@ public class PollingScheduler {
             }
 
             cache.putLiveMatches(matches);
+            cache.putBettingMatches(resolveBettingMatches(matches));
             rememberActiveMatches(matches);
             cleanupFinishedGames();
             liveBackoff.success();
@@ -125,9 +130,61 @@ public class PollingScheduler {
     }
 
     /**
+     * 실제 라이브 매치에 배팅 창이 가까운 예정 매치를 합쳐 배팅 전용 캐시를 만든다.
+     *
+     * @param liveMatches getLive에서 확인한 실제 라이브 매치 목록
+     * @return 매치 ID가 중복되지 않는 배팅 후보 매치 목록
+     */
+    private List<DataCacheService.LiveMatch> resolveBettingMatches(
+            List<DataCacheService.LiveMatch> liveMatches
+    ) {
+        Map<String, DataCacheService.LiveMatch> candidates = new java.util.LinkedHashMap<>();
+        liveMatches.forEach(match -> candidates.put(match.matchId(), match));
+
+        ScheduleResponse schedule = cache.getSchedule();
+        if (schedule == null || schedule.data() == null || schedule.data().schedule() == null
+                || schedule.data().schedule().events() == null) {
+            return List.copyOf(candidates.values());
+        }
+
+        Instant now = Instant.now();
+        for (ScheduleResponse.Event event : schedule.data().schedule().events()) {
+            if (!isBettingPrewarmCandidate(event, now)
+                    || candidates.containsKey(event.match().id())) {
+                continue;
+            }
+            DataCacheService.LiveMatch candidate = resolveLiveMatch(event);
+            candidates.put(candidate.matchId(), candidate);
+        }
+        return List.copyOf(candidates.values());
+    }
+
+    /**
+     * 배팅 시간 계산에 필요한 정보를 미리 적재할 가까운 예정 경기인지 확인한다.
+     *
+     * @param event 일정 이벤트
+     * @param now 현재 UTC Instant
+     * @return 현재 기준 30분 전부터 시작 5분 후 범위의 미완료 경기이면 true
+     */
+    private boolean isBettingPrewarmCandidate(ScheduleResponse.Event event, Instant now) {
+        if (event == null || event.match() == null || event.match().id() == null
+                || event.startTime() == null
+                || "completed".equalsIgnoreCase(event.state())) {
+            return false;
+        }
+        try {
+            Instant scheduledStart = Instant.parse(event.startTime());
+            return !scheduledStart.isAfter(now.plus(BETTING_PREWARM_BEFORE_START))
+                    && now.isBefore(scheduledStart.plus(BETTING_PREWARM_AFTER_START));
+        } catch (RuntimeException exception) {
+            return false;
+        }
+    }
+
+    /**
      * getEventDetails로 진행 중 게임과 팀을 결합하고 배팅 종료 판단 정보까지 LiveMatch로 조립한다.
      *
-     * @param event getLive에서 조회한 라이브 일정 이벤트
+     * @param event getLive 또는 일정 캐시에서 조회한 매치 이벤트
      * @return 팀·세트·best-of 정보가 결합된 라이브 매치 캐시 값
      */
     private DataCacheService.LiveMatch resolveLiveMatch(ScheduleResponse.Event event) {

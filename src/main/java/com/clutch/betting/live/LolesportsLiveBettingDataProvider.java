@@ -6,6 +6,7 @@ import com.clutch.lolesports.service.SetWinnerTracker;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -21,13 +22,13 @@ public class LolesportsLiveBettingDataProvider implements LiveBettingDataProvide
     private final SetWinnerTracker setWinnerTracker;
 
     /**
-     * 캐시된 모든 라이브 매치를 배팅용 스냅샷으로 변환한다.
+     * 캐시된 모든 배팅 후보 매치를 배팅용 스냅샷으로 변환한다.
      *
      * @return 배팅 동기화용 라이브 매치 스냅샷 목록
      */
     @Override
     public List<LiveMatchSnapshot> findLiveMatches() {
-        return dataCacheService.getLiveMatches().stream()
+        return dataCacheService.getBettingMatches().stream()
                 .map(this::toSnapshot)
                 .toList();
     }
@@ -54,7 +55,7 @@ public class LolesportsLiveBettingDataProvider implements LiveBettingDataProvide
     }
 
     /**
-     * 외부 라이브 매치에서 유효한 팀과 정렬된 세트 상태를 추출한다.
+     * 외부 배팅 후보 매치에서 유효한 팀과 정렬된 세트 상태를 추출한다.
      *
      * @param liveMatch lolesports 라이브 매치 캐시 값
      * @return 배팅 도메인용 라이브 매치 스냅샷
@@ -80,13 +81,19 @@ public class LolesportsLiveBettingDataProvider implements LiveBettingDataProvide
                                 dataCacheService.getGameStart(game.id()),
                                 ZoneOffset.UTC
                         );
+                LocalDateTime finishedAt = dataCacheService.getFeedFinishedAt(game.id()) == null
+                        ? null
+                        : LocalDateTime.ofInstant(
+                                dataCacheService.getFeedFinishedAt(game.id()),
+                                ZoneOffset.UTC
+                        );
                 sets.add(new SetSnapshot(
                         game.id(),
                         game.number(),
                         startedAt,
                         game.id().equals(liveMatch.activeGameId()),
-                        dataCacheService.isFeedFinished(game.id())
-                                || "completed".equalsIgnoreCase(game.state()),
+                        finishedAt != null || "completed".equalsIgnoreCase(game.state()),
+                        finishedAt,
                         setWinnerTracker.winnerOf(liveMatch.matchId(), game.id())
                 ));
             }
@@ -94,10 +101,28 @@ public class LolesportsLiveBettingDataProvider implements LiveBettingDataProvide
         sets.sort(Comparator.comparingInt(SetSnapshot::setNumber));
         return new LiveMatchSnapshot(
                 liveMatch.matchId(),
+                parseUtc(liveMatch.startTime()),
                 teamIds,
                 List.copyOf(sets),
                 isMatchFinished(liveMatch)
         );
+    }
+
+    /**
+     * RFC3339 공식 일정 시각을 UTC 로컬 시각으로 변환한다.
+     *
+     * @param value 외부 일정 시각 문자열
+     * @return UTC 공식 시작 시각 또는 파싱할 수 없으면 null
+     */
+    private LocalDateTime parseUtc(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return LocalDateTime.ofInstant(Instant.parse(value), ZoneOffset.UTC);
+        } catch (RuntimeException exception) {
+            return null;
+        }
     }
 
     /**
@@ -132,11 +157,11 @@ public class LolesportsLiveBettingDataProvider implements LiveBettingDataProvide
             int setNumber
     ) {
         if (match.sets().isEmpty()) {
-            return false;
+            return setNumber == 1 && externalGameId == null;
         }
         boolean previousSetFinished = setNumber == 1 || match.sets().stream()
                 .filter(set -> set.setNumber() == setNumber - 1)
-                .anyMatch(SetSnapshot::finished);
+                .anyMatch(set -> set.finished() && set.finishedAt() != null);
         if (!previousSetFinished) {
             return false;
         }

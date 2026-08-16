@@ -17,7 +17,6 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
-import java.time.Duration;
 import java.time.LocalDateTime;
 
 /** 한 매치의 특정 세트에 대한 배팅 가능 기간과 결과 상태를 관리한다. */
@@ -85,6 +84,7 @@ public class BettingEvent {
      * @param firstExternalTeamId 첫 번째 참가 팀 ID
      * @param secondExternalTeamId 두 번째 참가 팀 ID
      * @param openedAt 이벤트 오픈 시각
+     * @param closesAt 이벤트 마감 시각
      * @throws BettingException 필수 값이 없거나 세트·참가 팀 조건이 올바르지 않을 때
      */
     private BettingEvent(
@@ -92,7 +92,8 @@ public class BettingEvent {
             int setNumber,
             String firstExternalTeamId,
             String secondExternalTeamId,
-            LocalDateTime openedAt
+            LocalDateTime openedAt,
+            LocalDateTime closesAt
     ) {
         this.externalMatchId = requireText(externalMatchId, BettingErrorCode.EXTERNAL_MATCH_ID_REQUIRED);
         if (setNumber < 1) {
@@ -104,10 +105,7 @@ public class BettingEvent {
         if (this.firstExternalTeamId.equals(this.secondExternalTeamId)) {
             throw new BettingException(BettingErrorCode.DUPLICATE_TEAM_OPTIONS);
         }
-        if (openedAt == null) {
-            throw new BettingException(BettingErrorCode.EVENT_OPENED_AT_REQUIRED);
-        }
-        this.openedAt = openedAt;
+        definePeriod(openedAt, closesAt);
         this.status = BettingEventStatus.OPEN;
     }
 
@@ -119,6 +117,7 @@ public class BettingEvent {
      * @param firstExternalTeamId 첫 번째 참가 팀 ID
      * @param secondExternalTeamId 두 번째 참가 팀 ID
      * @param openedAt 이벤트 오픈 시각
+     * @param closesAt 이벤트 마감 시각
      * @return OPEN 상태의 신규 배팅 이벤트
      * @throws BettingException 필수 값이 없거나 세트·참가 팀 조건이 올바르지 않을 때
      */
@@ -127,14 +126,16 @@ public class BettingEvent {
             int setNumber,
             String firstExternalTeamId,
             String secondExternalTeamId,
-            LocalDateTime openedAt
+            LocalDateTime openedAt,
+            LocalDateTime closesAt
     ) {
         return new BettingEvent(
                 externalMatchId,
                 setNumber,
                 firstExternalTeamId,
                 secondExternalTeamId,
-                openedAt
+                openedAt,
+                closesAt
         );
     }
 
@@ -159,22 +160,19 @@ public class BettingEvent {
         if (now == null || status != BettingEventStatus.OPEN) {
             return false;
         }
-        return closesAt == null || now.isBefore(closesAt);
+        return openedAt != null
+                && closesAt != null
+                && !now.isBefore(openedAt)
+                && now.isBefore(closesAt);
     }
 
     /**
-     * 실제 세트 ID를 연결하고 세트 시작 시각 기준 마감 시각을 계산한다.
+     * 실제 세트 ID를 이벤트에 연결한다.
      *
      * @param externalGameId 외부 세트 ID
-     * @param setStartedAt 세트 시작 시각
-     * @param bettingDurationAfterStart 세트 시작 후 배팅 허용 기간
-     * @throws BettingException 외부 세트 ID가 없거나 배팅 허용 기간이 양수가 아니거나 다른 세트가 연결됐을 때
+     * @throws BettingException 외부 세트 ID가 없거나 다른 세트가 이미 연결됐을 때
      */
-    public void attachGame(
-            String externalGameId,
-            LocalDateTime setStartedAt,
-            Duration bettingDurationAfterStart
-    ) {
+    public void attachGame(String externalGameId) {
         if (status == BettingEventStatus.SETTLED || status == BettingEventStatus.CANCELLED) {
             return;
         }
@@ -183,15 +181,27 @@ public class BettingEvent {
             throw new BettingException(BettingErrorCode.EVENT_GAME_ALREADY_ATTACHED);
         }
         this.externalGameId = normalizedGameId;
-        if (setStartedAt != null) {
-            if (bettingDurationAfterStart == null
-                    || bettingDurationAfterStart.isZero()
-                    || bettingDurationAfterStart.isNegative()) {
-                throw new BettingException(BettingErrorCode.INVALID_BETTING_DURATION);
-            }
-            LocalDateTime calculatedClosesAt = setStartedAt.plus(bettingDurationAfterStart);
-            this.closesAt = calculatedClosesAt;
+    }
+
+    /**
+     * 확정된 기준 시각으로 이벤트 오픈·마감 기간을 설정하거나 복구한다.
+     *
+     * @param openedAt 이벤트 오픈 시각
+     * @param closesAt 이벤트 마감 시각
+     * @throws BettingException 필수 시각이 없거나 마감이 오픈보다 늦지 않을 때
+     */
+    public void definePeriod(LocalDateTime openedAt, LocalDateTime closesAt) {
+        if (openedAt == null) {
+            throw new BettingException(BettingErrorCode.EVENT_OPENED_AT_REQUIRED);
         }
+        if (closesAt == null) {
+            throw new BettingException(BettingErrorCode.EVENT_CLOSES_AT_REQUIRED);
+        }
+        if (!closesAt.isAfter(openedAt)) {
+            throw new BettingException(BettingErrorCode.INVALID_BETTING_PERIOD);
+        }
+        this.openedAt = openedAt;
+        this.closesAt = closesAt;
     }
 
     /**
