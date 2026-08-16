@@ -2,10 +2,10 @@ package com.clutch.betting.service;
 
 import com.clutch.betting.domain.BetPointTransaction;
 import com.clutch.betting.domain.BettingEvent;
-import com.clutch.betting.domain.BettingEventStatus;
 import com.clutch.betting.domain.UserBet;
 import com.clutch.betting.dto.BetPlacementResult;
 import com.clutch.betting.dto.BettingEventView;
+import com.clutch.betting.dto.MyBetView;
 import com.clutch.betting.dto.UserBetView;
 import com.clutch.betting.exception.BettingErrorCode;
 import com.clutch.betting.exception.BettingException;
@@ -24,16 +24,14 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /** 사용자 배팅 등록과 현재 이벤트·내 배팅 조회 유스케이스를 제공한다. */
 @Service
 @RequiredArgsConstructor
 public class BettingService {
-
-    private static final List<BettingEventStatus> CURRENT_STATUSES = List.of(
-            BettingEventStatus.OPEN,
-            BettingEventStatus.CLOSED
-    );
 
     private final BettingEventRepository bettingEventRepository;
     private final UserBetRepository userBetRepository;
@@ -108,7 +106,7 @@ public class BettingService {
     }
 
     /**
-     * 사용자 배팅과 차감 원장을 함께 저장하고 DB 중복을 도메인 오류로 변환한다.
+     * 사용자 배팅을 저장하면서 DB 중복을 도메인 오류로 변환하고 차감 원장을 기록한다.
      *
      * @param userBet 저장할 사용자 배팅
      * @throws BettingException 동일 이벤트에 사용자 배팅이 이미 존재하는 경우
@@ -116,12 +114,12 @@ public class BettingService {
     private void saveBetAndStake(UserBet userBet) {
         try {
             userBetRepository.saveAndFlush(userBet);
-            transactionRepository.saveAndFlush(
-                    BetPointTransaction.stake(userBet.getId(), userBet.getAmount())
-            );
         } catch (DataIntegrityViolationException exception) {
             throw new BettingException(BettingErrorCode.DUPLICATE_BET);
         }
+        transactionRepository.saveAndFlush(
+                BetPointTransaction.stake(userBet.getId(), userBet.getAmount())
+        );
     }
 
     /**
@@ -144,7 +142,7 @@ public class BettingService {
     }
 
     /**
-     * 매치의 최신 진행 이벤트와 현재 사용자의 참여 여부를 함께 조회한다.
+     * 매치의 최신 세트 이벤트와 현재 사용자의 참여 여부를 함께 조회한다.
      *
      * @param externalMatchId 외부 매치 ID
      * @param userId 사용자 ID
@@ -154,20 +152,13 @@ public class BettingService {
     @Transactional(readOnly = true)
     public BettingEventView getCurrentEvent(String externalMatchId, Long userId) {
         BettingEvent event = bettingEventRepository
-                .findFirstByExternalMatchIdAndStatusInOrderBySetNumberDesc(
-                        externalMatchId,
-                        CURRENT_STATUSES
-                )
+                .findFirstByExternalMatchIdOrderBySetNumberDesc(externalMatchId)
                 .orElseThrow(() -> new BettingException(BettingErrorCode.EVENT_NOT_FOUND));
         LocalDateTime now = now();
         UserBet userBet = userBetRepository
                 .findByBettingEventIdAndUserId(event.getId(), userId)
                 .orElse(null);
-        boolean liveAvailable = liveBettingDataProvider.isAcceptingBets(
-                event.getExternalMatchId(),
-                event.getExternalGameId(),
-                event.getSetNumber()
-        );
+        boolean liveAvailable = isBettingAvailable(event, now);
         return new BettingEventView(
                 event.getId(),
                 event.getExternalMatchId(),
@@ -178,7 +169,7 @@ public class BettingService {
                 event.getStatus(),
                 event.getClosesAt(),
                 remainingSeconds(event.getClosesAt(), now),
-                userBet == null && event.isOpenAt(now) && liveAvailable,
+                userBet == null && liveAvailable,
                 toSummary(userBet)
         );
     }
@@ -205,6 +196,47 @@ public class BettingService {
                 userBet.getStatus(),
                 currentPoint(userId)
         );
+    }
+
+    /**
+     * 현재 사용자의 전체 배팅을 최신 등록 순서로 조회한다.
+     *
+     * @param userId 사용자 ID
+     * @return 경기와 세트 정보가 포함된 사용자 배팅 목록
+     * @throws BettingException 사용자 또는 연결된 배팅 이벤트를 찾을 수 없을 때
+     */
+    @Transactional(readOnly = true)
+    public List<MyBetView> getMyBets(Long userId) {
+        validateUser(userId);
+        List<UserBet> userBets = userBetRepository.findAllByUserIdOrderByCreatedAtDescIdDesc(userId);
+        Map<Long, BettingEvent> eventsById = loadEventsById(userBets);
+
+        return userBets.stream()
+                .map(userBet -> toMyBetView(userBet, eventsById))
+                .toList();
+    }
+
+    private boolean isBettingAvailable(BettingEvent event, LocalDateTime now) {
+        return event.isOpenAt(now) && liveBettingDataProvider.isAcceptingBets(
+                event.getExternalMatchId(),
+                event.getExternalGameId(),
+                event.getSetNumber()
+        );
+    }
+
+    private void validateUser(Long userId) {
+        if (userRepository.findPointById(userId).isEmpty()) {
+            throw new BettingException(BettingErrorCode.USER_NOT_FOUND);
+        }
+    }
+
+    private Map<Long, BettingEvent> loadEventsById(List<UserBet> userBets) {
+        List<Long> eventIds = userBets.stream()
+                .map(UserBet::getBettingEventId)
+                .distinct()
+                .toList();
+        return bettingEventRepository.findAllById(eventIds).stream()
+                .collect(Collectors.toMap(BettingEvent::getId, Function.identity()));
     }
 
     /**
@@ -245,6 +277,28 @@ public class BettingService {
                 userBet.getSelectedExternalTeamId(),
                 userBet.getAmount(),
                 userBet.getStatus()
+        );
+    }
+
+    /** 사용자 배팅과 연결 이벤트를 내 배팅 목록 항목으로 변환한다. */
+    private MyBetView toMyBetView(UserBet userBet, Map<Long, BettingEvent> eventsById) {
+        BettingEvent event = eventsById.get(userBet.getBettingEventId());
+        if (event == null) {
+            throw new BettingException(BettingErrorCode.EVENT_NOT_FOUND);
+        }
+        return new MyBetView(
+                userBet.getId(),
+                userBet.getBettingEventId(),
+                event.getExternalMatchId(),
+                event.getExternalGameId(),
+                event.getSetNumber(),
+                event.getFirstExternalTeamId(),
+                event.getSecondExternalTeamId(),
+                userBet.getSelectedExternalTeamId(),
+                userBet.getAmount(),
+                userBet.getStatus(),
+                event.getStatus(),
+                userBet.getCreatedAt()
         );
     }
 

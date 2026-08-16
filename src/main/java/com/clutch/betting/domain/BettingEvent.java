@@ -10,7 +10,6 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -22,16 +21,7 @@ import java.time.LocalDateTime;
 /** 한 매치의 특정 세트에 대한 배팅 가능 기간과 결과 상태를 관리한다. */
 @Getter
 @Entity
-@Table(
-        name = "betting_event",
-        uniqueConstraints = {
-                @UniqueConstraint(
-                        name = "uk_betting_event_match_set",
-                        columnNames = {"external_match_id", "set_number"}
-                ),
-                @UniqueConstraint(name = "uk_betting_event_game", columnNames = "external_game_id")
-        }
-)
+@Table(name = "betting_event")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class BettingEvent {
 
@@ -95,13 +85,22 @@ public class BettingEvent {
             LocalDateTime openedAt,
             LocalDateTime closesAt
     ) {
-        this.externalMatchId = requireText(externalMatchId, BettingErrorCode.EXTERNAL_MATCH_ID_REQUIRED);
+        this.externalMatchId = requireText(
+                externalMatchId,
+                BettingErrorCode.EXTERNAL_MATCH_ID_REQUIRED
+        );
         if (setNumber < 1) {
             throw new BettingException(BettingErrorCode.INVALID_SET_NUMBER);
         }
         this.setNumber = setNumber;
-        this.firstExternalTeamId = requireText(firstExternalTeamId, BettingErrorCode.FIRST_TEAM_ID_REQUIRED);
-        this.secondExternalTeamId = requireText(secondExternalTeamId, BettingErrorCode.SECOND_TEAM_ID_REQUIRED);
+        this.firstExternalTeamId = requireText(
+                firstExternalTeamId,
+                BettingErrorCode.FIRST_TEAM_ID_REQUIRED
+        );
+        this.secondExternalTeamId = requireText(
+                secondExternalTeamId,
+                BettingErrorCode.SECOND_TEAM_ID_REQUIRED
+        );
         if (this.firstExternalTeamId.equals(this.secondExternalTeamId)) {
             throw new BettingException(BettingErrorCode.DUPLICATE_TEAM_OPTIONS);
         }
@@ -173,7 +172,7 @@ public class BettingEvent {
      * @throws BettingException 외부 세트 ID가 없거나 다른 세트가 이미 연결됐을 때
      */
     public void attachGame(String externalGameId) {
-        if (status == BettingEventStatus.SETTLED || status == BettingEventStatus.CANCELLED) {
+        if (isTerminal()) {
             return;
         }
         String normalizedGameId = requireText(externalGameId, BettingErrorCode.EXTERNAL_GAME_ID_REQUIRED);
@@ -242,7 +241,7 @@ public class BettingEvent {
         if (!hasParticipant(winnerTeamId)) {
             throw new BettingException(BettingErrorCode.WINNER_NOT_PARTICIPANT);
         }
-        if (status == BettingEventStatus.SETTLED || status == BettingEventStatus.CANCELLED) {
+        if (isTerminal()) {
             return;
         }
         if (winnerExternalTeamId != null) {
@@ -274,8 +273,12 @@ public class BettingEvent {
                 || winnerExternalTeamId != null) {
             return;
         }
-        winnerExternalTeamId = null;
         status = BettingEventStatus.CANCELLED;
+    }
+
+    private boolean isTerminal() {
+        return status == BettingEventStatus.SETTLED
+                || status == BettingEventStatus.CANCELLED;
     }
 
     /**

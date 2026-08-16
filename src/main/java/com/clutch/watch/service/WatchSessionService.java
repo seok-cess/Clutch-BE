@@ -18,8 +18,9 @@ import com.clutch.watch.redis.session.WatchSessionSnapshot;
 import com.clutch.watch.repository.WatchSessionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -38,22 +39,25 @@ public class WatchSessionService {
     private final WatchSessionRepository watchSessionRepository;
     private final WatchSessionRedisRepository watchSessionRedisRepository;
     private final WatchSessionCompletionService watchSessionCompletionService;
+    private final WatchAccrualEligibilityProvider watchAccrualEligibilityProvider;
+    private final TransactionTemplate transactionTemplate;
     private final WatchRewardProperties properties;
+    private final Clock clock;
 
     /**
      * 사용자를 경기에 입장시킨다. 동일 경기에 재입장하면 기존 누적 상태를 유지하면서
      * sessionKey를 교체하고, 다른 경기에 입장하면 기존 세션을 미지급 종료한다.
      *
      * @param userId 경기를 시청할 사용자 ID
-     * @param matchId 시청할 경기 ID
+     * @param externalMatchId 시청할 LoL Esports 외부 경기 ID
      * @return 새 시청 세션과 heartbeat 정책을 담은 결과
      * @throws WatchException 사용자나 경기가 없거나, 경기가 시청 불가능하거나,
      *                               동일 사용자의 세션 전환이 진행 중인 경우
      */
-    @Transactional
-    public WatchSessionStartResult start(long userId, long matchId) {
+    public WatchSessionStartResult start(long userId, String externalMatchId) {
         validateUser(userId);
-        validateMatch(matchId);
+        EsportsMatch esportsMatch = validateMatch(externalMatchId);
+        long matchId = esportsMatch.getId();
 
         String lockToken = UUID.randomUUID().toString();
         if (!watchSessionRedisRepository.tryAcquireSwitchLock(userId, lockToken)) {
@@ -61,7 +65,7 @@ public class WatchSessionService {
         }
 
         try {
-            return openSession(userId, matchId);
+            return transactionTemplate.execute(status -> openSession(userId, matchId));
         } finally {
             watchSessionRedisRepository.releaseSwitchLock(userId, lockToken);
         }
@@ -78,16 +82,26 @@ public class WatchSessionService {
      * @throws WatchException Redis 세션을 찾을 수 없거나 heartbeat 검증에 실패한 경우
      */
     public WatchHeartbeatResult heartbeat(long userId, String sessionKey, long sequence) {
+        WatchSessionSnapshot snapshot = watchSessionRedisRepository.findSession(sessionKey)
+                .orElse(null);
+        boolean canAccumulate = canAccumulate(snapshot, userId);
         HeartbeatProcessingResult result = watchSessionRedisRepository.heartbeat(
                 userId,
                 sessionKey,
                 sequence,
-                Instant.now().toEpochMilli()
+                clock.instant().toEpochMilli(),
+                canAccumulate
         );
         if (result.status() != HeartbeatResult.SUCCESS) {
             throw new WatchException(toError(result.status()));
         }
-        return toHeartbeatResult(result);
+        return toHeartbeatResult(result, canAccumulate);
+    }
+
+    private boolean canAccumulate(WatchSessionSnapshot snapshot, long userId) {
+        return snapshot != null
+                && snapshot.userId() == userId
+                && watchAccrualEligibilityProvider.canAccumulate(snapshot.matchId());
     }
 
     /**
@@ -95,9 +109,13 @@ public class WatchSessionService {
      * 누적시간은 수령 기준을 넘지 않도록 제한하고, 남은 시간은 초 단위로 올림하여 반환한다.
      *
      * @param result Redis heartbeat 처리 결과
+     * @param canAccumulate 현재 진행 중인 세트가 있어 시간을 적립할 수 있는지 여부
      * @return 현재 수령 상태, 회차, 누적시간과 남은 시간을 포함한 응답 결과
      */
-    private WatchHeartbeatResult toHeartbeatResult(HeartbeatProcessingResult result) {
+    private WatchHeartbeatResult toHeartbeatResult(
+            HeartbeatProcessingResult result,
+            boolean canAccumulate
+    ) {
         long claimIntervalMillis = properties.claimInterval().toMillis();
         long eligibleMilliseconds = Math.min(
                 result.eligibleMilliseconds(),
@@ -106,7 +124,9 @@ public class WatchSessionService {
         long remainingMilliseconds = claimIntervalMillis - eligibleMilliseconds;
         WatchRewardState rewardState = remainingMilliseconds == 0L
                 ? WatchRewardState.CLAIMABLE
-                : WatchRewardState.ACCUMULATING;
+                : canAccumulate
+                        ? WatchRewardState.ACCUMULATING
+                        : WatchRewardState.PAUSED;
 
         return new WatchHeartbeatResult(
                 rewardState,
@@ -163,17 +183,17 @@ public class WatchSessionService {
     /**
      * 경기가 존재하고 현재 시청 가능한 진행 상태인지 검증한다.
      *
-     * @param matchId 검증할 경기 ID
+     * @param externalMatchId 검증할 LoL Esports 외부 경기 ID
+     * @return 시청 세션 FK에 사용할 내부 경기 엔티티
      * @throws WatchException 경기가 없거나 진행 중 상태가 아닌 경우
      */
-    private void validateMatch(long matchId) {
-        // TODO: lolesports는 첫 세트 종료 시 EsportsMatch를 생성할 수 있어, 진행 중인 첫 세트에서는 DB 조회가 실패할 수 있다.
-        //  경기 식별자 및 생성 시점 계약이 확정되면 입장 검증 기준을 변경해야 한다.
-        EsportsMatch esportsMatch = esportsMatchRepository.findById(matchId)
+    private EsportsMatch validateMatch(String externalMatchId) {
+        EsportsMatch esportsMatch = esportsMatchRepository.findByExternalMatchId(externalMatchId)
                 .orElseThrow(() -> new WatchException(WatchError.MATCH_NOT_FOUND));
         if (!"inProgress".equals(esportsMatch.getLifecycleStatus())) {
             throw new WatchException(WatchError.MATCH_NOT_WATCHABLE);
         }
+        return esportsMatch;
     }
 
     /**
@@ -269,7 +289,7 @@ public class WatchSessionService {
      */
     private WatchSessionStartResult createSession(long userId, long matchId) {
         String sessionKey = UUID.randomUUID().toString();
-        Instant enteredAt = Instant.now().truncatedTo(ChronoUnit.MILLIS);
+        Instant enteredAt = clock.instant().truncatedTo(ChronoUnit.MILLIS);
         WatchSession watchSession = WatchSession.start(
                 sessionKey,
                 userId,

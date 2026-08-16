@@ -114,6 +114,7 @@ public class PollingScheduler {
                 }
             }
 
+            persistLiveMatches(matches);
             cache.putLiveMatches(matches);
             cache.putBettingMatches(resolveBettingMatches(matches));
             rememberActiveMatches(matches);
@@ -126,6 +127,18 @@ public class PollingScheduler {
         } catch (Exception e) {
             liveBackoff.failure();
             log.warn("getLive 폴링 실패 (연속 {}회): {}", liveBackoff.failures(), e.toString());
+        }
+    }
+
+    /** 라이브 매치별 선저장 실패를 격리해 나머지 캐시 갱신을 계속한다. */
+    private void persistLiveMatches(List<DataCacheService.LiveMatch> matches) {
+        for (DataCacheService.LiveMatch match : matches) {
+            try {
+                persistService.persistLiveMatch(match);
+            } catch (RuntimeException exception) {
+                log.warn("라이브 매치 선저장 실패 (matchId={}): {}",
+                        match.matchId(), exception.toString());
+            }
         }
     }
 
@@ -324,8 +337,11 @@ public class PollingScheduler {
             log.warn("게임 {} 의 매치 정보를 찾지 못해 적재를 건너뛴다", gameId);
             return false;
         }
+        Integer bestOf = owner.bestOf() != null
+                ? owner.bestOf()
+                : bestOfFromSchedule(owner.matchId());
         return persistService.persistGame(gameId,
-                GamePersistService.MatchContext.of(owner, gameId, bestOfFromSchedule(owner.matchId())));
+                GamePersistService.MatchContext.of(owner, gameId, bestOf));
     }
 
     /** 일정 캐시에서 다전제 수를 찾는다 (라이브 응답에는 없다) */

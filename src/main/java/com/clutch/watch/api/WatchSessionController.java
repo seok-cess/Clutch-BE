@@ -10,6 +10,7 @@ import com.clutch.watch.dto.response.WatchSessionStartResponse;
 import com.clutch.watch.service.WatchPointClaimService;
 import com.clutch.watch.service.WatchSessionService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -42,7 +43,7 @@ public class WatchSessionController {
     @PostMapping("/matches/{matchId}/watch-sessions")
     public ResponseEntity<WatchSessionStartResponse> start(
             @PathVariable @Positive(message = "사용자 ID는 1 이상이어야 합니다.") long userId,
-            @PathVariable @Positive(message = "경기 ID는 1 이상이어야 합니다.") long matchId
+            @PathVariable @NotBlank(message = "경기 ID는 필수입니다.") String matchId
     ) {
         WatchSessionStartResult result = watchSessionService.start(userId, matchId);
         return ResponseEntity.ok(WatchSessionStartResponse.from(result));

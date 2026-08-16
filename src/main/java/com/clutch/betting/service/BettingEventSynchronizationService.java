@@ -14,6 +14,7 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Objects;
 
 /** 한 라이브 매치의 세트 스냅샷을 배팅 이벤트 생명주기에 반영한다. */
 @Service
@@ -31,7 +32,7 @@ public class BettingEventSynchronizationService {
      */
     @Transactional
     public void synchronizeMatch(LiveMatchSnapshot liveMatch) {
-        if (!isUsable(liveMatch)) {
+        if (!hasRequiredMatchData(liveMatch)) {
             return;
         }
         List<SetSnapshot> sets = liveMatch.sets();
@@ -62,23 +63,25 @@ public class BettingEventSynchronizationService {
             SetSnapshot set,
             LocalDateTime now
     ) {
-        var existingEvent = bettingEventRepository
+        BettingEvent event = bettingEventRepository
                 .findByExternalMatchIdAndSetNumberForUpdate(
                         liveMatch.externalMatchId(),
                         set.setNumber()
-                );
+                )
+                .orElse(null);
         BettingPeriod period = periodOf(liveMatch, set.setNumber());
         if (period == null) {
-            synchronizeWithoutPeriod(liveMatch, set, existingEvent.orElse(null));
+            synchronizeWithoutPeriod(liveMatch, set, event);
             return;
         }
         if (now.isBefore(period.openedAt())) {
-            updateOpenPeriod(existingEvent.orElse(null), period);
+            updateOpenPeriod(event, period);
             return;
         }
 
-        BettingEvent event = existingEvent
-                .orElseGet(() -> openEvent(liveMatch, set.setNumber(), period));
+        if (event == null) {
+            event = openEvent(liveMatch, set.setNumber(), period);
+        }
         updateOpenPeriod(event, period);
         attachGameIfPresent(event, set.externalGameId());
         event.closeIfExpired(now);
@@ -89,7 +92,8 @@ public class BettingEventSynchronizationService {
     }
 
     /**
-     * 기간을 복구할 수 없으면 진행 이벤트는 취소하고 종료 결과만 보존한다.
+     * 기간을 복구할 수 없으면 진행 이벤트는 유지하고 확인된 종료 결과만 반영한다.
+     * 라이브 피드의 일시적인 시각 누락은 경기 또는 배팅 이벤트 취소를 의미하지 않는다.
      *
      * @param liveMatch 세트가 속한 라이브 매치
      * @param set 동기화할 세트
@@ -101,9 +105,6 @@ public class BettingEventSynchronizationService {
             BettingEvent existingEvent
     ) {
         if (!set.finished()) {
-            if (existingEvent != null) {
-                existingEvent.cancel();
-            }
             return;
         }
         if (existingEvent != null) {
@@ -163,7 +164,7 @@ public class BettingEventSynchronizationService {
      * @param liveMatch 검증할 라이브 매치 스냅샷
      * @return 동기화에 필요한 최소 정보가 있으면 true
      */
-    private boolean isUsable(LiveMatchSnapshot liveMatch) {
+    private boolean hasRequiredMatchData(LiveMatchSnapshot liveMatch) {
         return liveMatch != null
                 && liveMatch.externalMatchId() != null
                 && !liveMatch.externalMatchId().isBlank()
@@ -262,33 +263,21 @@ public class BettingEventSynchronizationService {
             LocalDateTime now
     ) {
         BettingPeriod period = periodOf(liveMatch, 1);
-        var existingEvent = bettingEventRepository
-                .findByExternalMatchIdAndSetNumberForUpdate(liveMatch.externalMatchId(), 1);
         if (period == null) {
-            existingEvent.ifPresent(BettingEvent::cancel);
             return;
         }
+        BettingEvent event = bettingEventRepository
+                .findByExternalMatchIdAndSetNumberForUpdate(liveMatch.externalMatchId(), 1)
+                .orElse(null);
         if (now.isBefore(period.openedAt())) {
-            existingEvent
-                    .filter(event -> event.getStatus() == BettingEventStatus.OPEN)
-                    .ifPresent(event -> event.definePeriod(
-                            period.openedAt(),
-                            period.closesAt()
-                    ));
+            updateOpenPeriod(event, period);
             return;
         }
-        existingEvent.ifPresentOrElse(
-                event -> {
-                    if (event.getStatus() == BettingEventStatus.OPEN) {
-                        event.definePeriod(period.openedAt(), period.closesAt());
-                        event.closeIfExpired(now);
-                    }
-                },
-                () -> {
-                    BettingEvent event = openEvent(liveMatch, 1, period);
-                    event.closeIfExpired(now);
-                }
-        );
+        if (event == null) {
+            event = openEvent(liveMatch, 1, period);
+        }
+        updateOpenPeriod(event, period);
+        event.closeIfExpired(now);
     }
 
     /**
@@ -313,7 +302,7 @@ public class BettingEventSynchronizationService {
         return liveMatch.sets().stream()
                 .filter(set -> set.setNumber() == setNumber - 1)
                 .map(SetSnapshot::finishedAt)
-                .filter(java.util.Objects::nonNull)
+                .filter(Objects::nonNull)
                 .findFirst()
                 .map(finishedAt -> new BettingPeriod(
                         finishedAt,

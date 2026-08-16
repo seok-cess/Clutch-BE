@@ -129,6 +129,26 @@ public class GamePersistService {
         return gameRepo.findByExternalGameIdAndFinalizedAtIsNotNull(externalGameId).isPresent();
     }
 
+    /**
+     * 진행 중인 매치와 참가 팀 메타데이터를 시청 세션보다 먼저 저장한다.
+     *
+     * <p>세트 종료 적재만 기다리면 첫 세트 시청 중에는 {@code watch_session}이 참조할
+     * 매치 행이 없어 입장이 실패한다. 라이브 폴링 시점에 매치와 팀만 선저장하고,
+     * 세트 통계는 기존 종료 적재 흐름에서 확정한다.</p>
+     *
+     * @param liveMatch 현재 라이브 매치 스냅샷
+     */
+    @Transactional
+    public void persistLiveMatch(DataCacheService.LiveMatch liveMatch) {
+        MatchContext context = MatchContext.of(
+                liveMatch,
+                liveMatch.activeGameId(),
+                liveMatch.bestOf()
+        );
+        EsportsMatch match = upsertMatch(context);
+        upsertMatchTeams(match, context);
+    }
+
     // ---- 매치 / 팀 ----
 
     private EsportsMatch upsertMatch(MatchContext ctx) {

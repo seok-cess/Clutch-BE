@@ -40,16 +40,12 @@ public interface BettingEventRepository extends JpaRepository<BettingEvent, Long
     List<BettingEvent> findAllByStatus(BettingEventStatus status);
 
     /**
-     * 매치에서 현재 상태 목록에 포함되는 가장 최근 세트 이벤트를 조회한다.
+     * 상태와 무관하게 매치의 가장 최근 세트 이벤트를 조회한다.
      *
      * @param externalMatchId 외부 매치 ID
-     * @param statuses 조회할 배팅 이벤트 상태 목록
-     * @return 가장 큰 세트 번호를 가진 현재 이벤트
+     * @return 가장 큰 세트 번호를 가진 이벤트
      */
-    Optional<BettingEvent> findFirstByExternalMatchIdAndStatusInOrderBySetNumberDesc(
-            String externalMatchId,
-            List<BettingEventStatus> statuses
-    );
+    Optional<BettingEvent> findFirstByExternalMatchIdOrderBySetNumberDesc(String externalMatchId);
 
     /**
      * 배팅 등록·정산과 동기화의 상태 충돌을 막기 위해 이벤트 행을 잠가 조회한다.

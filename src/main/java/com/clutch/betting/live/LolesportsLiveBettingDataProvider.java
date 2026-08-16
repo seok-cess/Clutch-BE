@@ -1,6 +1,7 @@
 package com.clutch.betting.live;
 
 import com.clutch.lolesports.dto.external.EventDetailsResponse;
+import com.clutch.lolesports.repository.EsportsGameRepository;
 import com.clutch.lolesports.service.DataCacheService;
 import com.clutch.lolesports.service.SetWinnerTracker;
 import lombok.RequiredArgsConstructor;
@@ -9,7 +10,7 @@ import org.springframework.stereotype.Component;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
-import java.util.ArrayList;
+import java.time.format.DateTimeParseException;
 import java.util.Comparator;
 import java.util.List;
 
@@ -20,6 +21,7 @@ public class LolesportsLiveBettingDataProvider implements LiveBettingDataProvide
 
     private final DataCacheService dataCacheService;
     private final SetWinnerTracker setWinnerTracker;
+    private final EsportsGameRepository esportsGameRepository;
 
     /**
      * 캐시된 모든 배팅 후보 매치를 배팅용 스냅샷으로 변환한다.
@@ -89,14 +91,17 @@ public class LolesportsLiveBettingDataProvider implements LiveBettingDataProvide
             return List.of();
         }
 
-        List<SetSnapshot> sets = new ArrayList<>();
-        for (EventDetailsResponse.Game game : liveMatch.games()) {
-            if (game.id() != null && !game.id().isBlank() && game.number() != null) {
-                sets.add(toSetSnapshot(liveMatch, game));
-            }
-        }
-        sets.sort(Comparator.comparingInt(SetSnapshot::setNumber));
-        return List.copyOf(sets);
+        return liveMatch.games().stream()
+                .filter(this::hasRequiredGameData)
+                .map(game -> toSetSnapshot(liveMatch, game))
+                .sorted(Comparator.comparingInt(SetSnapshot::setNumber))
+                .toList();
+    }
+
+    private boolean hasRequiredGameData(EventDetailsResponse.Game game) {
+        return game.id() != null
+                && !game.id().isBlank()
+                && game.number() != null;
     }
 
     /**
@@ -112,15 +117,31 @@ public class LolesportsLiveBettingDataProvider implements LiveBettingDataProvide
     ) {
         LocalDateTime startedAt = toUtc(dataCacheService.getGameStart(game.id()));
         LocalDateTime finishedAt = toUtc(dataCacheService.getFeedFinishedAt(game.id()));
+        boolean finished = finishedAt != null || "completed".equalsIgnoreCase(game.state());
         return new SetSnapshot(
                 game.id(),
                 game.number(),
                 startedAt,
                 game.id().equals(liveMatch.activeGameId()),
-                finishedAt != null || "completed".equalsIgnoreCase(game.state()),
+                finished,
                 finishedAt,
-                setWinnerTracker.winnerOf(liveMatch.matchId(), game.id())
+                findWinnerExternalTeamId(liveMatch.matchId(), game.id(), finished)
         );
+    }
+
+    /** 메모리 승자가 없으면 완료 세트에 한해 DB에 확정된 승자를 복원한다. */
+    private String findWinnerExternalTeamId(String matchId, String gameId, boolean finished) {
+        String trackedWinner = setWinnerTracker.winnerOf(matchId, gameId);
+        if (trackedWinner != null || !finished) {
+            return trackedWinner;
+        }
+
+        return esportsGameRepository.findWinnerExternalTeamId(gameId)
+                .map(winnerTeamId -> {
+                    setWinnerTracker.restoreWinner(matchId, gameId, winnerTeamId);
+                    return winnerTeamId;
+                })
+                .orElse(null);
     }
 
     /**
@@ -145,7 +166,7 @@ public class LolesportsLiveBettingDataProvider implements LiveBettingDataProvide
         }
         try {
             return LocalDateTime.ofInstant(Instant.parse(value), ZoneOffset.UTC);
-        } catch (RuntimeException exception) {
+        } catch (DateTimeParseException exception) {
             return null;
         }
     }
@@ -157,6 +178,9 @@ public class LolesportsLiveBettingDataProvider implements LiveBettingDataProvide
      * @return 매치 승리 조건을 충족한 팀이 있으면 true
      */
     private boolean isMatchFinished(DataCacheService.LiveMatch liveMatch) {
+        if (liveMatch.activeGameId() != null && !liveMatch.activeGameId().isBlank()) {
+            return false;
+        }
         if (liveMatch.bestOf() == null || liveMatch.bestOf() < 1) {
             return false;
         }
@@ -196,12 +220,10 @@ public class LolesportsLiveBettingDataProvider implements LiveBettingDataProvide
                     .filter(set -> set.externalGameId().equals(externalGameId))
                     .anyMatch(set -> !set.finished());
         }
-        List<SetSnapshot> targetSets = match.sets().stream()
+        return match.sets().stream()
                 .filter(set -> set.setNumber() == setNumber)
-                .toList();
-        if (!targetSets.isEmpty()) {
-            return targetSets.stream().anyMatch(set -> !set.finished());
-        }
-        return setNumber > 1;
+                .findFirst()
+                .map(set -> !set.finished())
+                .orElse(setNumber > 1);
     }
 }

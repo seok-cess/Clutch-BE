@@ -43,9 +43,8 @@ public class WatchPointAwardService {
             long rewardSequence,
             long rewardPoint
     ) {
-        WatchSession watchSession = watchSessionRepository.findBySessionKey(sessionKey)
-                .orElseThrow(() -> new WatchException(WatchError.WATCH_SESSION_NOT_FOUND));
-        validateSession(watchSession, userId);
+        WatchSession watchSession = findOwnedSession(userId, sessionKey);
+        validateWatching(watchSession);
 
         User user = userRepository.findByIdForUpdate(userId)
                 .orElseThrow(() -> new WatchException(WatchError.USER_NOT_FOUND));
@@ -96,11 +95,7 @@ public class WatchPointAwardService {
             String sessionKey,
             long rewardSequence
     ) {
-        WatchSession watchSession = watchSessionRepository.findBySessionKey(sessionKey)
-                .orElseThrow(() -> new WatchException(WatchError.WATCH_SESSION_NOT_FOUND));
-        if (!watchSession.getUserId().equals(userId)) {
-            throw new WatchException(WatchError.WATCH_SESSION_USER_MISMATCH);
-        }
+        WatchSession watchSession = findOwnedSession(userId, sessionKey);
         WatchPointTransaction transaction = watchPointTransactionRepository
                 .findByWatchSessionIdAndRewardSequence(watchSession.getId(), rewardSequence)
                 .orElseThrow(() -> new WatchException(WatchError.POINT_TRANSACTION_NOT_FOUND));
@@ -123,17 +118,18 @@ public class WatchPointAwardService {
                 .orElseThrow(() -> new WatchException(WatchError.USER_NOT_FOUND));
     }
 
-    /**
-     * DB 시청 세션의 소유자와 포인트 지급 가능 상태를 검증한다.
-     *
-     * @param watchSession 검증할 DB 시청 세션
-     * @param userId 포인트 수령을 요청한 사용자 ID
-     * @throws WatchException 세션 소유자가 다르거나 세션이 이미 종료된 경우
-     */
-    private void validateSession(WatchSession watchSession, long userId) {
+    /** DB 시청 세션을 조회하고 요청 사용자가 소유한 세션인지 검증한다. */
+    private WatchSession findOwnedSession(long userId, String sessionKey) {
+        WatchSession watchSession = watchSessionRepository.findBySessionKey(sessionKey)
+                .orElseThrow(() -> new WatchException(WatchError.WATCH_SESSION_NOT_FOUND));
         if (!watchSession.getUserId().equals(userId)) {
             throw new WatchException(WatchError.WATCH_SESSION_USER_MISMATCH);
         }
+        return watchSession;
+    }
+
+    /** 포인트를 지급할 수 있는 시청 중 세션인지 검증한다. */
+    private void validateWatching(WatchSession watchSession) {
         if (watchSession.getStatus() != WatchSessionStatus.WATCHING) {
             throw new WatchException(WatchError.WATCH_SESSION_EXPIRED);
         }

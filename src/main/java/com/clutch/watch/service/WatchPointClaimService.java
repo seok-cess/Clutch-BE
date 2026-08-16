@@ -6,12 +6,12 @@ import com.clutch.watch.dto.WatchPointClaimResult;
 import com.clutch.watch.exception.WatchError;
 import com.clutch.watch.exception.WatchException;
 import com.clutch.watch.redis.reward.RewardClaimCompletionResult;
-import com.clutch.watch.redis.reward.RewardClaimCompletionStatus;
+import com.clutch.watch.redis.reward.RewardClaimStatus;
 import com.clutch.watch.redis.session.WatchSessionRedisRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.time.Instant;
+import java.time.Clock;
 import java.util.UUID;
 
 /**
@@ -24,6 +24,7 @@ public class WatchPointClaimService {
     private final WatchSessionRedisRepository watchSessionRedisRepository;
     private final WatchPointAwardService pointAwardService;
     private final WatchRewardProperties properties;
+    private final Clock clock;
 
     /**
      * 한 사용자의 세션 전환과 포인트 수령이 동시에 처리되지 않도록 lock을 획득한 뒤 포인트를 수령한다.
@@ -62,7 +63,7 @@ public class WatchPointClaimService {
             String sessionKey,
             long rewardSequence
     ) {
-        RewardClaimCompletionStatus eligibility = watchSessionRedisRepository.prepareRewardClaim(
+        RewardClaimStatus eligibility = watchSessionRedisRepository.prepareRewardClaim(
                 userId,
                 sessionKey,
                 rewardSequence
@@ -93,7 +94,7 @@ public class WatchPointClaimService {
      * @return 새로 지급하거나 DB에서 복원한 지급 결과
      */
     private WatchPointAwardResult awardOrRestore(
-            RewardClaimCompletionStatus eligibility,
+            RewardClaimStatus eligibility,
             long userId,
             String sessionKey,
             long rewardSequence
@@ -131,10 +132,10 @@ public class WatchPointClaimService {
                 userId,
                 sessionKey,
                 rewardSequence,
-                Instant.now().toEpochMilli()
+                clock.instant().toEpochMilli()
         );
-        if (completion.status() != RewardClaimCompletionStatus.SUCCESS
-                && completion.status() != RewardClaimCompletionStatus.ALREADY_COMPLETED) {
+        if (completion.status() != RewardClaimStatus.SUCCESS
+                && completion.status() != RewardClaimStatus.ALREADY_COMPLETED) {
             throw new WatchException(WatchError.REWARD_CLAIM_COMPLETION_FAILED);
         }
         return completion;
@@ -173,7 +174,7 @@ public class WatchPointClaimService {
      * @return 처리 상태에 대응하는 시청 도메인 오류
      * @throws WatchException 성공 상태를 오류로 변환하려는 경우
      */
-    private WatchError toError(RewardClaimCompletionStatus status) {
+    private WatchError toError(RewardClaimStatus status) {
         return switch (status) {
             case REPLACED -> WatchError.WATCH_SESSION_REPLACED;
             case EXPIRED -> WatchError.WATCH_SESSION_EXPIRED;

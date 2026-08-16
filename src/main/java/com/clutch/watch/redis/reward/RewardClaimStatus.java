@@ -1,9 +1,9 @@
 package com.clutch.watch.redis.reward;
 
 /**
- * DB 포인트 지급 후 Redis 회차 전환 결과.
+ * Redis 포인트 수령의 자격 검증 및 회차 전환 상태.
  */
-public enum RewardClaimCompletionStatus {
+public enum RewardClaimStatus {
     SUCCESS,
     ALREADY_COMPLETED,
     REPLACED,

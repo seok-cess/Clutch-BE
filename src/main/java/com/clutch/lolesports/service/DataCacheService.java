@@ -237,6 +237,22 @@ public class DataCacheService {
     }
 
     /**
+     * 실제 livestats 프레임 기준으로 세트가 시작되어 아직 끝나지 않았는지 확인한다.
+     * 외부 세트 상태가 inProgress여도 첫 프레임이 없으면 밴픽 또는 시작 전으로 본다.
+     *
+     * @param gameId 확인할 외부 게임 ID
+     * @return 최신 프레임이 인게임 또는 일시정지 상태이면 true
+     */
+    public boolean isGameInProgress(String gameId) {
+        WindowResponse.Frame frame = getNewestWindowFrame(gameId);
+        if (frame == null || frame.gameState() == null) {
+            return false;
+        }
+        return "in_game".equalsIgnoreCase(frame.gameState())
+                || "paused".equalsIgnoreCase(frame.gameState());
+    }
+
+    /**
      * livestats 피드가 처음 finished 상태를 알린 시각을 반환한다.
      *
      * @param gameId 외부 게임 ID

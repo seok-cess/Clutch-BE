@@ -16,10 +16,6 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RestControllerAdvice(assignableTypes = BettingController.class)
 public class BettingExceptionHandler {
 
-    /** 상태 없는 배팅 예외 처리기를 생성한다. */
-    public BettingExceptionHandler() {
-    }
-
     /**
      * 배팅 오류 코드를 HTTP 상태와 오류 응답으로 매핑한다.
      *

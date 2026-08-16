@@ -3,6 +3,7 @@ package com.clutch.betting.api;
 import com.clutch.betting.dto.request.BetCreateRequest;
 import com.clutch.betting.dto.response.BetCreateResponse;
 import com.clutch.betting.dto.response.BettingEventResponse;
+import com.clutch.betting.dto.response.MyBetResponse;
 import com.clutch.betting.dto.response.UserBetResponse;
 import com.clutch.betting.service.BettingService;
 import com.clutch.wallet.web.CurrentUserId;
@@ -19,6 +20,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 /** 세트별 배팅 조회·등록 요청을 서비스 계층으로 전달한다. */
 @Validated
@@ -85,5 +88,20 @@ public class BettingController {
         return ResponseEntity.ok(UserBetResponse.from(
                 bettingService.getMyBet(bettingEventId, userId)
         ));
+    }
+
+    /**
+     * 현재 사용자가 등록한 전체 배팅을 최신 순서로 조회한다.
+     *
+     * @param userId X-User-Id 헤더에서 식별한 조회 사용자 ID
+     * @return 경기·세트 정보가 포함된 사용자 배팅 목록
+     */
+    @GetMapping("/users/me/bets")
+    public ResponseEntity<List<MyBetResponse>> getMyBets(@CurrentUserId Long userId) {
+        return ResponseEntity.ok(
+                bettingService.getMyBets(userId).stream()
+                        .map(MyBetResponse::from)
+                        .toList()
+        );
     }
 }

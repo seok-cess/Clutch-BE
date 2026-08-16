@@ -33,13 +33,12 @@ public interface UserBetRepository extends JpaRepository<UserBet, Long> {
     boolean existsByBettingEventIdAndUserId(Long bettingEventId, Long userId);
 
     /**
-     * 이벤트와 처리 상태에 해당하는 사용자 배팅을 조회한다.
+     * 사용자의 전체 배팅을 최신 등록 순서로 조회한다.
      *
-     * @param bettingEventId 배팅 이벤트 ID
-     * @param status 사용자 배팅 상태
-     * @return 조건에 맞는 사용자 배팅 목록
+     * @param userId 사용자 ID
+     * @return 최신 배팅이 먼저 정렬된 사용자 배팅 목록
      */
-    List<UserBet> findAllByBettingEventIdAndStatus(Long bettingEventId, UserBetStatus status);
+    List<UserBet> findAllByUserIdOrderByCreatedAtDescIdDesc(Long userId);
 
     /**
      * 정산·환불 교착을 줄이도록 사용자와 ID 순서로 배팅 행을 잠가 조회한다.
