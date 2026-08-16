@@ -28,10 +28,10 @@ CREATE TABLE `betting_event` (
     CONSTRAINT `chk_betting_event_winner`
         CHECK (`winner_external_team_id` IS NULL
             OR `winner_external_team_id` IN (`first_external_team_id`, `second_external_team_id`)),
+    CONSTRAINT `chk_betting_event_winner_status`
+        CHECK (`winner_external_team_id` IS NULL OR `status` IN ('CLOSED', 'SETTLED')),
     CONSTRAINT `chk_betting_event_settled_winner`
-        CHECK (`status` <> 'SETTLED' OR `winner_external_team_id` IS NOT NULL),
-    CONSTRAINT `chk_betting_event_period`
-        CHECK (`closes_at` IS NULL OR `closes_at` >= `opened_at`)
+        CHECK (`status` <> 'SETTLED' OR `winner_external_team_id` IS NOT NULL)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE `user_bet` (
