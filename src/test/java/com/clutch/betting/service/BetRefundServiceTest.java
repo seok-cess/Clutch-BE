@@ -4,7 +4,6 @@ import com.clutch.betting.domain.BetPointTransaction;
 import com.clutch.betting.domain.BettingEvent;
 import com.clutch.betting.domain.UserBet;
 import com.clutch.betting.domain.UserBetStatus;
-import com.clutch.betting.dto.BetRefundResult;
 import com.clutch.betting.repository.BetPointTransactionRepository;
 import com.clutch.betting.repository.BettingEventRepository;
 import com.clutch.betting.repository.UserBetRepository;
@@ -55,9 +54,8 @@ class BetRefundServiceTest {
         )).willReturn(List.of(userBet));
         given(userRepository.increasePoint(10L, 1_000L)).willReturn(1);
 
-        BetRefundResult result = service.refund(1L);
+        service.refund(1L);
 
-        assertThat(result.totalRefundPoint()).isEqualTo(1_000L);
         assertThat(userBet.getStatus()).isEqualTo(UserBetStatus.REFUNDED);
         verify(userRepository).increasePoint(10L, 1_000L);
         verify(transactionRepository).save(any(BetPointTransaction.class));

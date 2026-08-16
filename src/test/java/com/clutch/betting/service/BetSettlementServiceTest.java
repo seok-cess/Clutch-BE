@@ -5,7 +5,6 @@ import com.clutch.betting.domain.BettingEvent;
 import com.clutch.betting.domain.BettingEventStatus;
 import com.clutch.betting.domain.UserBet;
 import com.clutch.betting.domain.UserBetStatus;
-import com.clutch.betting.dto.BetSettlementResult;
 import com.clutch.betting.repository.BetPointTransactionRepository;
 import com.clutch.betting.repository.BettingEventRepository;
 import com.clutch.betting.repository.UserBetRepository;
@@ -50,11 +49,8 @@ class BetSettlementServiceTest {
         )).willReturn(List.of(winner, loser));
         given(userRepository.increasePoint(10L, 2_000L)).willReturn(1);
 
-        BetSettlementResult result = service.settle(1L);
+        service.settle(1L);
 
-        assertThat(result.wonCount()).isEqualTo(1);
-        assertThat(result.lostCount()).isEqualTo(1);
-        assertThat(result.totalPayoutPoint()).isEqualTo(2_000L);
         assertThat(event.getStatus()).isEqualTo(BettingEventStatus.SETTLED);
         assertThat(winner.getStatus()).isEqualTo(UserBetStatus.WON);
         assertThat(loser.getStatus()).isEqualTo(UserBetStatus.LOST);
@@ -68,9 +64,8 @@ class BetSettlementServiceTest {
         event.settle();
         given(eventRepository.findByIdForUpdate(1L)).willReturn(Optional.of(event));
 
-        BetSettlementResult result = service.settle(1L);
+        service.settle(1L);
 
-        assertThat(result.alreadyProcessed()).isTrue();
         verify(userRepository, never()).increasePoint(any(), any(Long.class));
     }
 

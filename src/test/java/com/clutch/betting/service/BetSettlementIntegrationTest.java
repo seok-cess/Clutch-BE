@@ -10,8 +10,6 @@ import com.clutch.betting.repository.BetPointTransactionRepository;
 import com.clutch.betting.repository.BettingEventRepository;
 import com.clutch.betting.repository.UserBetRepository;
 import com.clutch.betting.service.BetRefundService;
-import com.clutch.betting.dto.BetRefundResult;
-import com.clutch.betting.dto.BetSettlementResult;
 import com.clutch.betting.scheduler.BettingScheduler;
 import com.clutch.betting.service.BetSettlementService;
 import com.clutch.lolesports.service.PollingScheduler;
@@ -86,15 +84,13 @@ class BetSettlementIntegrationTest {
         ));
         entityManager.clear();
 
-        BetSettlementResult firstResult = settlementService.settle(event.getId());
+        settlementService.settle(event.getId());
         entityManager.flush();
         entityManager.clear();
-        BetSettlementResult secondResult = settlementService.settle(event.getId());
+        settlementService.settle(event.getId());
         entityManager.flush();
         entityManager.clear();
 
-        assertThat(firstResult.totalPayoutPoint()).isEqualTo(2_000L);
-        assertThat(secondResult.alreadyProcessed()).isTrue();
         assertThat(eventRepository.findById(event.getId()).orElseThrow().getStatus())
                 .isEqualTo(BettingEventStatus.SETTLED);
         assertThat(userBetRepository.findById(winnerBet.getId()).orElseThrow().getStatus())
@@ -130,15 +126,13 @@ class BetSettlementIntegrationTest {
         );
         entityManager.clear();
 
-        BetRefundResult firstResult = refundService.refund(event.getId());
+        refundService.refund(event.getId());
         entityManager.flush();
         entityManager.clear();
-        BetRefundResult secondResult = refundService.refund(event.getId());
+        refundService.refund(event.getId());
         entityManager.flush();
         entityManager.clear();
 
-        assertThat(firstResult.totalRefundPoint()).isEqualTo(1_000L);
-        assertThat(secondResult.alreadyProcessed()).isTrue();
         assertThat(userRepository.findById(user.getId()).orElseThrow().getPoint())
                 .isEqualTo(1_000L);
         assertThat(userBetRepository.findById(userBet.getId()).orElseThrow().getStatus())

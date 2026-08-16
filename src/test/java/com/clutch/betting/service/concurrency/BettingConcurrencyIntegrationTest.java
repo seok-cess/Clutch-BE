@@ -13,7 +13,6 @@ import com.clutch.betting.repository.UserBetRepository;
 import com.clutch.betting.service.BettingService;
 import com.clutch.betting.scheduler.BettingScheduler;
 import com.clutch.betting.service.BetSettlementService;
-import com.clutch.betting.dto.BetSettlementResult;
 import com.clutch.lolesports.service.PollingScheduler;
 import com.clutch.user.domain.User;
 import com.clutch.user.domain.UserRole;
@@ -126,16 +125,8 @@ class BettingConcurrencyIntegrationTest {
         transactionRepository.saveAndFlush(BetPointTransaction.stake(userBet.getId(), 1_000L));
         event.recordWinner("team-a");
         eventRepository.saveAndFlush(event);
-        AtomicInteger processed = new AtomicInteger();
+        runConcurrently(REQUEST_COUNT, () -> settlementService.settle(event.getId()));
 
-        runConcurrently(REQUEST_COUNT, () -> {
-            BetSettlementResult result = settlementService.settle(event.getId());
-            if (!result.alreadyProcessed()) {
-                processed.incrementAndGet();
-            }
-        });
-
-        assertThat(processed).hasValue(1);
         assertThat(userRepository.findById(user.getId()).orElseThrow().getPoint()).isEqualTo(6_000L);
         assertThat(transactionRepository.findByUserBetIdAndTransactionType(
                 userBet.getId(),

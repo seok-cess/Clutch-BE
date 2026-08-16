@@ -5,7 +5,6 @@ import com.clutch.betting.domain.BettingEvent;
 import com.clutch.betting.domain.BettingEventStatus;
 import com.clutch.betting.domain.UserBet;
 import com.clutch.betting.domain.UserBetStatus;
-import com.clutch.betting.dto.BetSettlementResult;
 import com.clutch.betting.exception.BettingErrorCode;
 import com.clutch.betting.exception.BettingException;
 import com.clutch.betting.repository.BetPointTransactionRepository;
@@ -34,16 +33,15 @@ public class BetSettlementService {
      * 이벤트와 배팅을 잠근 뒤 적중에는 2배 지급, 실패에는 몰수 결과를 기록한다.
      *
      * @param bettingEventId 정산할 배팅 이벤트 ID
-     * @return 적중·실패 건수와 총 지급 포인트
      * @throws BettingException 이벤트가 없거나 결과가 준비되지 않았거나 사용자를 찾을 수 없을 때
-     * @throws ArithmeticException 지급액 계산 또는 합산 중 long 범위를 넘을 때
+     * @throws ArithmeticException 지급액 계산 중 long 범위를 넘을 때
      */
     @Transactional
-    public BetSettlementResult settle(Long bettingEventId) {
+    public void settle(Long bettingEventId) {
         BettingEvent event = eventRepository.findByIdForUpdate(bettingEventId)
                 .orElseThrow(() -> new BettingException(BettingErrorCode.EVENT_NOT_FOUND));
         if (event.getStatus() == BettingEventStatus.SETTLED) {
-            return BetSettlementResult.alreadyProcessed(bettingEventId);
+            return;
         }
         if (event.getStatus() != BettingEventStatus.CLOSED
                 || event.getWinnerExternalTeamId() == null) {
@@ -55,9 +53,6 @@ public class BetSettlementService {
                         bettingEventId,
                         UserBetStatus.PLACED
                 );
-        int wonCount = 0;
-        int lostCount = 0;
-        long totalPayoutPoint = 0L;
         for (UserBet userBet : placedBets) {
             if (userBet.getSelectedExternalTeamId().equals(event.getWinnerExternalTeamId())) {
                 long payoutPoint = Math.multiplyExact(userBet.getAmount(), PAYOUT_MULTIPLIER);
@@ -66,21 +61,11 @@ public class BetSettlementService {
                 transactionRepository.save(
                         BetPointTransaction.payout(userBet.getId(), payoutPoint)
                 );
-                wonCount++;
-                totalPayoutPoint = Math.addExact(totalPayoutPoint, payoutPoint);
             } else {
                 userBet.lose();
-                lostCount++;
             }
         }
         event.settle();
-        return new BetSettlementResult(
-                bettingEventId,
-                wonCount,
-                lostCount,
-                totalPayoutPoint,
-                false
-        );
     }
 
     /**

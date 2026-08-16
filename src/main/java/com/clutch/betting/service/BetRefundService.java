@@ -5,7 +5,6 @@ import com.clutch.betting.domain.BettingEvent;
 import com.clutch.betting.domain.BettingEventStatus;
 import com.clutch.betting.domain.UserBet;
 import com.clutch.betting.domain.UserBetStatus;
-import com.clutch.betting.dto.BetRefundResult;
 import com.clutch.betting.exception.BettingErrorCode;
 import com.clutch.betting.exception.BettingException;
 import com.clutch.betting.repository.BetPointTransactionRepository;
@@ -29,15 +28,13 @@ public class BetRefundService {
     private final UserRepository userRepository;
 
     /**
-     * 취소 이벤트의 미처리 배팅을 환불하며 반복 호출은 처리 완료 결과로 응답한다.
+     * 취소 이벤트의 미처리 배팅을 환불하며 처리할 배팅이 없으면 멱등하게 종료한다.
      *
      * @param bettingEventId 환불할 배팅 이벤트 ID
-     * @return 환불 건수·총액과 기존 처리 여부
      * @throws BettingException 이벤트가 없거나 취소 상태가 아니거나 사용자를 찾을 수 없을 때
-     * @throws ArithmeticException 총 환불 포인트 합산 중 long 범위를 넘을 때
      */
     @Transactional
-    public BetRefundResult refund(Long bettingEventId) {
+    public void refund(Long bettingEventId) {
         BettingEvent event = eventRepository.findByIdForUpdate(bettingEventId)
                 .orElseThrow(() -> new BettingException(BettingErrorCode.EVENT_NOT_FOUND));
         if (event.getStatus() != BettingEventStatus.CANCELLED) {
@@ -49,10 +46,9 @@ public class BetRefundService {
                         UserBetStatus.PLACED
                 );
         if (placedBets.isEmpty()) {
-            return BetRefundResult.alreadyProcessed(bettingEventId);
+            return;
         }
 
-        long totalRefundPoint = 0L;
         for (UserBet userBet : placedBets) {
             if (userRepository.increasePoint(userBet.getUserId(), userBet.getAmount()) != 1) {
                 throw new BettingException(BettingErrorCode.USER_NOT_FOUND);
@@ -61,13 +57,6 @@ public class BetRefundService {
             transactionRepository.save(
                     BetPointTransaction.refund(userBet.getId(), userBet.getAmount())
             );
-            totalRefundPoint = Math.addExact(totalRefundPoint, userBet.getAmount());
         }
-        return new BetRefundResult(
-                bettingEventId,
-                placedBets.size(),
-                totalRefundPoint,
-                false
-        );
     }
 }
