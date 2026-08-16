@@ -12,6 +12,7 @@ import com.clutch.betting.repository.BettingEventRepository;
 import com.clutch.betting.repository.UserBetRepository;
 import com.clutch.user.repository.UserRepository;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Clock;
@@ -65,6 +66,24 @@ class BettingPlacementTest {
         assertThat(result.userId()).isEqualTo(20L);
         verify(userRepository).decreasePointIfEnough(20L, 1_000L);
         verify(transactionRepository).saveAndFlush(any(BetPointTransaction.class));
+    }
+
+    @Test
+    void propagatesStakeTransactionIntegrityFailure() {
+        BettingEvent event = openEvent();
+        given(eventRepository.findByIdForUpdate(10L)).willReturn(Optional.of(event));
+        given(liveBettingDataProvider.isAcceptingBets("match-1", "game-1", 1)).willReturn(true);
+        given(userRepository.decreasePointIfEnough(20L, 1_000L)).willReturn(1);
+        given(userBetRepository.saveAndFlush(any(UserBet.class))).willAnswer(invocation -> {
+            UserBet bet = invocation.getArgument(0);
+            ReflectionTestUtils.setField(bet, "id", 30L);
+            return bet;
+        });
+        given(transactionRepository.saveAndFlush(any(BetPointTransaction.class)))
+                .willThrow(new DataIntegrityViolationException("ledger constraint"));
+
+        assertThatThrownBy(() -> service.place(20L, 10L, "team-a", 1_000L))
+                .isInstanceOf(DataIntegrityViolationException.class);
     }
 
     @Test

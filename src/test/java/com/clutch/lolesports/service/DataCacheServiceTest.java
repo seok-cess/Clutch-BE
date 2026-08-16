@@ -83,6 +83,21 @@ class DataCacheServiceTest {
     }
 
     @Test
+    void 실제_인게임과_일시정지_프레임에서만_세트_진행으로_판정한다() {
+        DataCacheService cache = new DataCacheService();
+
+        assertEquals(false, cache.isGameInProgress(GAME));
+        cache.addWindowFrames(GAME, null, List.of(frame(0, 100)));
+        assertEquals(true, cache.isGameInProgress(GAME));
+        cache.addWindowFrames(GAME, null, List.of(new WindowResponse.Frame(
+                T0.plusSeconds(1).toString(), "paused", null, null)));
+        assertEquals(true, cache.isGameInProgress(GAME));
+        cache.addWindowFrames(GAME, null, List.of(new WindowResponse.Frame(
+                T0.plusSeconds(2).toString(), "finished", null, null)));
+        assertEquals(false, cache.isGameInProgress(GAME));
+    }
+
+    @Test
     void 버퍼가_비면_null() {
         DataCacheService cache = new DataCacheService();
 

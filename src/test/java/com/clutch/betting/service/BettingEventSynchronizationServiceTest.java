@@ -57,9 +57,9 @@ class BettingEventSynchronizationServiceTest {
         verify(repository, never()).save(any(BettingEvent.class));
     }
 
-    /** 공식 시작 시각을 복구할 수 없는 진행 이벤트가 취소되는지 검증한다. */
+    /** 공식 시작 시각이 일시적으로 누락돼도 진행 이벤트를 유지하는지 검증한다. */
     @Test
-    void cancelsExistingEventWhenOfficialStartCannotBeRecovered() {
+    void preservesExistingEventWhenOfficialStartCannotBeRecovered() {
         BettingEventSynchronizationService service = serviceAt("2026-08-14T09:40:00Z");
         BettingEvent existing = firstEvent();
         given(repository.findByExternalMatchIdAndSetNumberForUpdate("match-1", 1))
@@ -74,7 +74,27 @@ class BettingEventSynchronizationServiceTest {
 
         service.synchronizeMatch(missingSchedule);
 
-        assertThat(existing.getStatus()).isEqualTo(BettingEventStatus.CANCELLED);
+        assertThat(existing.getStatus()).isEqualTo(BettingEventStatus.OPEN);
+    }
+
+    /** 이전 세트 종료 시각이 누락돼도 선개설된 다음 세트 이벤트를 유지하는지 검증한다. */
+    @Test
+    void preservesNextSetEventWhenPreviousFinishTimeIsMissing() {
+        BettingEventSynchronizationService service = serviceAt("2026-08-14T10:03:00Z");
+        BettingEvent existing = BettingEvent.open(
+                "match-1",
+                2,
+                "team-a",
+                "team-b",
+                LocalDateTime.of(2026, 8, 14, 10, 2),
+                LocalDateTime.of(2026, 8, 14, 10, 22)
+        );
+        given(repository.findByExternalMatchIdAndSetNumberForUpdate("match-1", 2))
+                .willReturn(Optional.of(existing));
+
+        service.synchronizeMatch(snapshot(List.of(activeSet(2))));
+
+        assertThat(existing.getStatus()).isEqualTo(BettingEventStatus.OPEN);
     }
 
     /** 스케줄러가 늦게 복구돼도 첫 세트 마감이 공식 시작 1분 후로 유지되는지 검증한다. */

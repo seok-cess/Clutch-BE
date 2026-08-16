@@ -35,6 +35,7 @@ class WatchSessionControllerTest {
 
     private static final long USER_ID = 100L;
     private static final long MATCH_ID = 200L;
+    private static final String EXTERNAL_MATCH_ID = "external-match-200";
     private static final String SESSION_KEY = "33ce4d12-e136-4da4-9ba5-e955091b09bf";
 
     @Mock
@@ -67,7 +68,7 @@ class WatchSessionControllerTest {
     @Test
     void startsWatchSession() throws Exception {
         Instant enteredAt = Instant.parse("2026-08-13T03:00:00Z");
-        when(watchSessionService.start(USER_ID, MATCH_ID)).thenReturn(new WatchSessionStartResult(
+        when(watchSessionService.start(USER_ID, EXTERNAL_MATCH_ID)).thenReturn(new WatchSessionStartResult(
                 SESSION_KEY,
                 MATCH_ID,
                 enteredAt,
@@ -76,7 +77,7 @@ class WatchSessionControllerTest {
                 0L
         ));
 
-        mockMvc.perform(post("/api/users/{userId}/matches/{matchId}/watch-sessions", USER_ID, MATCH_ID))
+        mockMvc.perform(post("/api/users/{userId}/matches/{matchId}/watch-sessions", USER_ID, EXTERNAL_MATCH_ID))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.sessionKey").value(SESSION_KEY))
@@ -86,7 +87,7 @@ class WatchSessionControllerTest {
                 .andExpect(jsonPath("$.sessionTimeoutSeconds").value(90))
                 .andExpect(jsonPath("$.heartbeatSequence").value(0));
 
-        verify(watchSessionService).start(USER_ID, MATCH_ID);
+        verify(watchSessionService).start(USER_ID, EXTERNAL_MATCH_ID);
     }
 
     /**
@@ -95,7 +96,7 @@ class WatchSessionControllerTest {
     @Test
     void resumesSameMatchSession() throws Exception {
         Instant enteredAt = Instant.parse("2026-08-13T03:00:00Z");
-        when(watchSessionService.start(USER_ID, MATCH_ID)).thenReturn(new WatchSessionStartResult(
+        when(watchSessionService.start(USER_ID, EXTERNAL_MATCH_ID)).thenReturn(new WatchSessionStartResult(
                 SESSION_KEY,
                 MATCH_ID,
                 enteredAt,
@@ -104,7 +105,7 @@ class WatchSessionControllerTest {
                 7L
         ));
 
-        mockMvc.perform(post("/api/users/{userId}/matches/{matchId}/watch-sessions", USER_ID, MATCH_ID))
+        mockMvc.perform(post("/api/users/{userId}/matches/{matchId}/watch-sessions", USER_ID, EXTERNAL_MATCH_ID))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.sessionKey").value(SESSION_KEY))
                 .andExpect(jsonPath("$.heartbeatSequence").value(7));
@@ -236,10 +237,10 @@ class WatchSessionControllerTest {
      */
     @Test
     void returnsApiErrorWhenMatchIsNotWatchable() throws Exception {
-        when(watchSessionService.start(USER_ID, MATCH_ID))
+        when(watchSessionService.start(USER_ID, EXTERNAL_MATCH_ID))
                 .thenThrow(new WatchException(WatchError.MATCH_NOT_WATCHABLE));
 
-        mockMvc.perform(post("/api/users/{userId}/matches/{matchId}/watch-sessions", USER_ID, MATCH_ID))
+        mockMvc.perform(post("/api/users/{userId}/matches/{matchId}/watch-sessions", USER_ID, EXTERNAL_MATCH_ID))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("MATCH_NOT_WATCHABLE"))
                 .andExpect(jsonPath("$.message").value("현재 시청 가능한 경기가 아닙니다."));

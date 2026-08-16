@@ -28,12 +28,13 @@ class PollingSchedulerBettingCacheTest {
         LolesportsApiClient api = mock(LolesportsApiClient.class);
         DataCacheService cache = new DataCacheService();
         SetWinnerTracker setWinnerTracker = mock(SetWinnerTracker.class);
+        GamePersistService persistService = mock(GamePersistService.class);
         PollingScheduler scheduler = new PollingScheduler(
                 api,
                 mock(LiveStatsClient.class),
                 cache,
                 mock(PentakillDetector.class),
-                mock(GamePersistService.class),
+                persistService,
                 setWinnerTracker,
                 properties()
         );
@@ -51,7 +52,7 @@ class PollingSchedulerBettingCacheTest {
         );
         cache.putSchedule(schedule(List.of(nearEvent, farEvent)));
         when(api.getLive()).thenReturn(schedule(List.of()));
-        when(api.getEventDetails("near-match")).thenReturn(details());
+        when(api.getEventDetails("near-match")).thenReturn(details("near-match"));
 
         scheduler.pollLiveMatches();
 
@@ -63,6 +64,32 @@ class PollingSchedulerBettingCacheTest {
                         .toList()
         );
         verify(api).getEventDetails("near-match");
+    }
+
+    /** 진행 중 매치는 시청 세션 FK가 즉시 참조할 수 있도록 라이브 폴링에서 선저장한다. */
+    @Test
+    void 라이브_매치를_시청_세션보다_먼저_저장한다() {
+        LolesportsApiClient api = mock(LolesportsApiClient.class);
+        DataCacheService cache = new DataCacheService();
+        GamePersistService persistService = mock(GamePersistService.class);
+        PollingScheduler scheduler = new PollingScheduler(
+                api,
+                mock(LiveStatsClient.class),
+                cache,
+                mock(PentakillDetector.class),
+                persistService,
+                mock(SetWinnerTracker.class),
+                properties()
+        );
+        ScheduleResponse.Event liveEvent = event("live-match", Instant.now(), "inProgress");
+        when(api.getLive()).thenReturn(schedule(List.of(liveEvent)));
+        when(api.getEventDetails("live-match")).thenReturn(details("live-match"));
+
+        scheduler.pollLiveMatches();
+
+        DataCacheService.LiveMatch liveMatch = cache.getLiveMatches().getFirst();
+        assertEquals("live-match", liveMatch.matchId());
+        verify(persistService).persistLiveMatch(liveMatch);
     }
 
     /**
@@ -131,7 +158,7 @@ class PollingSchedulerBettingCacheTest {
      *
      * @return 세트가 아직 생성되지 않은 매치 상세 응답
      */
-    private EventDetailsResponse details() {
+    private EventDetailsResponse details(String matchId) {
         List<ScheduleResponse.Team> teams = List.of(
                 new ScheduleResponse.Team("team-a", "A", "A", null, null, null),
                 new ScheduleResponse.Team("team-b", "B", "B", null, null, null)
@@ -139,7 +166,7 @@ class PollingSchedulerBettingCacheTest {
         return new EventDetailsResponse(
                 new EventDetailsResponse.Data(
                         new EventDetailsResponse.Event(
-                                "near-match",
+                                matchId,
                                 "match",
                                 new ScheduleResponse.League("LCK", "lck"),
                                 new EventDetailsResponse.Match(

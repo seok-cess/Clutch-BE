@@ -23,7 +23,10 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.support.TransactionTemplate;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -36,6 +39,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -44,6 +48,7 @@ class WatchSessionServiceTest {
 
     private static final long USER_ID = 100L;
     private static final long MATCH_ID = 200L;
+    private static final String EXTERNAL_MATCH_ID = "external-match-200";
     private static final String OLD_SESSION_KEY = "old-session-key";
 
     @Mock
@@ -61,6 +66,12 @@ class WatchSessionServiceTest {
     @Mock
     private WatchSessionCompletionService watchSessionCompletionService;
 
+    @Mock
+    private WatchAccrualEligibilityProvider watchAccrualEligibilityProvider;
+
+    @Mock
+    private TransactionTemplate transactionTemplate;
+
     private WatchSessionService service;
 
     /**
@@ -68,13 +79,20 @@ class WatchSessionServiceTest {
      */
     @BeforeEach
     void setUp() {
+        lenient().when(transactionTemplate.execute(any())).thenAnswer(invocation -> {
+            org.springframework.transaction.support.TransactionCallback<?> callback = invocation.getArgument(0);
+            return callback.doInTransaction(null);
+        });
         service = new WatchSessionService(
                 userRepository,
                 esportsMatchRepository,
                 watchSessionRepository,
                 watchSessionRedisRepository,
                 watchSessionCompletionService,
-                rewardProperties()
+                watchAccrualEligibilityProvider,
+                transactionTemplate,
+                rewardProperties(),
+                Clock.systemUTC()
         );
     }
 
@@ -86,7 +104,7 @@ class WatchSessionServiceTest {
         allowSessionStart();
         when(watchSessionRedisRepository.findActiveSessionKey(USER_ID)).thenReturn(Optional.empty());
 
-        WatchSessionStartResult result = service.start(USER_ID, MATCH_ID);
+        WatchSessionStartResult result = service.start(USER_ID, EXTERNAL_MATCH_ID);
 
         assertThat(result.sessionKey()).isNotBlank();
         assertThat(result.matchId()).isEqualTo(MATCH_ID);
@@ -110,6 +128,24 @@ class WatchSessionServiceTest {
     }
 
     /**
+     * 세션 변경 트랜잭션이 끝난 뒤에만 전환 lock을 해제하는지 검증한다.
+     */
+    @Test
+    void releasesSwitchLockAfterSessionTransactionCompletes() {
+        allowSessionStart();
+        when(watchSessionRedisRepository.findActiveSessionKey(USER_ID)).thenReturn(Optional.empty());
+
+        service.start(USER_ID, EXTERNAL_MATCH_ID);
+
+        InOrder inOrder = inOrder(transactionTemplate, watchSessionRedisRepository);
+        inOrder.verify(transactionTemplate).execute(any());
+        inOrder.verify(watchSessionRedisRepository).releaseSwitchLock(
+                org.mockito.ArgumentMatchers.eq(USER_ID),
+                anyString()
+        );
+    }
+
+    /**
      * 다른 경기 입장 시 기존 세션을 미지급 종료하고 새 세션을 생성하는지 검증한다.
      */
     @Test
@@ -121,7 +157,7 @@ class WatchSessionServiceTest {
         when(watchSessionRedisRepository.findSession(OLD_SESSION_KEY))
                 .thenReturn(Optional.of(snapshot));
 
-        service.start(USER_ID, MATCH_ID);
+        service.start(USER_ID, EXTERNAL_MATCH_ID);
 
         InOrder inOrder = inOrder(watchSessionCompletionService, watchSessionRepository, watchSessionRedisRepository);
         inOrder.verify(watchSessionCompletionService).completeWithoutReward(snapshot);
@@ -159,7 +195,7 @@ class WatchSessionServiceTest {
         when(watchSessionRepository.findBySessionKey(OLD_SESSION_KEY))
                 .thenReturn(Optional.of(watchSession));
 
-        WatchSessionStartResult result = service.start(USER_ID, MATCH_ID);
+        WatchSessionStartResult result = service.start(USER_ID, EXTERNAL_MATCH_ID);
 
         assertThat(result.sessionKey()).isNotEqualTo(OLD_SESSION_KEY);
         assertThat(result.heartbeatSequence()).isEqualTo(snapshot.sequence());
@@ -175,11 +211,12 @@ class WatchSessionServiceTest {
     @Test
     void rejectsStartWhenAnotherRequestIsSwitchingSession() {
         when(userRepository.existsById(USER_ID)).thenReturn(true);
-        when(esportsMatchRepository.findById(MATCH_ID)).thenReturn(Optional.of(inProgressMatch()));
+        when(esportsMatchRepository.findByExternalMatchId(EXTERNAL_MATCH_ID))
+                .thenReturn(Optional.of(inProgressMatch()));
         when(watchSessionRedisRepository.tryAcquireSwitchLock(org.mockito.ArgumentMatchers.eq(USER_ID), anyString()))
                 .thenReturn(false);
 
-        assertThatThrownBy(() -> service.start(USER_ID, MATCH_ID))
+        assertThatThrownBy(() -> service.start(USER_ID, EXTERNAL_MATCH_ID))
                 .isInstanceOf(WatchException.class)
                 .hasMessage("시청 세션 전환이 진행 중입니다.");
 
@@ -196,8 +233,8 @@ class WatchSessionServiceTest {
     void rejectsStartWhenUserIsMissing() {
         when(userRepository.existsById(USER_ID)).thenReturn(false);
 
-        assertWatchError(() -> service.start(USER_ID, MATCH_ID), WatchError.USER_NOT_FOUND);
-        verify(esportsMatchRepository, never()).findById(MATCH_ID);
+        assertWatchError(() -> service.start(USER_ID, EXTERNAL_MATCH_ID), WatchError.USER_NOT_FOUND);
+        verify(esportsMatchRepository, never()).findByExternalMatchId(EXTERNAL_MATCH_ID);
         verify(watchSessionRedisRepository, never())
                 .tryAcquireSwitchLock(org.mockito.ArgumentMatchers.eq(USER_ID), anyString());
     }
@@ -208,9 +245,9 @@ class WatchSessionServiceTest {
     @Test
     void rejectsStartWhenMatchIsMissing() {
         when(userRepository.existsById(USER_ID)).thenReturn(true);
-        when(esportsMatchRepository.findById(MATCH_ID)).thenReturn(Optional.empty());
+        when(esportsMatchRepository.findByExternalMatchId(EXTERNAL_MATCH_ID)).thenReturn(Optional.empty());
 
-        assertWatchError(() -> service.start(USER_ID, MATCH_ID), WatchError.MATCH_NOT_FOUND);
+        assertWatchError(() -> service.start(USER_ID, EXTERNAL_MATCH_ID), WatchError.MATCH_NOT_FOUND);
         verify(watchSessionRedisRepository, never())
                 .tryAcquireSwitchLock(org.mockito.ArgumentMatchers.eq(USER_ID), anyString());
     }
@@ -225,7 +262,7 @@ class WatchSessionServiceTest {
                 .thenReturn(Optional.of(OLD_SESSION_KEY));
         when(watchSessionRedisRepository.findSession(OLD_SESSION_KEY)).thenReturn(Optional.empty());
 
-        assertWatchError(() -> service.start(USER_ID, MATCH_ID), WatchError.WATCH_SESSION_STATE_MISSING);
+        assertWatchError(() -> service.start(USER_ID, EXTERNAL_MATCH_ID), WatchError.WATCH_SESSION_STATE_MISSING);
         verifyLockReleasedWithOwnerToken();
         verify(watchSessionRepository, never()).save(any(WatchSession.class));
     }
@@ -244,7 +281,7 @@ class WatchSessionServiceTest {
         doThrow(new WatchException(WatchError.WATCH_SESSION_NOT_FOUND))
                 .when(watchSessionCompletionService).completeWithoutReward(snapshot);
 
-        assertThatThrownBy(() -> service.start(USER_ID, MATCH_ID))
+        assertThatThrownBy(() -> service.start(USER_ID, EXTERNAL_MATCH_ID))
                 .isInstanceOf(WatchException.class)
                 .hasMessage("시청 세션을 찾을 수 없습니다.");
 
@@ -264,7 +301,7 @@ class WatchSessionServiceTest {
                 .initialize(org.mockito.ArgumentMatchers.eq(USER_ID),
                         org.mockito.ArgumentMatchers.eq(MATCH_ID), anyString(), anyLong());
 
-        assertWatchError(() -> service.start(USER_ID, MATCH_ID), WatchError.HEARTBEAT_RESULT_MISSING);
+        assertWatchError(() -> service.start(USER_ID, EXTERNAL_MATCH_ID), WatchError.HEARTBEAT_RESULT_MISSING);
         verifyLockReleasedWithOwnerToken();
     }
 
@@ -273,11 +310,13 @@ class WatchSessionServiceTest {
      */
     @Test
     void processesHeartbeatWithServerTime() {
+        allowHeartbeat(true);
         when(watchSessionRedisRepository.heartbeat(
                 org.mockito.ArgumentMatchers.eq(USER_ID),
                 org.mockito.ArgumentMatchers.eq(OLD_SESSION_KEY),
                 org.mockito.ArgumentMatchers.eq(3L),
-                anyLong()
+                anyLong(),
+                org.mockito.ArgumentMatchers.eq(true)
         )).thenReturn(new HeartbeatProcessingResult(
                 HeartbeatResult.SUCCESS,
                 300_000L,
@@ -298,19 +337,22 @@ class WatchSessionServiceTest {
                 org.mockito.ArgumentMatchers.eq(USER_ID),
                 org.mockito.ArgumentMatchers.eq(OLD_SESSION_KEY),
                 org.mockito.ArgumentMatchers.eq(3L),
-                serverTime.capture()
+                serverTime.capture(),
+                org.mockito.ArgumentMatchers.eq(true)
         );
-        verify(esportsMatchRepository, never()).findById(anyLong());
+        verify(esportsMatchRepository, never()).findByExternalMatchId(anyString());
         assertThat(serverTime.getValue()).isBetween(beforeRequest, afterRequest);
     }
 
     @Test
     void returnsAccumulatingStateBeforeFiveMinutes() {
+        allowHeartbeat(true);
         when(watchSessionRedisRepository.heartbeat(
                 org.mockito.ArgumentMatchers.eq(USER_ID),
                 org.mockito.ArgumentMatchers.eq(OLD_SESSION_KEY),
                 org.mockito.ArgumentMatchers.eq(3L),
-                anyLong()
+                anyLong(),
+                org.mockito.ArgumentMatchers.eq(true)
         )).thenReturn(new HeartbeatProcessingResult(
                 HeartbeatResult.SUCCESS,
                 299_000L,
@@ -326,6 +368,31 @@ class WatchSessionServiceTest {
     }
 
     /**
+     * 세트가 진행 중이지 않으면 세션은 유지하되 시청시간 상태를 일시정지로 반환하는지 검증한다.
+     */
+    @Test
+    void pausesAccumulationOutsideActiveSet() {
+        allowHeartbeat(false);
+        when(watchSessionRedisRepository.heartbeat(
+                org.mockito.ArgumentMatchers.eq(USER_ID),
+                org.mockito.ArgumentMatchers.eq(OLD_SESSION_KEY),
+                org.mockito.ArgumentMatchers.eq(3L),
+                anyLong(),
+                org.mockito.ArgumentMatchers.eq(false)
+        )).thenReturn(new HeartbeatProcessingResult(
+                HeartbeatResult.SUCCESS,
+                120_000L,
+                1L
+        ));
+
+        WatchHeartbeatResult result = service.heartbeat(USER_ID, OLD_SESSION_KEY, 3L);
+
+        assertThat(result.rewardState()).isEqualTo(WatchRewardState.PAUSED);
+        assertThat(result.accumulatedSeconds()).isEqualTo(120L);
+        assertThat(result.remainingSeconds()).isEqualTo(180L);
+    }
+
+    /**
      * Redis Lua가 세션 없음 상태를 반환하면 도메인 오류로 변환하는지 검증한다.
      */
     @Test
@@ -334,7 +401,8 @@ class WatchSessionServiceTest {
                 org.mockito.ArgumentMatchers.eq(USER_ID),
                 org.mockito.ArgumentMatchers.eq(OLD_SESSION_KEY),
                 org.mockito.ArgumentMatchers.eq(1L),
-                anyLong()
+                anyLong(),
+                org.mockito.ArgumentMatchers.eq(false)
         )).thenReturn(new HeartbeatProcessingResult(
                 HeartbeatResult.SESSION_NOT_FOUND,
                 0L,
@@ -345,11 +413,20 @@ class WatchSessionServiceTest {
                 () -> service.heartbeat(USER_ID, OLD_SESSION_KEY, 1L),
                 WatchError.WATCH_SESSION_NOT_FOUND
         );
-        verify(esportsMatchRepository, never()).findById(anyLong());
+        verify(esportsMatchRepository, never()).findByExternalMatchId(anyString());
         verify(watchSessionRedisRepository)
                 .heartbeat(org.mockito.ArgumentMatchers.eq(USER_ID),
                         org.mockito.ArgumentMatchers.eq(OLD_SESSION_KEY),
-                        org.mockito.ArgumentMatchers.eq(1L), anyLong());
+                        org.mockito.ArgumentMatchers.eq(1L), anyLong(),
+                        org.mockito.ArgumentMatchers.eq(false));
+    }
+
+    private void allowHeartbeat(boolean canAccumulate) {
+        WatchSessionSnapshot snapshot = oldSnapshot();
+        when(watchSessionRedisRepository.findSession(OLD_SESSION_KEY))
+                .thenReturn(Optional.of(snapshot));
+        when(watchAccrualEligibilityProvider.canAccumulate(snapshot.matchId()))
+                .thenReturn(canAccumulate);
     }
 
     /**
@@ -357,7 +434,8 @@ class WatchSessionServiceTest {
      */
     private void allowSessionStart() {
         when(userRepository.existsById(USER_ID)).thenReturn(true);
-        when(esportsMatchRepository.findById(MATCH_ID)).thenReturn(Optional.of(inProgressMatch()));
+        when(esportsMatchRepository.findByExternalMatchId(EXTERNAL_MATCH_ID))
+                .thenReturn(Optional.of(inProgressMatch()));
         when(watchSessionRedisRepository.tryAcquireSwitchLock(org.mockito.ArgumentMatchers.eq(USER_ID), anyString()))
                 .thenReturn(true);
     }
@@ -391,8 +469,8 @@ class WatchSessionServiceTest {
      * @return 지정한 상태를 가진 경기
      */
     private EsportsMatch matchWithStatus(String lifecycleStatus) {
-        return new EsportsMatch(
-                "external-match",
+        EsportsMatch match = new EsportsMatch(
+                EXTERNAL_MATCH_ID,
                 "league",
                 "2026",
                 "tournament",
@@ -402,6 +480,8 @@ class WatchSessionServiceTest {
                 lifecycleStatus,
                 3
         );
+        ReflectionTestUtils.setField(match, "id", MATCH_ID);
+        return match;
     }
 
     /**

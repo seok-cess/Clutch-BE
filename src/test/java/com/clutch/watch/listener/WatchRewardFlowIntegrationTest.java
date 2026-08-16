@@ -12,6 +12,7 @@ import com.clutch.watch.repository.WatchPointTransactionRepository;
 import com.clutch.watch.repository.WatchSessionRepository;
 import com.clutch.watch.redis.session.WatchSessionRedisRepository;
 import com.clutch.watch.redis.session.WatchSessionSnapshot;
+import com.clutch.watch.service.WatchAccrualEligibilityProvider;
 import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -38,6 +39,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -87,6 +90,9 @@ class WatchRewardFlowIntegrationTest {
     @MockitoBean
     private PollingScheduler pollingScheduler;
 
+    @MockitoBean
+    private WatchAccrualEligibilityProvider watchAccrualEligibilityProvider;
+
     private final List<Long> userIds = new ArrayList<>();
     private final List<Long> matchIds = new ArrayList<>();
     private final List<String> sessionKeys = new ArrayList<>();
@@ -97,6 +103,7 @@ class WatchRewardFlowIntegrationTest {
     @BeforeEach
     void clearRedisBeforeTest() {
         flushRedisDatabase();
+        when(watchAccrualEligibilityProvider.canAccumulate(anyLong())).thenReturn(true);
     }
 
     /**
@@ -412,14 +419,14 @@ class WatchRewardFlowIntegrationTest {
     void returnsApiErrorsForMissingUserAndUnwatchableMatch() throws Exception {
         EsportsMatch inProgressMatch = saveMatch("inProgress");
         mockMvc.perform(post("/api/users/{userId}/matches/{matchId}/watch-sessions",
-                        Long.MAX_VALUE, inProgressMatch.getId()))
+                        Long.MAX_VALUE, inProgressMatch.getExternalMatchId()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("USER_NOT_FOUND"));
 
         User user = saveUser();
         EsportsMatch completedMatch = saveMatch("completed");
         mockMvc.perform(post("/api/users/{userId}/matches/{matchId}/watch-sessions",
-                        user.getId(), completedMatch.getId()))
+                        user.getId(), completedMatch.getExternalMatchId()))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("MATCH_NOT_WATCHABLE"));
     }
@@ -525,8 +532,11 @@ class WatchRewardFlowIntegrationTest {
      * @throws Exception MockMvc 요청 처리에 실패한 경우
      */
     private String startSession(long userId, long matchId) throws Exception {
+        String externalMatchId = esportsMatchRepository.findById(matchId)
+                .orElseThrow()
+                .getExternalMatchId();
         String response = mockMvc.perform(post(
-                        "/api/users/{userId}/matches/{matchId}/watch-sessions", userId, matchId))
+                        "/api/users/{userId}/matches/{matchId}/watch-sessions", userId, externalMatchId))
                 .andExpect(status().is2xxSuccessful())
                 .andReturn().getResponse().getContentAsString();
         String sessionKey = JsonPath.read(response, "$.sessionKey");
@@ -659,10 +669,13 @@ class WatchRewardFlowIntegrationTest {
      * 경기 시청 세션 시작 API를 호출하고 HTTP 상태를 반환한다.
      */
     private int requestStartSession(long userId, long matchId) throws Exception {
+        String externalMatchId = esportsMatchRepository.findById(matchId)
+                .orElseThrow()
+                .getExternalMatchId();
         return mockMvc.perform(post(
                         "/api/users/{userId}/matches/{matchId}/watch-sessions",
                         userId,
-                        matchId
+                        externalMatchId
                 ))
                 .andReturn()
                 .getResponse()

@@ -4,6 +4,7 @@ import com.clutch.betting.domain.BettingEventStatus;
 import com.clutch.betting.domain.UserBetStatus;
 import com.clutch.betting.dto.BetPlacementResult;
 import com.clutch.betting.dto.BettingEventView;
+import com.clutch.betting.dto.MyBetView;
 import com.clutch.betting.dto.UserBetView;
 import com.clutch.betting.service.BettingService;
 import org.junit.jupiter.api.Test;
@@ -14,6 +15,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -99,6 +101,32 @@ class BettingControllerTest {
                 .andExpect(jsonPath("$.userId").value(10))
                 .andExpect(jsonPath("$.status").value("WON"))
                 .andExpect(jsonPath("$.currentPoint").value(11000));
+    }
+
+    @Test
+    void getsMyBetHistory() throws Exception {
+        given(bettingService.getMyBets(10L)).willReturn(List.of(new MyBetView(
+                100L,
+                1L,
+                "match-1",
+                "game-1",
+                2,
+                "team-a",
+                "team-b",
+                "team-a",
+                1_000L,
+                UserBetStatus.WON,
+                BettingEventStatus.SETTLED,
+                LocalDateTime.of(2026, 8, 14, 10, 1)
+        )));
+
+        mockMvc.perform(get("/api/users/me/bets")
+                        .header("X-User-Id", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].externalMatchId").value("match-1"))
+                .andExpect(jsonPath("$[0].setNumber").value(2))
+                .andExpect(jsonPath("$[0].selectedTeamId").value("team-a"))
+                .andExpect(jsonPath("$[0].status").value("WON"));
     }
 
     @Test

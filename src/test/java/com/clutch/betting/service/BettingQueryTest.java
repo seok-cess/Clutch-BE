@@ -4,6 +4,7 @@ import com.clutch.betting.domain.BettingEvent;
 import com.clutch.betting.domain.BettingEventStatus;
 import com.clutch.betting.domain.UserBet;
 import com.clutch.betting.dto.BettingEventView;
+import com.clutch.betting.dto.MyBetView;
 import com.clutch.betting.dto.UserBetView;
 import com.clutch.betting.live.LiveBettingDataProvider;
 import com.clutch.betting.repository.BetPointTransactionRepository;
@@ -53,10 +54,8 @@ class BettingQueryTest {
         );
         ReflectionTestUtils.setField(event, "id", 1L);
         event.attachGame("game-1");
-        given(eventRepository.findFirstByExternalMatchIdAndStatusInOrderBySetNumberDesc(
-                "match-1",
-                List.of(BettingEventStatus.OPEN, BettingEventStatus.CLOSED)
-        )).willReturn(Optional.of(event));
+        given(eventRepository.findFirstByExternalMatchIdOrderBySetNumberDesc("match-1"))
+                .willReturn(Optional.of(event));
         given(userBetRepository.findByBettingEventIdAndUserId(1L, 10L))
                 .willReturn(Optional.empty());
         given(liveBettingDataProvider.isAcceptingBets("match-1", "game-1", 1)).willReturn(true);
@@ -81,10 +80,8 @@ class BettingQueryTest {
         ReflectionTestUtils.setField(event, "id", 2L);
         UserBet userBet = UserBet.place(2L, 10L, "team-a", 1_000L);
         ReflectionTestUtils.setField(userBet, "id", 20L);
-        given(eventRepository.findFirstByExternalMatchIdAndStatusInOrderBySetNumberDesc(
-                "match-1",
-                List.of(BettingEventStatus.OPEN, BettingEventStatus.CLOSED)
-        )).willReturn(Optional.of(event));
+        given(eventRepository.findFirstByExternalMatchIdOrderBySetNumberDesc("match-1"))
+                .willReturn(Optional.of(event));
         given(userBetRepository.findByBettingEventIdAndUserId(2L, 10L))
                 .willReturn(Optional.of(userBet));
         given(liveBettingDataProvider.isAcceptingBets("match-1", null, 2)).willReturn(true);
@@ -93,6 +90,29 @@ class BettingQueryTest {
 
         assertThat(view.bettingAvailable()).isFalse();
         assertThat(view.myBet().userBetId()).isEqualTo(20L);
+    }
+
+    @Test
+    void returnsCancelledLatestEventAsUnavailable() {
+        BettingEvent event = BettingEvent.open(
+                "match-1",
+                3,
+                "team-a",
+                "team-b",
+                LocalDateTime.of(2026, 8, 14, 10, 0),
+                LocalDateTime.of(2026, 8, 14, 10, 2)
+        );
+        ReflectionTestUtils.setField(event, "id", 3L);
+        event.cancel();
+        given(eventRepository.findFirstByExternalMatchIdOrderBySetNumberDesc("match-1"))
+                .willReturn(Optional.of(event));
+        given(userBetRepository.findByBettingEventIdAndUserId(3L, 10L))
+                .willReturn(Optional.empty());
+
+        BettingEventView view = service.getCurrentEvent("match-1", 10L);
+
+        assertThat(view.status()).isEqualTo(BettingEventStatus.CANCELLED);
+        assertThat(view.bettingAvailable()).isFalse();
     }
 
     @Test
@@ -107,5 +127,35 @@ class BettingQueryTest {
 
         assertThat(view.userBetId()).isEqualTo(20L);
         assertThat(view.userId()).isEqualTo(10L);
+    }
+
+    @Test
+    void returnsMyBetsWithEventDetailsInRepositoryOrder() {
+        BettingEvent event = BettingEvent.open(
+                "match-1",
+                2,
+                "team-a",
+                "team-b",
+                LocalDateTime.of(2026, 8, 14, 10, 0),
+                LocalDateTime.of(2026, 8, 14, 10, 2)
+        );
+        ReflectionTestUtils.setField(event, "id", 2L);
+        event.attachGame("game-2");
+        UserBet userBet = UserBet.place(2L, 10L, "team-a", 2_000L);
+        ReflectionTestUtils.setField(userBet, "id", 20L);
+        given(userRepository.findPointById(10L)).willReturn(Optional.of(8_000L));
+        given(userBetRepository.findAllByUserIdOrderByCreatedAtDescIdDesc(10L))
+                .willReturn(List.of(userBet));
+        given(eventRepository.findAllById(List.of(2L))).willReturn(List.of(event));
+
+        List<MyBetView> views = service.getMyBets(10L);
+
+        assertThat(views).singleElement().satisfies(view -> {
+            assertThat(view.externalMatchId()).isEqualTo("match-1");
+            assertThat(view.externalGameId()).isEqualTo("game-2");
+            assertThat(view.setNumber()).isEqualTo(2);
+            assertThat(view.selectedTeamId()).isEqualTo("team-a");
+            assertThat(view.amount()).isEqualTo(2_000L);
+        });
     }
 }
