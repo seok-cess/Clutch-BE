@@ -1,10 +1,13 @@
-package com.clutch.watch.service.service;
+package com.clutch.watch.service;
 
 import com.clutch.lolesports.entity.EsportsMatch;
 import com.clutch.lolesports.repository.EsportsMatchRepository;
 import com.clutch.user.repository.UserRepository;
 import com.clutch.watch.config.WatchRewardProperties;
 import com.clutch.watch.domain.WatchSession;
+import com.clutch.watch.dto.WatchHeartbeatResult;
+import com.clutch.watch.dto.WatchRewardState;
+import com.clutch.watch.dto.WatchSessionStartResult;
 import com.clutch.watch.exception.WatchError;
 import com.clutch.watch.exception.WatchException;
 import com.clutch.watch.redis.heartbeat.HeartbeatProcessingResult;
@@ -13,9 +16,6 @@ import com.clutch.watch.redis.session.SessionKeyReplacementResult;
 import com.clutch.watch.redis.session.WatchSessionRedisRepository;
 import com.clutch.watch.redis.session.WatchSessionSnapshot;
 import com.clutch.watch.repository.WatchSessionRepository;
-import com.clutch.watch.service.dto.WatchHeartbeatResult;
-import com.clutch.watch.service.dto.WatchRewardState;
-import com.clutch.watch.service.dto.WatchSessionStartResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,7 +37,7 @@ public class WatchSessionService {
     private final EsportsMatchRepository esportsMatchRepository;
     private final WatchSessionRepository watchSessionRepository;
     private final WatchSessionRedisRepository watchSessionRedisRepository;
-    private final WatchRewardService watchRewardService;
+    private final WatchSessionCompletionService watchSessionCompletionService;
     private final WatchRewardProperties properties;
 
     /**
@@ -61,7 +61,7 @@ public class WatchSessionService {
         }
 
         try {
-            return startOrReplaceSession(userId, matchId);
+            return openSession(userId, matchId);
         } finally {
             watchSessionRedisRepository.releaseSwitchLock(userId, lockToken);
         }
@@ -77,17 +77,7 @@ public class WatchSessionService {
      * @return heartbeat 처리 후 현재 회차의 포인트 수령 상태
      * @throws WatchException Redis 세션을 찾을 수 없거나 heartbeat 검증에 실패한 경우
      */
-    @Transactional(readOnly = true)
     public WatchHeartbeatResult heartbeat(long userId, String sessionKey, long sequence) {
-        String activeSessionKey = watchSessionRedisRepository.findActiveSessionKey(userId)
-                .orElse(null);
-        if (activeSessionKey != null && !activeSessionKey.equals(sessionKey)) {
-            throw new WatchException(WatchError.WATCH_SESSION_REPLACED);
-        }
-
-        WatchSessionSnapshot snapshot = watchSessionRedisRepository.findSession(sessionKey)
-                .orElseThrow(() -> new WatchException(WatchError.WATCH_SESSION_NOT_FOUND));
-
         HeartbeatProcessingResult result = watchSessionRedisRepository.heartbeat(
                 userId,
                 sessionKey,
@@ -186,7 +176,14 @@ public class WatchSessionService {
         }
     }
 
-    private WatchSessionStartResult startOrReplaceSession(long userId, long matchId) {
+    /**
+     * 활성 세션 유무와 대상 경기에 따라 신규 생성, 재입장 또는 경기 전환을 선택한다.
+     *
+     * @param userId 시청 사용자 ID
+     * @param matchId 입장할 경기 ID
+     * @return 활성화된 시청 세션 정보
+     */
+    private WatchSessionStartResult openSession(long userId, long matchId) {
         String activeSessionKey = watchSessionRedisRepository.findActiveSessionKey(userId)
                 .orElse(null);
         if (activeSessionKey == null) {
@@ -196,17 +193,24 @@ public class WatchSessionService {
         WatchSessionSnapshot snapshot = watchSessionRedisRepository.findSession(activeSessionKey)
                 .orElseThrow(() -> new WatchException(WatchError.WATCH_SESSION_STATE_MISSING));
         if (snapshot.matchId() == matchId) {
-            return resumeSameMatch(userId, snapshot);
+            return replaceSessionKey(userId, snapshot);
         }
 
-        discardSession(snapshot);
+        completePreviousSession(snapshot);
         return createSession(userId, matchId);
     }
 
     /**
      * 동일 경기 누적 상태를 새 sessionKey로 옮겨 최신 입장 화면만 활성화한다.
+     *
+     * @param userId 시청 사용자 ID
+     * @param snapshot 교체 전 Redis 시청 세션 상태
+     * @return 새 sessionKey를 반영한 시청 세션 시작 결과
      */
-    private WatchSessionStartResult resumeSameMatch(long userId, WatchSessionSnapshot snapshot) {
+    private WatchSessionStartResult replaceSessionKey(
+            long userId,
+            WatchSessionSnapshot snapshot
+    ) {
         String newSessionKey = UUID.randomUUID().toString();
         SessionKeyReplacementResult replacement = watchSessionRedisRepository.replaceSessionKey(
                 userId,
@@ -214,7 +218,7 @@ public class WatchSessionService {
                 newSessionKey
         );
         if (replacement == SessionKeyReplacementResult.EXPIRED) {
-            discardSession(snapshot);
+            completePreviousSession(snapshot);
             return createSession(userId, snapshot.matchId());
         }
         if (replacement != SessionKeyReplacementResult.SUCCESS) {
@@ -236,7 +240,7 @@ public class WatchSessionService {
             throw exception;
         }
 
-        return startResult(
+        return toStartResult(
                 newSessionKey,
                 snapshot.matchId(),
                 Instant.ofEpochMilli(snapshot.enteredAt()),
@@ -246,9 +250,11 @@ public class WatchSessionService {
 
     /**
      * 기존 세션을 포인트 지급 없이 완료하고 Redis 활성 상태를 정리한다.
+     *
+     * @param snapshot 완료할 Redis 시청 세션 상태
      */
-    private void discardSession(WatchSessionSnapshot snapshot) {
-        watchRewardService.discard(snapshot);
+    private void completePreviousSession(WatchSessionSnapshot snapshot) {
+        watchSessionCompletionService.completeWithoutReward(snapshot);
         watchSessionRedisRepository.deleteActiveIfMatches(snapshot.userId(), snapshot.sessionKey());
         watchSessionRedisRepository.deleteAlive(snapshot.userId(), snapshot.sessionKey());
         watchSessionRedisRepository.deleteSession(snapshot.sessionKey());
@@ -273,7 +279,7 @@ public class WatchSessionService {
         watchSessionRepository.save(watchSession);
         watchSessionRedisRepository.initialize(userId, matchId, sessionKey, enteredAt.toEpochMilli());
 
-        return startResult(
+        return toStartResult(
                 sessionKey,
                 matchId,
                 enteredAt,
@@ -281,7 +287,16 @@ public class WatchSessionService {
         );
     }
 
-    private WatchSessionStartResult startResult(
+    /**
+     * 내부 시청 세션 값을 API 계층에 전달할 시작 결과로 변환한다.
+     *
+     * @param sessionKey 시청 세션 외부 식별자
+     * @param matchId 시청 경기 ID
+     * @param enteredAt 서버 입장 시각
+     * @param heartbeatSequence 마지막 처리 Heartbeat 순번
+     * @return 시청 세션 시작 결과
+     */
+    private WatchSessionStartResult toStartResult(
             String sessionKey,
             long matchId,
             Instant enteredAt,

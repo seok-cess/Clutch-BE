@@ -1,4 +1,4 @@
-package com.clutch.watch.service.dto;
+package com.clutch.watch.dto;
 
 import java.time.Instant;
 

@@ -4,6 +4,9 @@ import com.clutch.lolesports.entity.EsportsMatch;
 import com.clutch.lolesports.repository.EsportsMatchRepository;
 import com.clutch.user.repository.UserRepository;
 import com.clutch.watch.config.WatchRewardProperties;
+import com.clutch.watch.dto.WatchHeartbeatResult;
+import com.clutch.watch.dto.WatchRewardState;
+import com.clutch.watch.dto.WatchSessionStartResult;
 import com.clutch.watch.domain.WatchSession;
 import com.clutch.watch.exception.WatchError;
 import com.clutch.watch.exception.WatchException;
@@ -13,11 +16,6 @@ import com.clutch.watch.redis.session.SessionKeyReplacementResult;
 import com.clutch.watch.redis.session.WatchSessionRedisRepository;
 import com.clutch.watch.redis.session.WatchSessionSnapshot;
 import com.clutch.watch.repository.WatchSessionRepository;
-import com.clutch.watch.service.dto.WatchHeartbeatResult;
-import com.clutch.watch.service.dto.WatchRewardState;
-import com.clutch.watch.service.dto.WatchSessionStartResult;
-import com.clutch.watch.service.service.WatchRewardService;
-import com.clutch.watch.service.service.WatchSessionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -61,7 +59,7 @@ class WatchSessionServiceTest {
     private WatchSessionRedisRepository watchSessionRedisRepository;
 
     @Mock
-    private WatchRewardService watchRewardService;
+    private WatchSessionCompletionService watchSessionCompletionService;
 
     private WatchSessionService service;
 
@@ -75,7 +73,7 @@ class WatchSessionServiceTest {
                 esportsMatchRepository,
                 watchSessionRepository,
                 watchSessionRedisRepository,
-                watchRewardService,
+                watchSessionCompletionService,
                 rewardProperties()
         );
     }
@@ -115,7 +113,7 @@ class WatchSessionServiceTest {
      * 다른 경기 입장 시 기존 세션을 미지급 종료하고 새 세션을 생성하는지 검증한다.
      */
     @Test
-    void discardsExistingSessionBeforeStartingDifferentMatch() {
+    void completesExistingSessionBeforeStartingDifferentMatch() {
         allowSessionStart();
         WatchSessionSnapshot snapshot = oldSnapshot();
         when(watchSessionRedisRepository.findActiveSessionKey(USER_ID))
@@ -125,8 +123,8 @@ class WatchSessionServiceTest {
 
         service.start(USER_ID, MATCH_ID);
 
-        InOrder inOrder = inOrder(watchRewardService, watchSessionRepository, watchSessionRedisRepository);
-        inOrder.verify(watchRewardService).discard(snapshot);
+        InOrder inOrder = inOrder(watchSessionCompletionService, watchSessionRepository, watchSessionRedisRepository);
+        inOrder.verify(watchSessionCompletionService).completeWithoutReward(snapshot);
         inOrder.verify(watchSessionRedisRepository).deleteActiveIfMatches(USER_ID, OLD_SESSION_KEY);
         inOrder.verify(watchSessionRedisRepository).deleteAlive(USER_ID, OLD_SESSION_KEY);
         inOrder.verify(watchSessionRedisRepository).deleteSession(OLD_SESSION_KEY);
@@ -167,7 +165,7 @@ class WatchSessionServiceTest {
         assertThat(result.heartbeatSequence()).isEqualTo(snapshot.sequence());
         assertThat(watchSession.getSessionKey()).isEqualTo(result.sessionKey());
         verify(watchSessionRepository, never()).save(any(WatchSession.class));
-        verify(watchRewardService, never()).discard(any());
+        verify(watchSessionCompletionService, never()).completeWithoutReward(any());
         verify(watchSessionRepository).flush();
     }
 
@@ -236,7 +234,7 @@ class WatchSessionServiceTest {
      * 기존 세션 미지급 종료 중 예외가 발생해도 자신이 획득한 전환 lock을 해제하는지 검증한다.
      */
     @Test
-    void releasesSwitchLockWhenDiscardFails() {
+    void releasesSwitchLockWhenSessionCompletionFails() {
         allowSessionStart();
         WatchSessionSnapshot snapshot = oldSnapshot();
         when(watchSessionRedisRepository.findActiveSessionKey(USER_ID))
@@ -244,7 +242,7 @@ class WatchSessionServiceTest {
         when(watchSessionRedisRepository.findSession(OLD_SESSION_KEY))
                 .thenReturn(Optional.of(snapshot));
         doThrow(new WatchException(WatchError.WATCH_SESSION_NOT_FOUND))
-                .when(watchRewardService).discard(snapshot);
+                .when(watchSessionCompletionService).completeWithoutReward(snapshot);
 
         assertThatThrownBy(() -> service.start(USER_ID, MATCH_ID))
                 .isInstanceOf(WatchException.class)
@@ -275,11 +273,6 @@ class WatchSessionServiceTest {
      */
     @Test
     void processesHeartbeatWithServerTime() {
-        WatchSessionSnapshot snapshot = oldSnapshot();
-        when(watchSessionRedisRepository.findSession(OLD_SESSION_KEY))
-                .thenReturn(Optional.of(snapshot));
-        when(watchSessionRedisRepository.findActiveSessionKey(USER_ID))
-                .thenReturn(Optional.of(OLD_SESSION_KEY));
         when(watchSessionRedisRepository.heartbeat(
                 org.mockito.ArgumentMatchers.eq(USER_ID),
                 org.mockito.ArgumentMatchers.eq(OLD_SESSION_KEY),
@@ -313,11 +306,6 @@ class WatchSessionServiceTest {
 
     @Test
     void returnsAccumulatingStateBeforeFiveMinutes() {
-        WatchSessionSnapshot snapshot = oldSnapshot();
-        when(watchSessionRedisRepository.findSession(OLD_SESSION_KEY))
-                .thenReturn(Optional.of(snapshot));
-        when(watchSessionRedisRepository.findActiveSessionKey(USER_ID))
-                .thenReturn(Optional.of(OLD_SESSION_KEY));
         when(watchSessionRedisRepository.heartbeat(
                 org.mockito.ArgumentMatchers.eq(USER_ID),
                 org.mockito.ArgumentMatchers.eq(OLD_SESSION_KEY),
@@ -338,20 +326,30 @@ class WatchSessionServiceTest {
     }
 
     /**
-     * Redis session Hash가 없으면 heartbeat를 실행하지 않고 세션 없음 결과를 반환하는지 검증한다.
+     * Redis Lua가 세션 없음 상태를 반환하면 도메인 오류로 변환하는지 검증한다.
      */
     @Test
     void rejectsHeartbeatWhenRedisSessionIsMissing() {
-        when(watchSessionRedisRepository.findActiveSessionKey(USER_ID)).thenReturn(Optional.empty());
-        when(watchSessionRedisRepository.findSession(OLD_SESSION_KEY)).thenReturn(Optional.empty());
+        when(watchSessionRedisRepository.heartbeat(
+                org.mockito.ArgumentMatchers.eq(USER_ID),
+                org.mockito.ArgumentMatchers.eq(OLD_SESSION_KEY),
+                org.mockito.ArgumentMatchers.eq(1L),
+                anyLong()
+        )).thenReturn(new HeartbeatProcessingResult(
+                HeartbeatResult.SESSION_NOT_FOUND,
+                0L,
+                0L
+        ));
 
         assertWatchError(
                 () -> service.heartbeat(USER_ID, OLD_SESSION_KEY, 1L),
                 WatchError.WATCH_SESSION_NOT_FOUND
         );
         verify(esportsMatchRepository, never()).findById(anyLong());
-        verify(watchSessionRedisRepository, never())
-                .heartbeat(anyLong(), anyString(), anyLong(), anyLong());
+        verify(watchSessionRedisRepository)
+                .heartbeat(org.mockito.ArgumentMatchers.eq(USER_ID),
+                        org.mockito.ArgumentMatchers.eq(OLD_SESSION_KEY),
+                        org.mockito.ArgumentMatchers.eq(1L), anyLong());
     }
 
     /**
@@ -384,15 +382,6 @@ class WatchSessionServiceTest {
      */
     private EsportsMatch inProgressMatch() {
         return matchWithStatus("inProgress");
-    }
-
-    /**
-     * 테스트에 사용할 종료된 경기 엔티티를 생성한다.
-     *
-     * @return lifecycle 상태가 completed인 경기
-     */
-    private EsportsMatch completedMatch() {
-        return matchWithStatus("completed");
     }
 
     /**

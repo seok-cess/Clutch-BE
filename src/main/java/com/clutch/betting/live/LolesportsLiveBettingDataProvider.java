@@ -69,43 +69,68 @@ public class LolesportsLiveBettingDataProvider implements LiveBettingDataProvide
                         .distinct()
                         .toList();
 
-        List<SetSnapshot> sets = new ArrayList<>();
-        if (liveMatch.games() != null) {
-            for (EventDetailsResponse.Game game : liveMatch.games()) {
-                if (game.id() == null || game.id().isBlank() || game.number() == null) {
-                    continue;
-                }
-                LocalDateTime startedAt = dataCacheService.getGameStart(game.id()) == null
-                        ? null
-                        : LocalDateTime.ofInstant(
-                                dataCacheService.getGameStart(game.id()),
-                                ZoneOffset.UTC
-                        );
-                LocalDateTime finishedAt = dataCacheService.getFeedFinishedAt(game.id()) == null
-                        ? null
-                        : LocalDateTime.ofInstant(
-                                dataCacheService.getFeedFinishedAt(game.id()),
-                                ZoneOffset.UTC
-                        );
-                sets.add(new SetSnapshot(
-                        game.id(),
-                        game.number(),
-                        startedAt,
-                        game.id().equals(liveMatch.activeGameId()),
-                        finishedAt != null || "completed".equalsIgnoreCase(game.state()),
-                        finishedAt,
-                        setWinnerTracker.winnerOf(liveMatch.matchId(), game.id())
-                ));
-            }
-        }
-        sets.sort(Comparator.comparingInt(SetSnapshot::setNumber));
         return new LiveMatchSnapshot(
                 liveMatch.matchId(),
                 parseUtc(liveMatch.startTime()),
                 teamIds,
-                List.copyOf(sets),
+                toSetSnapshots(liveMatch),
                 isMatchFinished(liveMatch)
         );
+    }
+
+    /**
+     * 외부 게임 목록을 세트 번호순 배팅 스냅샷으로 변환한다.
+     *
+     * @param liveMatch 세트 목록을 가진 외부 매치
+     * @return 유효한 세트만 포함한 정렬된 불변 목록
+     */
+    private List<SetSnapshot> toSetSnapshots(DataCacheService.LiveMatch liveMatch) {
+        if (liveMatch.games() == null) {
+            return List.of();
+        }
+
+        List<SetSnapshot> sets = new ArrayList<>();
+        for (EventDetailsResponse.Game game : liveMatch.games()) {
+            if (game.id() != null && !game.id().isBlank() && game.number() != null) {
+                sets.add(toSetSnapshot(liveMatch, game));
+            }
+        }
+        sets.sort(Comparator.comparingInt(SetSnapshot::setNumber));
+        return List.copyOf(sets);
+    }
+
+    /**
+     * 외부 게임과 캐시된 시작·종료·승자 정보를 하나의 세트 스냅샷으로 결합한다.
+     *
+     * @param liveMatch 세트가 속한 외부 매치
+     * @param game 변환할 외부 게임
+     * @return 배팅 도메인용 세트 스냅샷
+     */
+    private SetSnapshot toSetSnapshot(
+            DataCacheService.LiveMatch liveMatch,
+            EventDetailsResponse.Game game
+    ) {
+        LocalDateTime startedAt = toUtc(dataCacheService.getGameStart(game.id()));
+        LocalDateTime finishedAt = toUtc(dataCacheService.getFeedFinishedAt(game.id()));
+        return new SetSnapshot(
+                game.id(),
+                game.number(),
+                startedAt,
+                game.id().equals(liveMatch.activeGameId()),
+                finishedAt != null || "completed".equalsIgnoreCase(game.state()),
+                finishedAt,
+                setWinnerTracker.winnerOf(liveMatch.matchId(), game.id())
+        );
+    }
+
+    /**
+     * nullable Instant를 UTC LocalDateTime으로 변환한다.
+     *
+     * @param instant 변환할 절대 시각 또는 null
+     * @return UTC 로컬 시각 또는 입력이 null이면 null
+     */
+    private LocalDateTime toUtc(Instant instant) {
+        return instant == null ? null : LocalDateTime.ofInstant(instant, ZoneOffset.UTC);
     }
 
     /**

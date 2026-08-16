@@ -45,56 +45,116 @@ public class BettingEventSynchronizationService {
             return;
         }
         for (SetSnapshot set : sets) {
-            var existingEvent = bettingEventRepository
-                    .findByExternalMatchIdAndSetNumberForUpdate(
-                            liveMatch.externalMatchId(),
-                            set.setNumber()
-                    );
-            BettingPeriod period = periodOf(liveMatch, set.setNumber());
-            if (period == null) {
-                if (set.finished()) {
-                    existingEvent.ifPresent(event -> finishEvent(event, set));
-                    openNextEventAfterFinishedSet(liveMatch, set);
-                } else {
-                    existingEvent.ifPresent(BettingEvent::cancel);
-                }
-                continue;
-            }
-            if (now.isBefore(period.openedAt())) {
-                existingEvent
-                        .filter(event -> event.getStatus() == BettingEventStatus.OPEN)
-                        .ifPresent(event -> event.definePeriod(
-                                period.openedAt(),
-                                period.closesAt()
-                        ));
-                continue;
-            }
-            BettingEvent event = existingEvent
-                    .orElseGet(() -> openEvent(liveMatch, set.setNumber(), period));
-            if (event.getStatus() == BettingEventStatus.OPEN) {
-                event.definePeriod(period.openedAt(), period.closesAt());
-            }
-            if (set.externalGameId() != null && !set.externalGameId().isBlank()) {
-                event.attachGame(set.externalGameId());
-            }
-            event.closeIfExpired(now);
-            if (set.finished()) {
-                finishEvent(event, set);
-                openNextEventAfterFinishedSet(liveMatch, set);
-            }
+            synchronizeSet(liveMatch, set, now);
         }
-        if (liveMatch.matchFinished()) {
-            sets.stream()
-                    .filter(SetSnapshot::finished)
-                    .mapToInt(SetSnapshot::setNumber)
-                    .max()
-                    .ifPresent(lastFinishedSetNumber -> bettingEventRepository
-                            .findAllFutureEventsForUpdate(
-                                    liveMatch.externalMatchId(),
-                                    lastFinishedSetNumber
-                            )
-                            .forEach(BettingEvent::cancel));
+        cancelUnusedFutureEvents(liveMatch);
+    }
+
+    /**
+     * 한 세트의 기간 복구, 이벤트 생성, 마감과 종료 결과를 순서대로 반영한다.
+     *
+     * @param liveMatch 세트가 속한 라이브 매치
+     * @param set 동기화할 세트
+     * @param now 현재 UTC 시각
+     */
+    private void synchronizeSet(
+            LiveMatchSnapshot liveMatch,
+            SetSnapshot set,
+            LocalDateTime now
+    ) {
+        var existingEvent = bettingEventRepository
+                .findByExternalMatchIdAndSetNumberForUpdate(
+                        liveMatch.externalMatchId(),
+                        set.setNumber()
+                );
+        BettingPeriod period = periodOf(liveMatch, set.setNumber());
+        if (period == null) {
+            synchronizeWithoutPeriod(liveMatch, set, existingEvent.orElse(null));
+            return;
         }
+        if (now.isBefore(period.openedAt())) {
+            updateOpenPeriod(existingEvent.orElse(null), period);
+            return;
+        }
+
+        BettingEvent event = existingEvent
+                .orElseGet(() -> openEvent(liveMatch, set.setNumber(), period));
+        updateOpenPeriod(event, period);
+        attachGameIfPresent(event, set.externalGameId());
+        event.closeIfExpired(now);
+        if (set.finished()) {
+            finishEvent(event, set);
+            openNextEventAfterFinishedSet(liveMatch, set);
+        }
+    }
+
+    /**
+     * 기간을 복구할 수 없으면 진행 이벤트는 취소하고 종료 결과만 보존한다.
+     *
+     * @param liveMatch 세트가 속한 라이브 매치
+     * @param set 동기화할 세트
+     * @param existingEvent 기존 이벤트 또는 없으면 null
+     */
+    private void synchronizeWithoutPeriod(
+            LiveMatchSnapshot liveMatch,
+            SetSnapshot set,
+            BettingEvent existingEvent
+    ) {
+        if (!set.finished()) {
+            if (existingEvent != null) {
+                existingEvent.cancel();
+            }
+            return;
+        }
+        if (existingEvent != null) {
+            finishEvent(existingEvent, set);
+        }
+        openNextEventAfterFinishedSet(liveMatch, set);
+    }
+
+    /**
+     * 열린 이벤트에만 최신 오픈·마감 기간을 반영한다.
+     *
+     * @param event 갱신할 이벤트 또는 없으면 null
+     * @param period 최신 배팅 기간
+     */
+    private void updateOpenPeriod(BettingEvent event, BettingPeriod period) {
+        if (event != null && event.getStatus() == BettingEventStatus.OPEN) {
+            event.definePeriod(period.openedAt(), period.closesAt());
+        }
+    }
+
+    /**
+     * 외부 게임 ID가 준비된 경우에만 이벤트에 연결한다.
+     *
+     * @param event 게임을 연결할 이벤트
+     * @param externalGameId 외부 게임 ID 또는 미확정이면 null
+     */
+    private void attachGameIfPresent(BettingEvent event, String externalGameId) {
+        if (externalGameId != null && !externalGameId.isBlank()) {
+            event.attachGame(externalGameId);
+        }
+    }
+
+    /**
+     * 매치 종료 후 실제로 진행되지 않을 미래 세트 이벤트를 취소한다.
+     *
+     * @param liveMatch 종료 여부와 세트 목록을 가진 라이브 매치
+     */
+    private void cancelUnusedFutureEvents(LiveMatchSnapshot liveMatch) {
+        if (!liveMatch.matchFinished()) {
+            return;
+        }
+        liveMatch.sets().stream()
+                .filter(SetSnapshot::finished)
+                .mapToInt(SetSnapshot::setNumber)
+                .max()
+                .ifPresent(lastFinishedSetNumber -> bettingEventRepository
+                        .findAllFutureEventsForUpdate(
+                                liveMatch.externalMatchId(),
+                                lastFinishedSetNumber
+                        )
+                        .forEach(BettingEvent::cancel));
     }
 
     /**
@@ -184,9 +244,7 @@ public class BettingEventSynchronizationService {
      * @param finishedSet 종료된 세트 스냅샷
      */
     private void finishEvent(BettingEvent event, SetSnapshot finishedSet) {
-        if (finishedSet.externalGameId() != null && !finishedSet.externalGameId().isBlank()) {
-            event.attachGame(finishedSet.externalGameId());
-        }
+        attachGameIfPresent(event, finishedSet.externalGameId());
         event.close();
         if (finishedSet.winnerExternalTeamId() != null) {
             event.recordWinner(finishedSet.winnerExternalTeamId());

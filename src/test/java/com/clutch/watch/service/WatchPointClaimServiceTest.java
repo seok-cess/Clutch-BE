@@ -6,10 +6,8 @@ import com.clutch.watch.exception.WatchException;
 import com.clutch.watch.redis.reward.RewardClaimCompletionResult;
 import com.clutch.watch.redis.reward.RewardClaimCompletionStatus;
 import com.clutch.watch.redis.session.WatchSessionRedisRepository;
-import com.clutch.watch.service.dto.WatchPointClaimResult;
-import com.clutch.watch.service.dto.WatchPointClaimTransactionResult;
-import com.clutch.watch.service.service.WatchPointClaimService;
-import com.clutch.watch.service.service.WatchRewardClaimTransactionService;
+import com.clutch.watch.dto.WatchPointAwardResult;
+import com.clutch.watch.dto.WatchPointClaimResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -34,7 +32,7 @@ class WatchPointClaimServiceTest {
     private WatchSessionRedisRepository redisRepository;
 
     @Mock
-    private WatchRewardClaimTransactionService transactionService;
+    private WatchPointAwardService pointAwardService;
 
     private WatchPointClaimService service;
 
@@ -42,7 +40,7 @@ class WatchPointClaimServiceTest {
     void setUp() {
         service = new WatchPointClaimService(
                 redisRepository,
-                transactionService,
+                pointAwardService,
                 properties()
         );
         when(redisRepository.tryAcquireSwitchLock(
@@ -56,8 +54,8 @@ class WatchPointClaimServiceTest {
     void awardsPointAndStartsNextRewardSequence() {
         when(redisRepository.prepareRewardClaim(USER_ID, SESSION_KEY, 1L))
                 .thenReturn(RewardClaimCompletionStatus.SUCCESS);
-        when(transactionService.award(USER_ID, SESSION_KEY, 1L, 100L))
-                .thenReturn(new WatchPointClaimTransactionResult(1L, 100L, 500L));
+        when(pointAwardService.award(USER_ID, SESSION_KEY, 1L, 100L))
+                .thenReturn(new WatchPointAwardResult(1L, 100L, 500L));
         when(redisRepository.completeRewardClaim(
                 org.mockito.ArgumentMatchers.eq(USER_ID),
                 org.mockito.ArgumentMatchers.eq(SESSION_KEY),
@@ -83,8 +81,8 @@ class WatchPointClaimServiceTest {
     void recoversRepeatedRequestFromExistingTransaction() {
         when(redisRepository.prepareRewardClaim(USER_ID, SESSION_KEY, 1L))
                 .thenReturn(RewardClaimCompletionStatus.INVALID_REWARD_SEQUENCE);
-        when(transactionService.findExisting(USER_ID, SESSION_KEY, 1L))
-                .thenReturn(new WatchPointClaimTransactionResult(1L, 100L, 500L));
+        when(pointAwardService.findExisting(USER_ID, SESSION_KEY, 1L))
+                .thenReturn(new WatchPointAwardResult(1L, 100L, 500L));
         when(redisRepository.completeRewardClaim(
                 org.mockito.ArgumentMatchers.eq(USER_ID),
                 org.mockito.ArgumentMatchers.eq(SESSION_KEY),

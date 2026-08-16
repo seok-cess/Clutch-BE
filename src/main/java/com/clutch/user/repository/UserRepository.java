@@ -1,7 +1,9 @@
 package com.clutch.user.repository;
 
 import com.clutch.user.domain.User;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -9,8 +11,18 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 
-/** 사용자 조회와 배팅 포인트의 원자적 증감을 제공한다. */
+/** 사용자 조회와 포인트의 동시성 안전한 증감을 제공한다. */
 public interface UserRepository extends JpaRepository<User, Long> {
+
+    /**
+     * 엔티티 기반 포인트 변경이 다른 포인트 증감과 충돌하지 않도록 사용자 행을 잠근다.
+     *
+     * @param userId 잠글 사용자 ID
+     * @return 쓰기 잠금이 적용된 사용자
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select user from User user where user.id = :userId")
+    Optional<User> findByIdForUpdate(@Param("userId") Long userId);
 
     /**
      * 잔액이 충분할 때만 포인트를 차감해 동시 배팅의 초과 사용을 막는다.

@@ -1,4 +1,4 @@
-package com.clutch.watch.service.service;
+package com.clutch.watch.service;
 
 import com.clutch.user.domain.User;
 import com.clutch.user.repository.UserRepository;
@@ -7,9 +7,9 @@ import com.clutch.watch.domain.WatchSession;
 import com.clutch.watch.domain.WatchSessionStatus;
 import com.clutch.watch.exception.WatchError;
 import com.clutch.watch.exception.WatchException;
+import com.clutch.watch.dto.WatchPointAwardResult;
 import com.clutch.watch.repository.WatchPointTransactionRepository;
 import com.clutch.watch.repository.WatchSessionRepository;
-import com.clutch.watch.service.dto.WatchPointClaimTransactionResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,7 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 @RequiredArgsConstructor
-public class WatchRewardClaimTransactionService {
+public class WatchPointAwardService {
 
     private final WatchSessionRepository watchSessionRepository;
     private final WatchPointTransactionRepository watchPointTransactionRepository;
@@ -37,7 +37,7 @@ public class WatchRewardClaimTransactionService {
      * @throws WatchException 세션 또는 사용자가 없거나 세션이 지급 가능한 상태가 아닌 경우
      */
     @Transactional
-    public WatchPointClaimTransactionResult award(
+    public WatchPointAwardResult award(
             long userId,
             String sessionKey,
             long rewardSequence,
@@ -47,13 +47,13 @@ public class WatchRewardClaimTransactionService {
                 .orElseThrow(() -> new WatchException(WatchError.WATCH_SESSION_NOT_FOUND));
         validateSession(watchSession, userId);
 
-        User user = userRepository.findById(userId)
+        User user = userRepository.findByIdForUpdate(userId)
                 .orElseThrow(() -> new WatchException(WatchError.USER_NOT_FOUND));
         WatchPointTransaction existingTransaction = watchPointTransactionRepository
                 .findByWatchSessionIdAndRewardSequence(watchSession.getId(), rewardSequence)
                 .orElse(null);
         if (existingTransaction != null) {
-            return new WatchPointClaimTransactionResult(
+            return new WatchPointAwardResult(
                     rewardSequence,
                     existingTransaction.getAwardedPoint(),
                     user.getPoint()
@@ -73,7 +73,7 @@ public class WatchRewardClaimTransactionService {
                 rewardPoint
         ));
 
-        return new WatchPointClaimTransactionResult(
+        return new WatchPointAwardResult(
                 rewardSequence,
                 rewardPoint,
                 user.getPoint()
@@ -91,7 +91,7 @@ public class WatchRewardClaimTransactionService {
      * @throws WatchException 세션, 거래 또는 사용자가 없거나 세션 소유자가 다른 경우
      */
     @Transactional(readOnly = true)
-    public WatchPointClaimTransactionResult findExisting(
+    public WatchPointAwardResult findExisting(
             long userId,
             String sessionKey,
             long rewardSequence
@@ -104,13 +104,23 @@ public class WatchRewardClaimTransactionService {
         WatchPointTransaction transaction = watchPointTransactionRepository
                 .findByWatchSessionIdAndRewardSequence(watchSession.getId(), rewardSequence)
                 .orElseThrow(() -> new WatchException(WatchError.POINT_TRANSACTION_NOT_FOUND));
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new WatchException(WatchError.USER_NOT_FOUND));
-        return new WatchPointClaimTransactionResult(
+        return new WatchPointAwardResult(
                 rewardSequence,
                 transaction.getAwardedPoint(),
-                user.getPoint()
+                currentPoint(userId)
         );
+    }
+
+    /**
+     * 사용자 엔티티를 적재하지 않고 최신 포인트만 조회한다.
+     *
+     * @param userId 조회할 사용자 ID
+     * @return 사용자의 현재 포인트
+     * @throws WatchException 사용자를 찾을 수 없는 경우
+     */
+    private long currentPoint(long userId) {
+        return userRepository.findPointById(userId)
+                .orElseThrow(() -> new WatchException(WatchError.USER_NOT_FOUND));
     }
 
     /**

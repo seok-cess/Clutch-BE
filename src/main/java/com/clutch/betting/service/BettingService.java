@@ -61,8 +61,35 @@ public class BettingService {
     ) {
         BettingEvent event = bettingEventRepository.findByIdForUpdate(bettingEventId)
                 .orElseThrow(() -> new BettingException(BettingErrorCode.EVENT_NOT_FOUND));
-        LocalDateTime now = LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC);
-        if (!event.isOpenAt(now)) {
+        validatePlaceRequest(event, bettingEventId, userId, selectedExternalTeamId);
+
+        UserBet userBet = UserBet.place(
+                bettingEventId,
+                userId,
+                selectedExternalTeamId,
+                amount
+        );
+        decreasePointOrThrow(userId, amount);
+        saveBetAndStake(userBet);
+        return toPlacementResult(userBet, currentPoint(userId));
+    }
+
+    /**
+     * 이벤트 시간·라이브 상태·팀·중복 조건을 순서대로 검증한다.
+     *
+     * @param event 배팅 대상 이벤트
+     * @param bettingEventId 배팅 이벤트 ID
+     * @param userId 배팅 사용자 ID
+     * @param selectedExternalTeamId 선택한 외부 팀 ID
+     * @throws BettingException 배팅 등록 조건을 만족하지 못하는 경우
+     */
+    private void validatePlaceRequest(
+            BettingEvent event,
+            Long bettingEventId,
+            Long userId,
+            String selectedExternalTeamId
+    ) {
+        if (!event.isOpenAt(now())) {
             throw new BettingException(BettingErrorCode.EVENT_NOT_OPEN);
         }
         if (!liveBettingDataProvider.isAcceptingBets(
@@ -78,30 +105,41 @@ public class BettingService {
         if (userBetRepository.existsByBettingEventIdAndUserId(bettingEventId, userId)) {
             throw new BettingException(BettingErrorCode.DUPLICATE_BET);
         }
+    }
 
-        UserBet userBet = UserBet.place(
-                bettingEventId,
-                userId,
-                selectedExternalTeamId,
-                amount
-        );
-        decreasePoint(userId, amount);
+    /**
+     * 사용자 배팅과 차감 원장을 함께 저장하고 DB 중복을 도메인 오류로 변환한다.
+     *
+     * @param userBet 저장할 사용자 배팅
+     * @throws BettingException 동일 이벤트에 사용자 배팅이 이미 존재하는 경우
+     */
+    private void saveBetAndStake(UserBet userBet) {
         try {
             userBetRepository.saveAndFlush(userBet);
-            transactionRepository.saveAndFlush(BetPointTransaction.stake(userBet.getId(), amount));
+            transactionRepository.saveAndFlush(
+                    BetPointTransaction.stake(userBet.getId(), userBet.getAmount())
+            );
         } catch (DataIntegrityViolationException exception) {
             throw new BettingException(BettingErrorCode.DUPLICATE_BET);
         }
+    }
 
+    /**
+     * 저장된 배팅과 최신 포인트를 등록 응답 모델로 변환한다.
+     *
+     * @param userBet 저장된 사용자 배팅
+     * @param currentPoint 배팅 차감 후 사용자 포인트
+     * @return 배팅 등록 결과
+     */
+    private BetPlacementResult toPlacementResult(UserBet userBet, long currentPoint) {
         return new BetPlacementResult(
                 userBet.getId(),
                 userBet.getUserId(),
-                bettingEventId,
-                selectedExternalTeamId,
-                amount,
+                userBet.getBettingEventId(),
+                userBet.getSelectedExternalTeamId(),
+                userBet.getAmount(),
                 userBet.getStatus(),
-                userRepository.findPointById(userId)
-                        .orElseThrow(() -> new BettingException(BettingErrorCode.USER_NOT_FOUND))
+                currentPoint
         );
     }
 
@@ -158,8 +196,6 @@ public class BettingService {
         UserBet userBet = userBetRepository
                 .findByBettingEventIdAndUserId(bettingEventId, userId)
                 .orElseThrow(() -> new BettingException(BettingErrorCode.BET_NOT_FOUND));
-        long currentPoint = userRepository.findPointById(userId)
-                .orElseThrow(() -> new BettingException(BettingErrorCode.USER_NOT_FOUND));
         return new UserBetView(
                 userBet.getId(),
                 userBet.getUserId(),
@@ -167,7 +203,7 @@ public class BettingService {
                 userBet.getSelectedExternalTeamId(),
                 userBet.getAmount(),
                 userBet.getStatus(),
-                currentPoint
+                currentPoint(userId)
         );
     }
 
@@ -219,7 +255,7 @@ public class BettingService {
      * @param amount 차감할 포인트
      * @throws BettingException 사용자가 없거나 보유 포인트가 부족할 때
      */
-    private void decreasePoint(Long userId, long amount) {
+    private void decreasePointOrThrow(Long userId, long amount) {
         int updated = userRepository.decreasePointIfEnough(userId, amount);
         if (updated == 1) {
             return;
@@ -228,5 +264,17 @@ public class BettingService {
             throw new BettingException(BettingErrorCode.USER_NOT_FOUND);
         }
         throw new BettingException(BettingErrorCode.INSUFFICIENT_POINT);
+    }
+
+    /**
+     * 사용자 엔티티를 적재하지 않고 최신 포인트만 조회한다.
+     *
+     * @param userId 조회할 사용자 ID
+     * @return 사용자의 현재 포인트
+     * @throws BettingException 사용자를 찾을 수 없는 경우
+     */
+    private long currentPoint(Long userId) {
+        return userRepository.findPointById(userId)
+                .orElseThrow(() -> new BettingException(BettingErrorCode.USER_NOT_FOUND));
     }
 }

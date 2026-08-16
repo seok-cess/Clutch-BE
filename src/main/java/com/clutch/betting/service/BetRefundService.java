@@ -37,26 +37,42 @@ public class BetRefundService {
     public void refund(Long bettingEventId) {
         BettingEvent event = eventRepository.findByIdForUpdate(bettingEventId)
                 .orElseThrow(() -> new BettingException(BettingErrorCode.EVENT_NOT_FOUND));
-        if (event.getStatus() != BettingEventStatus.CANCELLED) {
-            throw new BettingException(BettingErrorCode.EVENT_NOT_CANCELLED);
-        }
+        validateCancelled(event);
         List<UserBet> placedBets = userBetRepository
                 .findAllByBettingEventIdAndStatusForUpdate(
                         bettingEventId,
                         UserBetStatus.PLACED
                 );
-        if (placedBets.isEmpty()) {
-            return;
-        }
-
         for (UserBet userBet : placedBets) {
-            if (userRepository.increasePoint(userBet.getUserId(), userBet.getAmount()) != 1) {
-                throw new BettingException(BettingErrorCode.USER_NOT_FOUND);
-            }
-            userBet.refund();
-            transactionRepository.save(
-                    BetPointTransaction.refund(userBet.getId(), userBet.getAmount())
-            );
+            refundBet(userBet);
         }
+    }
+
+    /**
+     * 환불 대상 이벤트가 취소 상태인지 검증한다.
+     *
+     * @param event 환불할 배팅 이벤트
+     * @throws BettingException 취소 상태가 아닌 경우
+     */
+    private void validateCancelled(BettingEvent event) {
+        if (event.getStatus() != BettingEventStatus.CANCELLED) {
+            throw new BettingException(BettingErrorCode.EVENT_NOT_CANCELLED);
+        }
+    }
+
+    /**
+     * 한 사용자 배팅의 포인트를 반환하고 환불 원장을 기록한다.
+     *
+     * @param userBet 환불할 사용자 배팅
+     * @throws BettingException 사용자를 찾을 수 없는 경우
+     */
+    private void refundBet(UserBet userBet) {
+        if (userRepository.increasePoint(userBet.getUserId(), userBet.getAmount()) != 1) {
+            throw new BettingException(BettingErrorCode.USER_NOT_FOUND);
+        }
+        userBet.refund();
+        transactionRepository.save(
+                BetPointTransaction.refund(userBet.getId(), userBet.getAmount())
+        );
     }
 }

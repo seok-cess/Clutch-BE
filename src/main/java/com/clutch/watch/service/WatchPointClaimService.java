@@ -1,13 +1,13 @@
-package com.clutch.watch.service.service;
+package com.clutch.watch.service;
 
 import com.clutch.watch.config.WatchRewardProperties;
+import com.clutch.watch.dto.WatchPointAwardResult;
+import com.clutch.watch.dto.WatchPointClaimResult;
 import com.clutch.watch.exception.WatchError;
 import com.clutch.watch.exception.WatchException;
 import com.clutch.watch.redis.reward.RewardClaimCompletionResult;
 import com.clutch.watch.redis.reward.RewardClaimCompletionStatus;
 import com.clutch.watch.redis.session.WatchSessionRedisRepository;
-import com.clutch.watch.service.dto.WatchPointClaimResult;
-import com.clutch.watch.service.dto.WatchPointClaimTransactionResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -22,7 +22,7 @@ import java.util.UUID;
 public class WatchPointClaimService {
 
     private final WatchSessionRedisRepository watchSessionRedisRepository;
-    private final WatchRewardClaimTransactionService transactionService;
+    private final WatchPointAwardService pointAwardService;
     private final WatchRewardProperties properties;
 
     /**
@@ -62,26 +62,71 @@ public class WatchPointClaimService {
             String sessionKey,
             long rewardSequence
     ) {
-        RewardClaimCompletionStatus preparation = watchSessionRedisRepository.prepareRewardClaim(
+        RewardClaimCompletionStatus eligibility = watchSessionRedisRepository.prepareRewardClaim(
                 userId,
                 sessionKey,
                 rewardSequence
         );
+        WatchPointAwardResult award = awardOrRestore(
+                eligibility,
+                userId,
+                sessionKey,
+                rewardSequence
+        );
+        RewardClaimCompletionResult completion = completeClaim(userId, sessionKey, rewardSequence);
 
-        WatchPointClaimTransactionResult transactionResult;
-        if (preparation == RewardClaimCompletionStatus.SUCCESS) {
-            transactionResult = transactionService.award(
+        return new WatchPointClaimResult(
+                award.rewardSequence(),
+                award.awardedPoint(),
+                award.totalPoint(),
+                completion.nextRewardSequence()
+        );
+    }
+
+    /**
+     * Redis 자격 상태에 따라 새 포인트를 지급하거나 기존 지급 결과를 복원한다.
+     *
+     * @param eligibility Redis 수령 자격 상태
+     * @param userId 포인트를 수령할 사용자 ID
+     * @param sessionKey 시청 세션 외부 식별자
+     * @param rewardSequence 수령할 포인트 회차
+     * @return 새로 지급하거나 DB에서 복원한 지급 결과
+     */
+    private WatchPointAwardResult awardOrRestore(
+            RewardClaimCompletionStatus eligibility,
+            long userId,
+            String sessionKey,
+            long rewardSequence
+    ) {
+        return switch (eligibility) {
+            case SUCCESS -> pointAwardService.award(
                     userId,
                     sessionKey,
                     rewardSequence,
                     properties.pointsPerClaim()
             );
-        } else if (preparation == RewardClaimCompletionStatus.INVALID_REWARD_SEQUENCE) {
-            transactionResult = findExistingOrReject(userId, sessionKey, rewardSequence);
-        } else {
-            throw new WatchException(toError(preparation));
-        }
+            case INVALID_REWARD_SEQUENCE -> findExistingOrReject(
+                    userId,
+                    sessionKey,
+                    rewardSequence
+            );
+            default -> throw new WatchException(toError(eligibility));
+        };
+    }
 
+    /**
+     * DB 지급이 끝난 회차를 Redis에 반영하고 다음 수령 회차를 시작한다.
+     *
+     * @param userId 포인트를 수령한 사용자 ID
+     * @param sessionKey 시청 세션 외부 식별자
+     * @param rewardSequence 완료한 포인트 회차
+     * @return 다음 포인트 회차 정보
+     */
+    private RewardClaimCompletionResult completeClaim(
+            long userId,
+            String sessionKey,
+            long rewardSequence
+    ) {
         RewardClaimCompletionResult completion = watchSessionRedisRepository.completeRewardClaim(
                 userId,
                 sessionKey,
@@ -92,13 +137,7 @@ public class WatchPointClaimService {
                 && completion.status() != RewardClaimCompletionStatus.ALREADY_COMPLETED) {
             throw new WatchException(WatchError.REWARD_CLAIM_COMPLETION_FAILED);
         }
-
-        return new WatchPointClaimResult(
-                transactionResult.rewardSequence(),
-                transactionResult.awardedPoint(),
-                transactionResult.totalPoint(),
-                completion.nextRewardSequence()
-        );
+        return completion;
     }
 
     /**
@@ -111,13 +150,13 @@ public class WatchPointClaimService {
      * @return DB에 저장된 기존 지급 결과
      * @throws WatchException 기존 지급 거래가 없거나 세션 및 사용자 검증에 실패한 경우
      */
-    private WatchPointClaimTransactionResult findExistingOrReject(
+    private WatchPointAwardResult findExistingOrReject(
             long userId,
             String sessionKey,
             long rewardSequence
     ) {
         try {
-            return transactionService.findExisting(userId, sessionKey, rewardSequence);
+            return pointAwardService.findExisting(userId, sessionKey, rewardSequence);
         } catch (WatchException exception) {
             if (exception.getError() == WatchError.POINT_TRANSACTION_NOT_FOUND) {
                 throw new WatchException(WatchError.REWARD_SEQUENCE_MISMATCH);

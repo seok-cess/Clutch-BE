@@ -43,10 +43,7 @@ public class BetSettlementService {
         if (event.getStatus() == BettingEventStatus.SETTLED) {
             return;
         }
-        if (event.getStatus() != BettingEventStatus.CLOSED
-                || event.getWinnerExternalTeamId() == null) {
-            throw new BettingException(BettingErrorCode.RESULT_NOT_READY);
-        }
+        validateResultReady(event);
 
         List<UserBet> placedBets = userBetRepository
                 .findAllByBettingEventIdAndStatusForUpdate(
@@ -54,18 +51,42 @@ public class BetSettlementService {
                         UserBetStatus.PLACED
                 );
         for (UserBet userBet : placedBets) {
-            if (userBet.getSelectedExternalTeamId().equals(event.getWinnerExternalTeamId())) {
-                long payoutPoint = Math.multiplyExact(userBet.getAmount(), PAYOUT_MULTIPLIER);
-                increasePoint(userBet.getUserId(), payoutPoint);
-                userBet.win();
-                transactionRepository.save(
-                        BetPointTransaction.payout(userBet.getId(), payoutPoint)
-                );
-            } else {
-                userBet.lose();
-            }
+            settleBet(userBet, event.getWinnerExternalTeamId());
         }
         event.settle();
+    }
+
+    /**
+     * 종료 상태와 승자 정보를 확인해 정산 가능한 이벤트인지 검증한다.
+     *
+     * @param event 정산할 배팅 이벤트
+     * @throws BettingException 이벤트가 아직 종료되지 않았거나 승자가 없는 경우
+     */
+    private void validateResultReady(BettingEvent event) {
+        if (event.getStatus() != BettingEventStatus.CLOSED
+                || event.getWinnerExternalTeamId() == null) {
+            throw new BettingException(BettingErrorCode.RESULT_NOT_READY);
+        }
+    }
+
+    /**
+     * 한 사용자 배팅을 승패에 따라 지급 또는 몰수 처리한다.
+     *
+     * @param userBet 처리할 사용자 배팅
+     * @param winnerExternalTeamId 확정된 승리 팀 ID
+     */
+    private void settleBet(UserBet userBet, String winnerExternalTeamId) {
+        if (!userBet.getSelectedExternalTeamId().equals(winnerExternalTeamId)) {
+            userBet.lose();
+            return;
+        }
+
+        long payoutPoint = Math.multiplyExact(userBet.getAmount(), PAYOUT_MULTIPLIER);
+        increasePoint(userBet.getUserId(), payoutPoint);
+        userBet.win();
+        transactionRepository.save(
+                BetPointTransaction.payout(userBet.getId(), payoutPoint)
+        );
     }
 
     /**

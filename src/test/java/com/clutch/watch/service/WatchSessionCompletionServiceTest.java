@@ -6,7 +6,6 @@ import com.clutch.watch.exception.WatchError;
 import com.clutch.watch.exception.WatchException;
 import com.clutch.watch.redis.session.WatchSessionSnapshot;
 import com.clutch.watch.repository.WatchSessionRepository;
-import com.clutch.watch.service.service.WatchRewardService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,7 +23,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class WatchRewardServiceTest {
+class WatchSessionCompletionServiceTest {
 
     private static final long USER_ID = 100L;
     private static final long MATCH_ID = 200L;
@@ -35,15 +34,15 @@ class WatchRewardServiceTest {
     @Mock
     private WatchSessionRepository watchSessionRepository;
 
-    private WatchRewardService service;
+    private WatchSessionCompletionService service;
 
     @BeforeEach
     void setUp() {
-        service = new WatchRewardService(watchSessionRepository);
+        service = new WatchSessionCompletionService(watchSessionRepository);
     }
 
     @Test
-    void discardsClaimableSessionWithoutAwardingPoint() {
+    void completesClaimableSessionWithoutAwardingPoint() {
         WatchSession watchSession = WatchSession.start(
                 SESSION_KEY,
                 USER_ID,
@@ -53,14 +52,14 @@ class WatchRewardServiceTest {
         when(watchSessionRepository.findBySessionKey(SESSION_KEY))
                 .thenReturn(Optional.of(watchSession));
 
-        service.discard(snapshot(300_000L));
+        service.completeWithoutReward(snapshot(300_000L));
 
         assertThat(watchSession.getStatus()).isEqualTo(WatchSessionStatus.COMPLETED);
         assertThat(watchSession.getEligibleMilliseconds()).isEqualTo(300_000L);
     }
 
     @Test
-    void ignoresAlreadyCompletedSessionWhenDiscardingAgain() {
+    void preservesAlreadyCompletedSessionWhenCompletingAgain() {
         WatchSession watchSession = WatchSession.start(
                 SESSION_KEY,
                 USER_ID,
@@ -71,7 +70,7 @@ class WatchRewardServiceTest {
         when(watchSessionRepository.findBySessionKey(SESSION_KEY))
                 .thenReturn(Optional.of(watchSession));
 
-        service.discard(snapshot(100_000L));
+        service.completeWithoutReward(snapshot(100_000L));
 
         assertThat(watchSession.getEligibleMilliseconds()).isEqualTo(300_000L);
     }
@@ -98,12 +97,12 @@ class WatchRewardServiceTest {
                 1L
         );
 
-        assertWatchError(() -> service.discard(snapshot), WatchError.REDIS_SESSION_USER_MISMATCH);
+        assertWatchError(() -> service.completeWithoutReward(snapshot), WatchError.REDIS_SESSION_USER_MISMATCH);
     }
 
     @Test
     void rejectsNegativeEligibleTimeBeforeRepositoryAccess() {
-        assertWatchError(() -> service.discard(snapshot(-1L)), WatchError.ELIGIBLE_TIME_NEGATIVE);
+        assertWatchError(() -> service.completeWithoutReward(snapshot(-1L)), WatchError.ELIGIBLE_TIME_NEGATIVE);
 
         verify(watchSessionRepository, never()).findBySessionKey(SESSION_KEY);
     }

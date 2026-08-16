@@ -121,7 +121,7 @@ class WatchRewardFlowIntegrationTest {
      * @throws Exception MockMvc 요청 처리에 실패한 경우
      */
     @Test
-    void discardsUnclaimedRewardOnExpiration() throws Exception {
+    void completesSessionWithoutUnclaimedRewardOnExpiration() throws Exception {
         User user = saveUser();
         EsportsMatch match = saveMatch("inProgress");
         String sessionKey = startSession(user.getId(), match.getId());
@@ -385,7 +385,7 @@ class WatchRewardFlowIntegrationTest {
      * @throws Exception MockMvc 요청 처리에 실패한 경우
      */
     @Test
-    void discardsRewardWhenAliveKeyExpires() throws Exception {
+    void completesSessionWithoutRewardWhenAliveKeyExpires() throws Exception {
         User user = saveUser();
         EsportsMatch match = saveMatch("inProgress");
         String sessionKey = startSession(user.getId(), match.getId());

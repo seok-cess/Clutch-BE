@@ -1,4 +1,4 @@
-package com.clutch.watch.service.service;
+package com.clutch.watch.service;
 
 import com.clutch.watch.domain.WatchSession;
 import com.clutch.watch.domain.WatchSessionStatus;
@@ -20,19 +20,18 @@ import java.time.ZoneOffset;
  */
 @Service
 @RequiredArgsConstructor
-public class WatchRewardService {
+public class WatchSessionCompletionService {
 
     private final WatchSessionRepository watchSessionRepository;
 
     /**
      * Redis의 마지막 시청 상태만 DB 세션에 반영하고 포인트는 지급하지 않는다.
      * 미수령 보상과 부분 누적시간이 세션 종료 시 자동 지급되지 않도록 사용한다.
-     * Redis에서 확정한 마지막 시청 상태를 반영하고 세션을 완료한다.
      *
      * @param snapshot 종료할 Redis 시청 세션 상태
      */
     @Transactional
-    public void discard(WatchSessionSnapshot snapshot) {
+    public void completeWithoutReward(WatchSessionSnapshot snapshot) {
         if (snapshot == null) {
             throw new WatchException(WatchError.REWARD_SNAPSHOT_REQUIRED);
         }
