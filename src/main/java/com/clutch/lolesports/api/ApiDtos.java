@@ -77,11 +77,25 @@ public final class ApiDtos {
     public record LiveSummary(boolean live, List<LiveMatchItem> matches) {
     }
 
+    /**
+     * 진행중(으로 노출되는) 매치 하나.
+     *
+     * 소스의 getLive 는 매치가 끝나도 한동안 진행중으로 남고, 세트 state 도 실제
+     * 종료보다 약 5분 늦다. 그래서 종료 여부는 소스 상태를 그대로 쓰지 않고
+     * 우리가 판정해 matchFinished / matchWinnerTeamId 로 내린다.
+     * 스코어(gameWins)만 소스 값을 그대로 쓴다.
+     *
+     * @param matchFinished      과반 세트 승리로 매치가 끝났는지
+     * @param matchWinnerTeamId  매치 최종 승리 팀. 미확정이면 null
+     */
     public record LiveMatchItem(
             String matchId,
             String leagueName,
             String blockName,
             String startTime,
+            Integer bestOf,
+            boolean matchFinished,
+            String matchWinnerTeamId,
             List<ScheduleTeam> teams,
             List<GameItem> games,
             String activeGameId
