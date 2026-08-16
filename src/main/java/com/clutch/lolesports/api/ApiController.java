@@ -166,6 +166,9 @@ public class ApiController {
                         m.leagueName(),
                         m.blockName(),
                         m.startTime(),
+                        m.bestOf(),
+                        m.isFinished(),
+                        m.winnerTeamId(),
                         mapTeams(m.teams()),
                         m.games() == null ? List.of() : m.games().stream()
                                 .map(g -> new ApiDtos.GameItem(
