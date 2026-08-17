@@ -28,7 +28,7 @@ class UserCouponRepositoryTest {
 
     private UserCoupon newCoupon(long claimId){
         return new UserCoupon(
-                claimId, 1L, 10L, 100L,
+                claimId, 1L, 10L, null, 100L,
                 "CPN-" + claimId, "RATE", new BigDecimal("50.00"),
                 Instant.now().plus(7, ChronoUnit.DAYS)
         );
