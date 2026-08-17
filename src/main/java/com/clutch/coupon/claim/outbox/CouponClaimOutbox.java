@@ -121,4 +121,22 @@ public class CouponClaimOutbox {
                 payload
         );
     }
+    /**
+     * 발행 완료 처리
+     *
+     * @param sentAt 발행 완료 시각
+     */
+    public void markSent(
+            LocalDateTime sentAt
+    ) {
+        this.status = CouponClaimOutboxStatus.SENT;
+        this.sentAt = sentAt;
+    }
+
+    /**
+     * 발행 재시도 횟수 증가
+     */
+    public void increaseRetryCount() {
+        this.retryCount++;
+    }
 }
