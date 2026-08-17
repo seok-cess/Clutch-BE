@@ -16,6 +16,11 @@ public enum CouponClaimErrorCode {
             HttpStatus.NOT_FOUND,
             "존재하지 않는 쿠폰 이벤트 항목입니다."
     ),
+    
+    COUPON_BENEFIT_NOT_FOUND(
+            HttpStatus.INTERNAL_SERVER_ERROR,
+            "쿠폰 혜택 정보를 조회할 수 없습니다."
+    ),
 
     COUPON_EVENT_OCCURRENCE_NOT_FOUND(
             HttpStatus.NOT_FOUND,

@@ -320,12 +320,27 @@ class CouponClaimConcurrencyIntegrationTest {
         }
 
         // then
-        Integer succeededClaimCount = jdbcTemplate.queryForObject(
+        Integer pendingClaimCount = jdbcTemplate.queryForObject(
                 """
                         SELECT COUNT(*)
                         FROM coupon_claim_request
                         WHERE coupon_event_occurrence_id = ?
-                          AND request_status = 'SUCCEEDED'
+                          AND request_status = 'PENDING'
+                        """,
+                Integer.class,
+                COUPON_EVENT_OCCURRENCE_ID
+        );
+
+        Integer pendingOutboxCount = jdbcTemplate.queryForObject(
+                """
+                        SELECT COUNT(*)
+                        FROM coupon_claim_outbox
+                        WHERE aggregate_id IN (
+                            SELECT coupon_claim_request_id
+                            FROM coupon_claim_request
+                            WHERE coupon_event_occurrence_id = ?
+                        )
+                          AND status = 'PENDING'
                         """,
                 Integer.class,
                 COUPON_EVENT_OCCURRENCE_ID
@@ -367,7 +382,7 @@ class CouponClaimConcurrencyIntegrationTest {
                 REQUEST_COUNT,
                 successResponseCount.get(),
                 failureResponseCount.get(),
-                succeededClaimCount,
+                pendingClaimCount,
                 successCount,
                 remainingRedisStock,
                 claimedUserCount
@@ -387,7 +402,10 @@ class CouponClaimConcurrencyIntegrationTest {
                         + failureResponseCount.get()
         ).isEqualTo(REQUEST_COUNT);
 
-        assertThat(succeededClaimCount)
+        assertThat(pendingClaimCount)
+                .isEqualTo(STOCK_QUANTITY);
+
+        assertThat(pendingOutboxCount)
                 .isEqualTo(STOCK_QUANTITY);
 
         assertThat(successCount)
