@@ -1,5 +1,8 @@
 package com.clutch.coupon.claim.service;
 
+import com.clutch.coupon.claim.outbox.CouponBenefitSnapshot;
+import com.clutch.coupon.claim.outbox.CouponBenefitSnapshotRepository;
+import com.clutch.coupon.claim.outbox.CouponClaimOutboxWriter;
 import com.clutch.coupon.claim.api.dto.CouponClaimCreateResponse;
 import com.clutch.coupon.claim.domain.CouponClaimRequest;
 import com.clutch.coupon.claim.exception.CouponClaimException;
@@ -17,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import java.time.Instant;
 import java.time.LocalDateTime;
 
 import static com.clutch.coupon.claim.exception.CouponClaimErrorCode.*;
@@ -35,6 +39,11 @@ public class CouponClaimService {
     private final CouponStockInitializer couponStockInitializer;
     private final CouponClaimRedisExecutor couponClaimRedisExecutor;
     private final CouponEventItemRepository couponEventItemRepository;
+
+    private final CouponBenefitSnapshotRepository
+            couponBenefitSnapshotRepository;
+
+    private final CouponClaimOutboxWriter couponClaimOutboxWriter;
 
     /**
      * 쿠폰 발급 요청 처리
@@ -83,6 +92,17 @@ public class CouponClaimService {
                         couponEventOccurrence,
                         currentTime
                 );
+
+        CouponBenefitSnapshot benefitSnapshot =
+                couponBenefitSnapshotRepository
+                        .findByCouponEventItemId(
+                                couponEventItem.getId()
+                        )
+                        .orElseThrow(() ->
+                                new CouponClaimException(
+                                        COUPON_BENEFIT_NOT_FOUND
+                                )
+                        );
 
         boolean alreadyClaimed = couponClaimRequestRepository
                 .existsByUserIdAndCouponEventOccurrenceId(
@@ -135,7 +155,12 @@ public class CouponClaimService {
                     COUPON_STOCK_EXHAUSTED
             );
         }
-        savedClaimRequest.succeed();
+
+        couponClaimOutboxWriter.writeAcceptedEvent(
+                savedClaimRequest,
+                benefitSnapshot,
+                Instant.now()
+        );
 
         return CouponClaimCreateResponse.from(savedClaimRequest);
     }

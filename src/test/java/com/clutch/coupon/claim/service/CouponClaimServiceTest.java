@@ -4,6 +4,9 @@ import com.clutch.coupon.claim.exception.CouponClaimException;
 import com.clutch.coupon.claim.api.dto.CouponClaimCreateResponse;
 import com.clutch.coupon.claim.domain.ClaimRequestStatus;
 import com.clutch.coupon.claim.domain.CouponClaimRequest;
+import com.clutch.coupon.claim.outbox.CouponBenefitSnapshot;
+import com.clutch.coupon.claim.outbox.CouponBenefitSnapshotRepository;
+import com.clutch.coupon.claim.outbox.CouponClaimOutboxWriter;
 import com.clutch.coupon.claim.repository.CouponClaimRequestRepository;
 import com.clutch.coupon.event.domain.CouponEvent;
 import com.clutch.coupon.event.domain.CouponEventItem;
@@ -22,12 +25,15 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -42,6 +48,11 @@ class CouponClaimServiceTest {
     private static final Long COUPON_EVENT_ID = 10L;
     private static final Long COUPON_EVENT_OCCURRENCE_ID = 15L;
     private static final Long COUPON_EVENT_ITEM_ID = 20L;
+    private static final CouponBenefitSnapshot BENEFIT_SNAPSHOT =
+            new CouponBenefitSnapshot(
+                    "RATE",
+                    new BigDecimal("20.00")
+            );
 
     @Mock
     private CouponEventRepository couponEventRepository;
@@ -54,6 +65,13 @@ class CouponClaimServiceTest {
 
     @Mock
     private CouponClaimRequestRepository couponClaimRequestRepository;
+
+    @Mock
+    private CouponBenefitSnapshotRepository
+            couponBenefitSnapshotRepository;
+
+    @Mock
+    private CouponClaimOutboxWriter couponClaimOutboxWriter;
 
     @Mock
     private CouponClaimItemSelector couponClaimItemSelector;
@@ -86,6 +104,12 @@ class CouponClaimServiceTest {
 
         when(couponEventItem.getId())
                 .thenReturn(COUPON_EVENT_ITEM_ID);
+
+        when(couponBenefitSnapshotRepository
+                .findByCouponEventItemId(
+                        COUPON_EVENT_ITEM_ID
+                ))
+                .thenReturn(Optional.of(BENEFIT_SNAPSHOT));
 
         when(couponClaimRequestRepository
                 .existsByUserIdAndCouponEventOccurrenceId(
@@ -128,7 +152,7 @@ class CouponClaimServiceTest {
         assertThat(response.couponEventItemId())
                 .isEqualTo(COUPON_EVENT_ITEM_ID);
         assertThat(response.requestStatus())
-                .isEqualTo(ClaimRequestStatus.SUCCEEDED);
+                .isEqualTo(ClaimRequestStatus.PENDING);
 
         ArgumentCaptor<CouponClaimRequest> captor =
                 ArgumentCaptor.forClass(
@@ -146,7 +170,14 @@ class CouponClaimServiceTest {
         assertThat(savedClaimRequest.getCouponEventOccurrenceId())
                 .isEqualTo(COUPON_EVENT_OCCURRENCE_ID);
         assertThat(savedClaimRequest.getRequestStatus())
-                .isEqualTo(ClaimRequestStatus.SUCCEEDED);
+                .isEqualTo(ClaimRequestStatus.PENDING);
+
+        verify(couponClaimOutboxWriter)
+                .writeAcceptedEvent(
+                        eq(savedClaimRequest),
+                        eq(BENEFIT_SNAPSHOT),
+                        any(Instant.class)
+                );
 
         verify(couponClaimRedisExecutor).claim(
                 COUPON_EVENT_ITEM_ID,
@@ -295,6 +326,15 @@ class CouponClaimServiceTest {
         // given
         givenOpenEventAndItem();
 
+        when(couponEventItem.getId())
+                .thenReturn(COUPON_EVENT_ITEM_ID);
+
+        when(couponBenefitSnapshotRepository
+                .findByCouponEventItemId(
+                        COUPON_EVENT_ITEM_ID
+                ))
+                .thenReturn(Optional.of(BENEFIT_SNAPSHOT));
+
         when(couponClaimRequestRepository
                 .existsByUserIdAndCouponEventOccurrenceId(
                         USER_ID,
@@ -328,6 +368,12 @@ class CouponClaimServiceTest {
 
         when(couponEventItem.getId())
                 .thenReturn(COUPON_EVENT_ITEM_ID);
+
+        when(couponBenefitSnapshotRepository
+                .findByCouponEventItemId(
+                        COUPON_EVENT_ITEM_ID
+                ))
+                .thenReturn(Optional.of(BENEFIT_SNAPSHOT));
 
         when(couponClaimRequestRepository
                 .existsByUserIdAndCouponEventOccurrenceId(
@@ -397,6 +443,12 @@ class CouponClaimServiceTest {
 
         when(couponEventItem.getId())
                 .thenReturn(COUPON_EVENT_ITEM_ID);
+
+        when(couponBenefitSnapshotRepository
+                .findByCouponEventItemId(
+                        COUPON_EVENT_ITEM_ID
+                ))
+                .thenReturn(Optional.of(BENEFIT_SNAPSHOT));
 
         when(couponClaimRequestRepository
                 .existsByUserIdAndCouponEventOccurrenceId(

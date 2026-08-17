@@ -79,9 +79,21 @@ public class CouponClaimRequest {
     private LocalDateTime updatedAt;
 
     /**
+     * 처리 완료 시각
+     */
+    @Column(name = "completed_at")
+    private LocalDateTime completedAt;
+
+    /**
+     * 발급 실패 사유
+     */
+    @Column(name = "failure_reason", length = 500)
+    private String failureReason;
+
+    /**
      * 쿠폰 발급 요청 생성자
      *
-     * @param couponEventId     쿠폰 이벤트 식별자
+     * @param couponEventId           쿠폰 이벤트 식별자
      * @param couponEventOccurrenceId 쿠폰 이벤트 회차 식별자
      * @param couponEventItemId       쿠폰 이벤트 항목 식별자
      * @param userId                  사용자 식별자
@@ -102,7 +114,7 @@ public class CouponClaimRequest {
     /**
      * 쿠폰 발급 요청 생성 팩토리
      *
-     * @param couponEventId     쿠폰 이벤트 식별자
+     * @param couponEventId           쿠폰 이벤트 식별자
      * @param couponEventOccurrenceId 쿠폰 이벤트 회차 식별자
      * @param couponEventItemId       쿠폰 이벤트 항목 식별자
      * @param userId                  사용자 식별자
@@ -123,16 +135,50 @@ public class CouponClaimRequest {
     }
 
     /**
-     * 발급 성공 상태 전이
+     * 처리 대기 상태 여부
+     *
+     * @return 처리 대기 상태 여부
      */
-    public void succeed() {
-        this.requestStatus = ClaimRequestStatus.SUCCEEDED;
+    public boolean isPending() {
+        return this.requestStatus
+                == ClaimRequestStatus.PENDING;
+    }
+
+    /**
+     * 발급 성공 상태 전이
+     *
+     * @param completedAt 처리 완료 시각
+     */
+    public void succeed(
+            LocalDateTime completedAt
+    ) {
+        if (!isPending()) {
+            return;
+        }
+
+        this.requestStatus =
+                ClaimRequestStatus.SUCCEEDED;
+        this.completedAt = completedAt;
+        this.failureReason = null;
     }
 
     /**
      * 발급 실패 상태 전이
+     *
+     * @param failureReason 발급 실패 사유
+     * @param completedAt   처리 완료 시각
      */
-    public void fail() {
-        this.requestStatus = ClaimRequestStatus.FAILED;
+    public void fail(
+            String failureReason,
+            LocalDateTime completedAt
+    ) {
+        if (!isPending()) {
+            return;
+        }
+
+        this.requestStatus =
+                ClaimRequestStatus.FAILED;
+        this.failureReason = failureReason;
+        this.completedAt = completedAt;
     }
 }
