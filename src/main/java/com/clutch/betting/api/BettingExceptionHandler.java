@@ -13,7 +13,10 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 /** 배팅 API에서 발생한 도메인·요청 검증 예외를 공통 응답으로 변환한다. */
-@RestControllerAdvice(assignableTypes = BettingController.class)
+@RestControllerAdvice(assignableTypes = {
+        BettingController.class,
+        BettingAdminController.class
+})
 public class BettingExceptionHandler {
 
     /**
@@ -59,7 +62,7 @@ public class BettingExceptionHandler {
     private HttpStatus statusOf(BettingErrorCode code) {
         return switch (code) {
             case EVENT_NOT_FOUND, BET_NOT_FOUND, USER_NOT_FOUND -> HttpStatus.NOT_FOUND;
-            case DUPLICATE_BET -> HttpStatus.CONFLICT;
+            case DUPLICATE_BET, WINNER_ALREADY_DECIDED -> HttpStatus.CONFLICT;
             default -> HttpStatus.BAD_REQUEST;
         };
     }
