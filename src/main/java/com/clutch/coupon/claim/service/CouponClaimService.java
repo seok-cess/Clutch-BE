@@ -22,6 +22,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 
 import static com.clutch.coupon.claim.exception.CouponClaimErrorCode.*;
 
@@ -79,7 +80,7 @@ public class CouponClaimService {
                                         COUPON_EVENT_OCCURRENCE_NOT_FOUND
                                 )
                         );
-        LocalDateTime currentTime = LocalDateTime.now();
+        LocalDateTime currentTime = LocalDateTime.now(ZoneOffset.UTC);
 
         if (!couponEventOccurrence.isOpenAt(currentTime)) {
             throw new CouponClaimException(
