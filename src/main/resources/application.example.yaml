@@ -26,10 +26,18 @@ spring:
       namespace: clutch:session
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+      properties:
+        enable.idempotence: true
     consumer:
       group-id: ${KAFKA_CONSUMER_GROUP:clutch-local}
       auto-offset-reset: earliest
-
+      enable-auto-commit: false
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
 management:
   endpoints:
     web:
@@ -51,6 +59,13 @@ watch:
     max-eligible-interval: ${WATCH_REWARD_MAX_ELIGIBLE_INTERVAL:60s}
     claim-interval: ${WATCH_REWARD_CLAIM_INTERVAL:5m}
     points-per-claim: ${WATCH_REWARD_POINTS_PER_CLAIM:100}
+
+# ---- 세트별 승패 배팅 ----
+betting:
+  first-set-open-before-start: ${BETTING_FIRST_SET_OPEN_BEFORE_START:20m}
+  first-set-close-after-start: ${BETTING_FIRST_SET_CLOSE_AFTER_START:1m}
+  next-set-betting-duration: ${BETTING_NEXT_SET_BETTING_DURATION:20m}
+  synchronization-interval: ${BETTING_SYNCHRONIZATION_INTERVAL:1s}
 
 # ---- lolesports 비공식 피드 연동 ----
 lolesports:

@@ -33,12 +33,14 @@ public class ApiController {
     private final com.clutch.lolesports.service.TeamRecordService records;
     private final com.clutch.lolesports.service.GameQueryService gameQuery;
     private final com.clutch.lolesports.service.SetWinnerTracker setWinners;
+    private final com.clutch.lolesports.service.SeasonStatsService seasonStats;
 
     public ApiController(DataCacheService cache, HistoricalGameService historical,
                          LolesportsProperties props, com.clutch.lolesports.client.LiveStatsClient liveStats,
                          com.clutch.lolesports.service.TeamRecordService records,
                          com.clutch.lolesports.service.GameQueryService gameQuery,
-                         com.clutch.lolesports.service.SetWinnerTracker setWinners) {
+                         com.clutch.lolesports.service.SetWinnerTracker setWinners,
+                         com.clutch.lolesports.service.SeasonStatsService seasonStats) {
         this.cache = cache;
         this.historical = historical;
         this.props = props;
@@ -46,6 +48,7 @@ public class ApiController {
         this.records = records;
         this.gameQuery = gameQuery;
         this.setWinners = setWinners;
+        this.seasonStats = seasonStats;
     }
 
     /**
@@ -198,6 +201,24 @@ public class ApiController {
             @org.springframework.web.bind.annotation.RequestParam String a,
             @org.springframework.web.bind.annotation.RequestParam String b) {
         return ResponseEntity.ok(records.headToHead(a, b));
+    }
+
+    // ---- 시즌 누적 집계 (메인 화면 요약 카드) ----
+
+    /** 시즌 누적 KDA 상위 선수 (예: /api/stats/players/kda?limit=5) */
+    @GetMapping("/stats/players/kda")
+    public ResponseEntity<ApiDtos.PlayerKdaBoard> playerKda(
+            @org.springframework.web.bind.annotation.RequestParam(value = "season", required = false) String season,
+            @org.springframework.web.bind.annotation.RequestParam(value = "limit", defaultValue = "5") int limit) {
+        return ResponseEntity.ok(seasonStats.playerKda(season, limit));
+    }
+
+    /** 시즌 챔피언 픽률·승률 (예: /api/stats/champions?limit=5) */
+    @GetMapping("/stats/champions")
+    public ResponseEntity<ApiDtos.ChampionBoard> champions(
+            @org.springframework.web.bind.annotation.RequestParam(value = "season", required = false) String season,
+            @org.springframework.web.bind.annotation.RequestParam(value = "limit", defaultValue = "5") int limit) {
+        return ResponseEntity.ok(seasonStats.champions(season, limit));
     }
 
     // ---- 매치별 게임(세트) 목록 — 과거 경기 열람 진입점 ----

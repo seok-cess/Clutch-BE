@@ -83,6 +83,21 @@ class DataCacheServiceTest {
     }
 
     @Test
+    void 실제_인게임과_일시정지_프레임에서만_세트_진행으로_판정한다() {
+        DataCacheService cache = new DataCacheService();
+
+        assertEquals(false, cache.isGameInProgress(GAME));
+        cache.addWindowFrames(GAME, null, List.of(frame(0, 100)));
+        assertEquals(true, cache.isGameInProgress(GAME));
+        cache.addWindowFrames(GAME, null, List.of(new WindowResponse.Frame(
+                T0.plusSeconds(1).toString(), "paused", null, null)));
+        assertEquals(true, cache.isGameInProgress(GAME));
+        cache.addWindowFrames(GAME, null, List.of(new WindowResponse.Frame(
+                T0.plusSeconds(2).toString(), "finished", null, null)));
+        assertEquals(false, cache.isGameInProgress(GAME));
+    }
+
+    @Test
     void 버퍼가_비면_null() {
         DataCacheService cache = new DataCacheService();
 
@@ -98,5 +113,41 @@ class DataCacheServiceTest {
         // 워밍업 직후 재생 시점이 버퍼 시작보다 앞선 경우에도 화면이 비지 않아야 함
         assertNotNull(cache.getWindowFrameAt(GAME, T0));
         assertEquals(150L, cache.getWindowFrameAt(GAME, T0).blueTeam().totalGold());
+    }
+
+    @Test
+    void 최초_finished_프레임_시각을_버퍼_해제_후에도_보존한다() {
+        DataCacheService cache = new DataCacheService();
+        WindowResponse.Frame finished = new WindowResponse.Frame(
+                T0.plusSeconds(10).toString(),
+                "finished",
+                null,
+                null
+        );
+
+        cache.addWindowFrames(GAME, null, List.of(finished));
+        cache.evictGame(GAME);
+
+        assertEquals(T0.plusSeconds(10), cache.getFeedFinishedAt(GAME));
+    }
+
+    @Test
+    void 라이브_화면과_배팅_후보_캐시는_분리한다() {
+        DataCacheService cache = new DataCacheService();
+        DataCacheService.LiveMatch upcoming = new DataCacheService.LiveMatch(
+                "match-1",
+                "1주 차",
+                "LCK",
+                T0.plusSeconds(60).toString(),
+                3,
+                List.of(),
+                List.of(),
+                null
+        );
+
+        cache.putBettingMatches(List.of(upcoming));
+
+        assertEquals(List.of(), cache.getLiveMatches());
+        assertEquals(List.of(upcoming), cache.getBettingMatches());
     }
 }

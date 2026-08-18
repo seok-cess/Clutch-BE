@@ -4,7 +4,7 @@ import com.clutch.watch.config.WatchRewardProperties;
 import com.clutch.watch.redis.heartbeat.HeartbeatProcessingResult;
 import com.clutch.watch.redis.heartbeat.HeartbeatResult;
 import com.clutch.watch.redis.reward.RewardClaimCompletionResult;
-import com.clutch.watch.redis.reward.RewardClaimCompletionStatus;
+import com.clutch.watch.redis.reward.RewardClaimStatus;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -115,6 +115,26 @@ class WatchSessionRedisRepositoryTest {
                 .isGreaterThan(85_000L);
     }
 
+    /**
+     * 세트 대기 구간은 누적하지 않고 lastSeen만 갱신하여 다음 세트 시작 시 대기 시간이 포함되지 않는지 검증한다.
+     */
+    @Test
+    void pausesOutsideActiveSetWithoutCarryingWaitingInterval() {
+        repository.initialize(100L, 200L, "session-1", 1_000_000L);
+        repository.heartbeat(100L, "session-1", 1L, 1_030_000L, true);
+
+        HeartbeatProcessingResult paused = repository.heartbeat(
+                100L, "session-1", 2L, 1_060_000L, false);
+        HeartbeatProcessingResult resumed = repository.heartbeat(
+                100L, "session-1", 3L, 1_090_000L, true);
+        WatchSessionSnapshot snapshot = repository.findSession("session-1").orElseThrow();
+
+        assertThat(paused.eligibleMilliseconds()).isEqualTo(30_000L);
+        assertThat(resumed.eligibleMilliseconds()).isEqualTo(60_000L);
+        assertThat(snapshot.lastSeen()).isEqualTo(1_090_000L);
+        assertThat(snapshot.sequence()).isEqualTo(3L);
+    }
+
     @Test
     void capsAccumulationAtClaimInterval() {
         repository.initialize(100L, 200L, "session-1", 1_000_000L);
@@ -199,7 +219,7 @@ class WatchSessionRedisRepositoryTest {
         );
 
         assertThat(repository.prepareRewardClaim(100L, "session-1", 1L))
-                .isEqualTo(RewardClaimCompletionStatus.SUCCESS);
+                .isEqualTo(RewardClaimStatus.SUCCESS);
         RewardClaimCompletionResult result = repository.completeRewardClaim(
                 100L,
                 "session-1",
@@ -208,7 +228,7 @@ class WatchSessionRedisRepositoryTest {
         );
         WatchSessionSnapshot snapshot = repository.findSession("session-1").orElseThrow();
 
-        assertThat(result.status()).isEqualTo(RewardClaimCompletionStatus.SUCCESS);
+        assertThat(result.status()).isEqualTo(RewardClaimStatus.SUCCESS);
         assertThat(result.nextRewardSequence()).isEqualTo(2L);
         assertThat(snapshot.eligibleMilliseconds()).isZero();
         assertThat(snapshot.rewardSequence()).isEqualTo(2L);
@@ -220,7 +240,7 @@ class WatchSessionRedisRepositoryTest {
         repository.initialize(100L, 200L, "session-1", 1_000_000L);
 
         assertThat(repository.prepareRewardClaim(100L, "session-1", 1L))
-                .isEqualTo(RewardClaimCompletionStatus.NOT_CLAIMABLE);
+                .isEqualTo(RewardClaimStatus.NOT_CLAIMABLE);
     }
 
     @Test
@@ -240,7 +260,7 @@ class WatchSessionRedisRepositoryTest {
                 1_300_001L
         );
 
-        assertThat(result.status()).isEqualTo(RewardClaimCompletionStatus.ALREADY_COMPLETED);
+        assertThat(result.status()).isEqualTo(RewardClaimStatus.ALREADY_COMPLETED);
         assertThat(result.nextRewardSequence()).isEqualTo(2L);
     }
 

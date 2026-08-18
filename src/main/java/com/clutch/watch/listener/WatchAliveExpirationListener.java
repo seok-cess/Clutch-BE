@@ -1,7 +1,7 @@
 package com.clutch.watch.listener;
 
 import com.clutch.watch.redis.session.WatchSessionRedisRepository;
-import com.clutch.watch.service.service.WatchRewardService;
+import com.clutch.watch.service.WatchSessionCompletionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.connection.Message;
@@ -21,7 +21,7 @@ public class WatchAliveExpirationListener implements MessageListener {
     private static final String ALIVE_KEY_PREFIX = "watch:alive:";
 
     private final WatchSessionRedisRepository watchSessionRedisRepository;
-    private final WatchRewardService watchRewardService;
+    private final WatchSessionCompletionService watchSessionCompletionService;
 
     /**
      * Redis keyevent 채널에서 전달된 만료 키를 문자열로 변환하여 처리한다.
@@ -47,7 +47,7 @@ public class WatchAliveExpirationListener implements MessageListener {
         }
 
         watchSessionRedisRepository.findSession(aliveKey.sessionKey()).ifPresent(snapshot -> {
-            watchRewardService.discard(snapshot);
+            watchSessionCompletionService.completeWithoutReward(snapshot);
             watchSessionRedisRepository.deleteActiveIfMatches(aliveKey.userId(), aliveKey.sessionKey());
             watchSessionRedisRepository.deleteSession(aliveKey.sessionKey());
         });

@@ -20,6 +20,9 @@ public class UserCoupon {
     @Column(name = "coupon_event_id", nullable = false)
     private Long couponEventId;
 
+    @Column(name = "coupon_event_occurrence_id")
+    private Long couponEventOccurrenceId;
+
     @Column(name = "coupon_event_item_id", nullable = false)
     private Long couponEventItemId;
 
@@ -59,11 +62,12 @@ public class UserCoupon {
 
     protected UserCoupon() {}
 
-    public UserCoupon(Long claimId, Long userId, Long couponEventId, Long couponEventItemId, String couponCode,
-                      String discountType, BigDecimal discountValue, Instant expiresAt){
+    public UserCoupon(Long claimId, Long userId, Long couponEventId, Long couponEventOccurrenceId, Long couponEventItemId,
+                      String couponCode, String discountType, BigDecimal discountValue, Instant expiresAt){
         this.claimId = claimId;
         this.userId = userId;
         this.couponEventId = couponEventId;
+        this.couponEventOccurrenceId = couponEventOccurrenceId;
         this.couponEventItemId = couponEventItemId;
         this.couponCode = couponCode;
         this.status = UserCouponStatus.ISSUED;
@@ -76,6 +80,7 @@ public class UserCoupon {
     public Long getClaimId() { return claimId; }
     public Long getUserId() { return userId; }
     public Long getCouponEventId() { return couponEventId; }
+    public Long getCouponEventOccurrenceId() { return couponEventOccurrenceId; }
     public Long getCouponEventItemId() { return couponEventItemId; }
     public String getCouponCode() { return couponCode; }
     public UserCouponStatus getStatus() { return status; }

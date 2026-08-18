@@ -14,6 +14,8 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -35,6 +37,8 @@ import java.util.concurrent.ConcurrentHashMap;
 public class PollingScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(PollingScheduler.class);
+    private static final Duration BETTING_PREWARM_BEFORE_START = Duration.ofMinutes(30);
+    private static final Duration BETTING_PREWARM_AFTER_START = Duration.ofMinutes(5);
 
     private final LolesportsApiClient api;
     private final LiveStatsClient liveStats;
@@ -115,9 +119,10 @@ public class PollingScheduler {
                 }
             }
 
+            persistLiveMatches(matches);
             matches = dropLongFinished(matches);
-
             cache.putLiveMatches(matches);
+            cache.putBettingMatches(resolveBettingMatches(matches));
             rememberActiveMatches(matches);
             cleanupFinishedGames();
             liveBackoff.success();
@@ -128,6 +133,70 @@ public class PollingScheduler {
         } catch (Exception e) {
             liveBackoff.failure();
             log.warn("getLive 폴링 실패 (연속 {}회): {}", liveBackoff.failures(), e.toString());
+        }
+    }
+
+    /** 라이브 매치별 선저장 실패를 격리해 나머지 캐시 갱신을 계속한다. */
+    private void persistLiveMatches(List<DataCacheService.LiveMatch> matches) {
+        for (DataCacheService.LiveMatch match : matches) {
+            try {
+                persistService.persistLiveMatch(match);
+            } catch (RuntimeException exception) {
+                log.warn("라이브 매치 선저장 실패 (matchId={}): {}",
+                        match.matchId(), exception.toString());
+            }
+        }
+    }
+
+    /**
+     * 실제 라이브 매치에 배팅 창이 가까운 예정 매치를 합쳐 배팅 전용 캐시를 만든다.
+     *
+     * @param liveMatches getLive에서 확인한 실제 라이브 매치 목록
+     * @return 매치 ID가 중복되지 않는 배팅 후보 매치 목록
+     */
+    private List<DataCacheService.LiveMatch> resolveBettingMatches(
+            List<DataCacheService.LiveMatch> liveMatches
+    ) {
+        Map<String, DataCacheService.LiveMatch> candidates = new java.util.LinkedHashMap<>();
+        liveMatches.forEach(match -> candidates.put(match.matchId(), match));
+
+        ScheduleResponse schedule = cache.getSchedule();
+        if (schedule == null || schedule.data() == null || schedule.data().schedule() == null
+                || schedule.data().schedule().events() == null) {
+            return List.copyOf(candidates.values());
+        }
+
+        Instant now = Instant.now();
+        for (ScheduleResponse.Event event : schedule.data().schedule().events()) {
+            if (!isBettingPrewarmCandidate(event, now)
+                    || candidates.containsKey(event.match().id())) {
+                continue;
+            }
+            DataCacheService.LiveMatch candidate = resolveLiveMatch(event);
+            candidates.put(candidate.matchId(), candidate);
+        }
+        return List.copyOf(candidates.values());
+    }
+
+    /**
+     * 배팅 시간 계산에 필요한 정보를 미리 적재할 가까운 예정 경기인지 확인한다.
+     *
+     * @param event 일정 이벤트
+     * @param now 현재 UTC Instant
+     * @return 현재 기준 30분 전부터 시작 5분 후 범위의 미완료 경기이면 true
+     */
+    private boolean isBettingPrewarmCandidate(ScheduleResponse.Event event, Instant now) {
+        if (event == null || event.match() == null || event.match().id() == null
+                || event.startTime() == null
+                || "completed".equalsIgnoreCase(event.state())) {
+            return false;
+        }
+        try {
+            Instant scheduledStart = Instant.parse(event.startTime());
+            return !scheduledStart.isAfter(now.plus(BETTING_PREWARM_BEFORE_START))
+                    && now.isBefore(scheduledStart.plus(BETTING_PREWARM_AFTER_START));
+        } catch (RuntimeException exception) {
+            return false;
         }
     }
 
@@ -172,7 +241,12 @@ public class PollingScheduler {
         return kept;
     }
 
-    /** getEventDetails 로 진행중 게임(gameId)을 찾아 LiveMatch 로 조립 */
+    /**
+     * getEventDetails로 진행 중 게임과 팀을 결합하고 배팅 종료 판단 정보까지 LiveMatch로 조립한다.
+     *
+     * @param event getLive 또는 일정 캐시에서 조회한 매치 이벤트
+     * @return 팀·세트·best-of 정보가 결합된 라이브 매치 캐시 값
+     */
     private DataCacheService.LiveMatch resolveLiveMatch(ScheduleResponse.Event event) {
         String matchId = event.match().id();
         List<EventDetailsResponse.Game> games = List.of();
@@ -210,6 +284,7 @@ public class PollingScheduler {
         // gameWins 증가분으로 세트 승자를 확정한다 (세트별 승패를 주는 필드가 없다)
         setWinners.observe(matchId, teams, games);
 
+        // 배팅 이벤트가 Bo3/Bo5의 종료 시점을 판단할 수 있도록 매치 전략도 함께 캐시한다.
         return new DataCacheService.LiveMatch(
                 matchId,
                 event.blockName(),
@@ -313,8 +388,11 @@ public class PollingScheduler {
             log.warn("게임 {} 의 매치 정보를 찾지 못해 적재를 건너뛴다", gameId);
             return false;
         }
+        Integer bestOf = owner.bestOf() != null
+                ? owner.bestOf()
+                : bestOfFromSchedule(owner.matchId());
         return persistService.persistGame(gameId,
-                GamePersistService.MatchContext.of(owner, gameId, bestOfFromSchedule(owner.matchId())));
+                GamePersistService.MatchContext.of(owner, gameId, bestOf));
     }
 
     /** 일정 캐시에서 다전제 수를 찾는다 (라이브 응답에는 없다) */

@@ -17,6 +17,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -71,6 +73,12 @@ class CouponClaimApiIntegrationTest {
      */
     @Autowired
     private EntityManager entityManager;
+
+    /**
+     * JSON 변환기
+     */
+    @Autowired
+    private ObjectMapper objectMapper;
 
     /**
      * 경기 데이터 수집 스케줄러 모의 객체
@@ -251,7 +259,7 @@ class CouponClaimApiIntegrationTest {
 
                 .andExpect(
                         jsonPath("$.requestStatus")
-                                .value("SUCCEEDED")
+                                .value("PENDING")
                 );
 
         entityManager.flush();
@@ -285,6 +293,53 @@ class CouponClaimApiIntegrationTest {
                 COUPON_EVENT_OCCURRENCE_ID
         );
 
+        Long claimId = jdbcTemplate.queryForObject(
+                """
+                        SELECT coupon_claim_request_id
+                        FROM coupon_claim_request
+                        WHERE user_id = ?
+                          AND coupon_event_item_id = ?
+                          AND coupon_event_occurrence_id = ?
+                        """,
+                Long.class,
+                USER_ID,
+                COUPON_EVENT_ITEM_ID,
+                COUPON_EVENT_OCCURRENCE_ID
+        );
+
+        String outboxStatus = jdbcTemplate.queryForObject(
+                """
+                        SELECT status
+                        FROM coupon_claim_outbox
+                        WHERE aggregate_id = ?
+                        """,
+                String.class,
+                claimId
+        );
+
+        String outboxTopic = jdbcTemplate.queryForObject(
+                """
+                        SELECT topic
+                        FROM coupon_claim_outbox
+                        WHERE aggregate_id = ?
+                        """,
+                String.class,
+                claimId
+        );
+
+        String outboxPayload = jdbcTemplate.queryForObject(
+                """
+                        SELECT payload
+                        FROM coupon_claim_outbox
+                        WHERE aggregate_id = ?
+                        """,
+                String.class,
+                claimId
+        );
+
+        JsonNode payloadJson =
+                objectMapper.readTree(outboxPayload);
+
         Integer successCount = jdbcTemplate.queryForObject(
                 """
                         SELECT success_count
@@ -296,8 +351,31 @@ class CouponClaimApiIntegrationTest {
         );
 
         assertThat(claimCount).isEqualTo(1);
-        assertThat(requestStatus).isEqualTo("SUCCEEDED");
+        assertThat(requestStatus).isEqualTo("PENDING");
         assertThat(successCount).isEqualTo(1);
+        assertThat(outboxStatus).isEqualTo("PENDING");
+        assertThat(outboxTopic)
+                .isEqualTo("coupon.claim.accepted");
+        assertThat(payloadJson.get("claimId").asLong())
+                .isEqualTo(claimId);
+        assertThat(payloadJson.get("userId").asLong())
+                .isEqualTo(USER_ID);
+        assertThat(payloadJson.get("couponEventId").asLong())
+                .isEqualTo(COUPON_EVENT_ID);
+        assertThat(payloadJson
+                .get("couponEventOccurrenceId")
+                .asLong())
+                .isEqualTo(COUPON_EVENT_OCCURRENCE_ID);
+        assertThat(payloadJson.get("couponEventItemId").asLong())
+                .isEqualTo(COUPON_EVENT_ITEM_ID);
+        assertThat(payloadJson.get("discountType").asText())
+                .isEqualTo("RATE");
+        assertThat(payloadJson.get("discountValue").decimalValue())
+                .isEqualByComparingTo("10.00");
+        assertThat(payloadJson.get("expiresAt").asText())
+                .isNotBlank();
+        assertThat(payloadJson.get("occurredAt").asText())
+                .isNotBlank();
     }
 
     /**
