@@ -17,6 +17,7 @@ import com.clutch.coupon.event.repository.CouponEventRepository;
 import com.clutch.coupon.claim.redis.CouponClaimRedisExecutor;
 import com.clutch.coupon.claim.redis.CouponClaimRedisResult;
 import com.clutch.coupon.claim.redis.CouponStockInitializer;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -26,14 +27,17 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -48,6 +52,13 @@ class CouponClaimServiceTest {
     private static final Long COUPON_EVENT_ID = 10L;
     private static final Long COUPON_EVENT_OCCURRENCE_ID = 15L;
     private static final Long COUPON_EVENT_ITEM_ID = 20L;
+    private static final Instant NOW = Instant.parse(
+            "2026-08-18T03:00:00Z"
+    );
+    private static final LocalDateTime NOW_UTC = LocalDateTime.ofInstant(
+            NOW,
+            ZoneOffset.UTC
+    );
     private static final CouponBenefitSnapshot BENEFIT_SNAPSHOT =
             new CouponBenefitSnapshot(
                     "RATE",
@@ -83,6 +94,9 @@ class CouponClaimServiceTest {
     private CouponClaimRedisExecutor couponClaimRedisExecutor;
 
     @Mock
+    private Clock clock;
+
+    @Mock
     private CouponEvent couponEvent;
 
     @Mock
@@ -93,6 +107,11 @@ class CouponClaimServiceTest {
 
     @InjectMocks
     private CouponClaimService couponClaimService;
+
+    @BeforeEach
+    void setUpClock() {
+        lenient().when(clock.instant()).thenReturn(NOW);
+    }
 
     /**
      * 정상 쿠폰 발급 요청 검증
@@ -189,6 +208,7 @@ class CouponClaimServiceTest {
                 .increaseSuccessCountAtomically(
                         COUPON_EVENT_ITEM_ID
                 );
+        verify(couponEventOccurrence).isOpenAt(NOW_UTC);
     }
 
     /**

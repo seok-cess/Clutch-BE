@@ -60,6 +60,12 @@ watch:
     claim-interval: ${WATCH_REWARD_CLAIM_INTERVAL:5m}
     points-per-claim: ${WATCH_REWARD_POINTS_PER_CLAIM:100}
 
+# ---- 쿠폰 이벤트 회차 만료 처리 ----
+coupon:
+  test:
+    event:
+      expiration-interval-ms: ${COUPON_TEST_EVENT_EXPIRATION_INTERVAL_MS:1000}
+
 # ---- 세트별 승패 배팅 ----
 betting:
   first-set-open-before-start: ${BETTING_FIRST_SET_OPEN_BEFORE_START:20m}
