@@ -34,13 +34,15 @@ public class ApiController {
     private final com.clutch.lolesports.service.GameQueryService gameQuery;
     private final com.clutch.lolesports.service.SetWinnerTracker setWinners;
     private final com.clutch.lolesports.service.SeasonStatsService seasonStats;
+    private final com.clutch.lolesports.service.PollingScheduler polling;
 
     public ApiController(DataCacheService cache, HistoricalGameService historical,
                          LolesportsProperties props, com.clutch.lolesports.client.LiveStatsClient liveStats,
                          com.clutch.lolesports.service.TeamRecordService records,
                          com.clutch.lolesports.service.GameQueryService gameQuery,
                          com.clutch.lolesports.service.SetWinnerTracker setWinners,
-                         com.clutch.lolesports.service.SeasonStatsService seasonStats) {
+                         com.clutch.lolesports.service.SeasonStatsService seasonStats,
+                         com.clutch.lolesports.service.PollingScheduler polling) {
         this.cache = cache;
         this.historical = historical;
         this.props = props;
@@ -49,6 +51,7 @@ public class ApiController {
         this.gameQuery = gameQuery;
         this.setWinners = setWinners;
         this.seasonStats = seasonStats;
+        this.polling = polling;
     }
 
     /**
@@ -179,7 +182,8 @@ public class ApiController {
                                         g.number(),
                                         g.state(),
                                         cache.isFeedFinished(g.id()),
-                                        setWinners.winnerOf(m.matchId(), g.id())))
+                                        setWinners.winnerOf(m.matchId(), g.id()),
+                                        polling.isStatsUnavailable(g.id())))
                                 .toList(),
                         m.activeGameId()
                 ))
@@ -232,7 +236,8 @@ public class ApiController {
                         g.number(),
                         g.state(),
                         cache.isFeedFinished(g.id()),
-                        setWinners.winnerOf(matchId, g.id())))
+                        setWinners.winnerOf(matchId, g.id()),
+                        polling.isStatsUnavailable(g.id())))
                 .toList());
     }
 

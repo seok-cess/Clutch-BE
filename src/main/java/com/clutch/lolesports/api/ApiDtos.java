@@ -166,7 +166,12 @@ public final class ApiDtos {
             Integer number,
             String state,
             boolean feedFinished,
-            String winnerTeamId
+            String winnerTeamId,
+            /**
+             * 소스가 이 세트의 인게임 통계를 제공하지 않는다.
+             * getLive 는 전 세계 리그를 주는데 일부 리그는 livestats 가 없다.
+             */
+            boolean statsUnavailable
     ) {
     }
 
