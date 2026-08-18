@@ -514,6 +514,21 @@ public class PollingScheduler {
         }
     }
 
+    /**
+     * 소스가 이 세트의 통계를 주지 않는 상태인지 (프론트 안내용).
+     *
+     * getLive 는 전 세계 리그를 다 주는데, 리그에 따라 livestats 가
+     * "Stats are disabled for game ..." 404 를 반환한다
+     * (2026-08-18 LRN 3V vs LYON 실측). 그런 경기는 화면이 영영 빈 스코어보드가 되므로,
+     * 폴링이 이미 파악한 상태를 노출해 프론트가 안내로 대체하고 요청을 멈추게 한다.
+     *
+     * 재시도 시각과 무관하게 "한 번이라도 미제공이었나"로 판단한다 —
+     * 60초마다 잠깐 풀리는 순간에 화면이 깜빡이면 안 된다.
+     */
+    public boolean isStatsUnavailable(String gameId) {
+        return gameId != null && statsRetryAt.containsKey(gameId);
+    }
+
     /** 통계 404 로 대기 중인 게임인지 (재시도 시각이 지났으면 다시 폴링 대상) */
     private boolean isStatsOnHold(String gameId) {
         Long retryAt = statsRetryAt.get(gameId);
