@@ -11,6 +11,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 
 /**
  * 세트(게임) 하나 + 팀 최종 총계.
@@ -243,7 +244,7 @@ public class EsportsGame {
         this.timelineCoveredFromSeconds = coveredFrom;
         this.timelineCoveredToSeconds = coveredTo;
         this.lastCollectionError = null;
-        this.finalizedAt = LocalDateTime.now();
+        this.finalizedAt = LocalDateTime.now(ZoneOffset.UTC);
     }
 
     /** 적재 실패 — 나중에 배치로 재시도할 수 있게 사유를 남긴다 */

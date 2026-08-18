@@ -28,6 +28,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -731,8 +732,8 @@ class WatchRewardFlowIntegrationTest {
                 "2026",
                 "integration-tournament",
                 "integration-block",
-                LocalDateTime.now().minusHours(1),
-                LocalDateTime.now().minusMinutes(30),
+                LocalDateTime.now(ZoneOffset.UTC).minusHours(1),
+                LocalDateTime.now(ZoneOffset.UTC).minusMinutes(30),
                 lifecycleStatus,
                 3
         ));

@@ -217,7 +217,7 @@ class CouponClaimApiIntegrationTest {
             throws Exception {
         // given
         LocalDateTime currentTime =
-                LocalDateTime.now();
+                LocalDateTime.now(ZoneOffset.UTC);
 
         CouponEventOccurrence occurrence =
                 couponEventOccurrenceRepository
