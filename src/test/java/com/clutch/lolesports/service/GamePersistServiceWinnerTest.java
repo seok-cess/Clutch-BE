@@ -1,0 +1,239 @@
+package com.clutch.lolesports.service;
+
+import com.clutch.lolesports.config.LolesportsProperties;
+import com.clutch.lolesports.dto.external.EventDetailsResponse;
+import com.clutch.lolesports.dto.external.ScheduleResponse;
+import com.clutch.lolesports.entity.EsportsGame;
+import com.clutch.lolesports.entity.EsportsMatch;
+import com.clutch.lolesports.entity.MatchTeam;
+import com.clutch.lolesports.repository.EsportsGameRepository;
+import com.clutch.lolesports.repository.EsportsMatchRepository;
+import com.clutch.lolesports.repository.GamePlayerStatRepository;
+import com.clutch.lolesports.repository.GameTimelinePointRepository;
+import com.clutch.lolesports.repository.MatchTeamRepository;
+import org.junit.jupiter.api.Test;
+import tools.jackson.databind.ObjectMapper;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+
+class GamePersistServiceWinnerTest {
+
+    private final DataCacheService cache = mock(DataCacheService.class);
+    private final EsportsMatchRepository matchRepository = mock(EsportsMatchRepository.class);
+    private final MatchTeamRepository matchTeamRepository = mock(MatchTeamRepository.class);
+    private final EsportsGameRepository gameRepository = mock(EsportsGameRepository.class);
+    private final GamePlayerStatRepository playerStatRepository = mock(GamePlayerStatRepository.class);
+    private final GameTimelinePointRepository timelineRepository = mock(GameTimelinePointRepository.class);
+    private final LolesportsProperties properties = mock(LolesportsProperties.class);
+    private final ObjectMapper objectMapper = mock(ObjectMapper.class);
+    private final SetWinnerTracker winnerTracker = mock(SetWinnerTracker.class);
+    private final GamePersistService service = new GamePersistService(
+            cache,
+            matchRepository,
+            matchTeamRepository,
+            gameRepository,
+            playerStatRepository,
+            timelineRepository,
+            properties,
+            objectMapper,
+            winnerTracker
+    );
+
+    @Test
+    void persistsWinnerDecidedAfterFinishedGameWasAlreadyStored() {
+        EsportsMatch match = mock(EsportsMatch.class);
+        MatchTeam firstTeam = team("team-a", 101L);
+        MatchTeam secondTeam = team("team-b", 102L);
+        EsportsGame game = mock(EsportsGame.class);
+        given(match.getId()).willReturn(10L);
+        given(matchRepository.findByExternalMatchId("match-1")).willReturn(Optional.of(match));
+        given(matchTeamRepository.findByMatchIdOrderByDisplayOrderAsc(10L))
+                .willReturn(List.of(firstTeam, secondTeam));
+        given(gameRepository.findByExternalGameId("game-1")).willReturn(Optional.of(game));
+        given(game.getExternalGameId()).willReturn("game-1");
+        given(winnerTracker.winnerOf("match-1", "game-1")).willReturn("team-a");
+
+        service.persistLiveMatch(liveMatch(completedGame("game-1", 1)));
+
+        verify(game).decideWinner(eq(101L), any(LocalDateTime.class));
+    }
+
+    @Test
+    void skipsWhenLiveMatchHasNoGamesYet() {
+        stubExistingMatchWithTeams();
+
+        service.persistLiveMatch(liveMatch(null));
+
+        verify(gameRepository, never()).findByExternalGameId(anyString());
+    }
+
+    @Test
+    void skipsGameThatIsNotYetCompleted() {
+        stubExistingMatchWithTeams();
+
+        service.persistLiveMatch(liveMatch(
+                new EventDetailsResponse.Game("game-1", 1, "inProgress", List.of())
+        ));
+
+        verify(gameRepository, never()).findByExternalGameId("game-1");
+    }
+
+    @Test
+    void skipsGameWithNullExternalId() {
+        stubExistingMatchWithTeams();
+
+        service.persistLiveMatch(liveMatch(
+                new EventDetailsResponse.Game(null, 1, "completed", List.of())
+        ));
+
+        verify(gameRepository, never()).findByExternalGameId(anyString());
+    }
+
+    @Test
+    void doesNotOverwriteAlreadyDecidedWinner() {
+        stubExistingMatchWithTeams();
+        EsportsGame game = mock(EsportsGame.class);
+        given(gameRepository.findByExternalGameId("game-1")).willReturn(Optional.of(game));
+        given(game.isWinnerDecided()).willReturn(true);
+
+        service.persistLiveMatch(liveMatch(completedGame("game-1", 1)));
+
+        verify(winnerTracker, never()).winnerOf(anyString(), anyString());
+        verify(game, never()).decideWinner(anyLong(), any());
+    }
+
+    @Test
+    void skipsWhenPersistedGameCannotBeFound() {
+        stubExistingMatchWithTeams();
+        given(gameRepository.findByExternalGameId("game-1")).willReturn(Optional.empty());
+
+        service.persistLiveMatch(liveMatch(completedGame("game-1", 1)));
+
+        verify(winnerTracker, never()).winnerOf(anyString(), anyString());
+    }
+
+    @Test
+    void skipsWhenTrackerHasNotDecidedWinnerYet() {
+        stubExistingMatchWithTeams();
+        EsportsGame game = mock(EsportsGame.class);
+        given(gameRepository.findByExternalGameId("game-1")).willReturn(Optional.of(game));
+        given(game.getExternalGameId()).willReturn("game-1");
+        given(winnerTracker.winnerOf("match-1", "game-1")).willReturn(null);
+
+        service.persistLiveMatch(liveMatch(completedGame("game-1", 1)));
+
+        verify(game, never()).decideWinner(anyLong(), any());
+    }
+
+    @Test
+    void skipsWhenWinningTeamIsNotMappedToAMatchTeam() {
+        stubExistingMatchWithTeams();
+        EsportsGame game = mock(EsportsGame.class);
+        given(gameRepository.findByExternalGameId("game-1")).willReturn(Optional.of(game));
+        given(game.getExternalGameId()).willReturn("game-1");
+        given(winnerTracker.winnerOf("match-1", "game-1")).willReturn("team-c");
+
+        service.persistLiveMatch(liveMatch(completedGame("game-1", 1)));
+
+        verify(game, never()).decideWinner(anyLong(), any());
+    }
+
+    @Test
+    void matchContextOfHandlesNullActiveGameIdWithoutThrowing() {
+        DataCacheService.LiveMatch match = liveMatch(new EventDetailsResponse.Game(
+                "game-1",
+                2,
+                "completed",
+                List.of(
+                        new EventDetailsResponse.GameTeam("team-a", "blue"),
+                        new EventDetailsResponse.GameTeam("team-b", "red")
+                )
+        ));
+
+        GamePersistService.MatchContext ctx = GamePersistService.MatchContext.of(match, null, 3);
+
+        assertThat(ctx.matchId()).isEqualTo("match-1");
+        assertThat(ctx.gameNumber()).isEqualTo(1);
+        assertThat(ctx.blueTeamId()).isNull();
+        assertThat(ctx.redTeamId()).isNull();
+    }
+
+    @Test
+    void matchContextOfResolvesSidesWhenActiveGameIdMatches() {
+        DataCacheService.LiveMatch match = liveMatch(new EventDetailsResponse.Game(
+                "game-1",
+                2,
+                "completed",
+                List.of(
+                        new EventDetailsResponse.GameTeam("team-a", "blue"),
+                        new EventDetailsResponse.GameTeam("team-b", "red")
+                )
+        ));
+
+        GamePersistService.MatchContext ctx = GamePersistService.MatchContext.of(match, "game-1", 3);
+
+        assertThat(ctx.gameNumber()).isEqualTo(2);
+        assertThat(ctx.blueTeamId()).isEqualTo("team-a");
+        assertThat(ctx.redTeamId()).isEqualTo("team-b");
+    }
+
+    private void stubExistingMatchWithTeams() {
+        EsportsMatch match = mock(EsportsMatch.class);
+        MatchTeam firstTeam = team("team-a", 101L);
+        MatchTeam secondTeam = team("team-b", 102L);
+        given(match.getId()).willReturn(10L);
+        given(matchRepository.findByExternalMatchId("match-1")).willReturn(Optional.of(match));
+        given(matchTeamRepository.findByMatchIdOrderByDisplayOrderAsc(10L))
+                .willReturn(List.of(firstTeam, secondTeam));
+    }
+
+    private MatchTeam team(String externalTeamId, Long id) {
+        MatchTeam team = mock(MatchTeam.class);
+        given(team.getExternalTeamId()).willReturn(externalTeamId);
+        given(team.getId()).willReturn(id);
+        return team;
+    }
+
+    private EventDetailsResponse.Game completedGame(String id, int number) {
+        return new EventDetailsResponse.Game(id, number, "completed", List.of());
+    }
+
+    private DataCacheService.LiveMatch liveMatch(EventDetailsResponse.Game game) {
+        return new DataCacheService.LiveMatch(
+                "match-1",
+                "결승",
+                "LCK",
+                "2026-08-18T08:00:00Z",
+                3,
+                List.of(
+                        scheduleTeam("team-a", 1),
+                        scheduleTeam("team-b", 0)
+                ),
+                game == null ? null : List.of(game),
+                null
+        );
+    }
+
+    private ScheduleResponse.Team scheduleTeam(String id, int gameWins) {
+        return new ScheduleResponse.Team(
+                id,
+                id,
+                id,
+                null,
+                new ScheduleResponse.Result(null, gameWins),
+                null
+        );
+    }
+}
