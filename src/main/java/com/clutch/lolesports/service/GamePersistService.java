@@ -185,9 +185,11 @@ public class GamePersistService {
                 })
                 .orElseGet(() -> matchRepo.save(new EsportsMatch(
                         ctx.matchId(),
-                        props.leagueId(),
+                        // 소스가 준 실제 리그를 쓴다. getLive 는 전 리그를 주므로
+                        // 설정값을 그대로 박으면 타 리그 경기까지 LCK 로 저장된다.
+                        ctx.leagueId() != null ? ctx.leagueId() : props.leagueId(),
                         seasonKeyOf(ctx.startTime()),
-                        props.tournamentId(),
+                        ctx.tournamentId() != null ? ctx.tournamentId() : props.tournamentId(),
                         ctx.blockName(),
                         toLdt(ctx.startTime()),
                         toLdt(ctx.startTime()),
@@ -391,7 +393,10 @@ public class GamePersistService {
     private void persistPlayerStats(EsportsGame game, String externalGameId,
                                     WindowResponse.Frame lastFrame,
                                     Map<String, MatchTeam> teamsByExternalId) {
-        playerStatRepo.deleteByGameId(game.getId());   // 재적재 시 중복 방지
+        // 재적재 시 중복 방지. flush 로 DELETE 를 먼저 내보내지 않으면 JPA 가 INSERT 를
+        // 앞세워 uk_game_player_stat_game_participant 에 걸린다 (all=true 백필 실패 원인).
+        playerStatRepo.deleteByGameId(game.getId());
+        playerStatRepo.flush();
 
         WindowResponse.GameMetadata meta = cache.getWindowMeta(externalGameId);
         Map<Integer, WindowResponse.ParticipantMetadata> metaById = participantMeta(meta);
@@ -455,7 +460,9 @@ public class GamePersistService {
 
     /** @return {시작 초, 종료 초} — 저장할 게 없으면 null */
     private int[] persistTimeline(EsportsGame game, String externalGameId) {
+        // 위와 같은 이유로 DELETE 를 먼저 확정한다 (uk_timeline_game_time)
         timelineRepo.deleteByGameId(game.getId());
+        timelineRepo.flush();
 
         Instant start = cache.getGameStart(externalGameId);
         if (start == null) {
@@ -601,6 +608,10 @@ public class GamePersistService {
     public record MatchContext(
             String matchId,
             String leagueName,
+            /** 실제 리그 식별자 — getEventDetails 기준. null 이면 설정값으로 폴백 */
+            String leagueId,
+            /** 실제 대회 식별자 — 스플릿마다 다르다. null 이면 설정값으로 폴백 */
+            String tournamentId,
             String blockName,
             String startTime,
             String state,
@@ -612,8 +623,18 @@ public class GamePersistService {
             /** 이 세트의 레드 진영 팀 id */
             String redTeamId
     ) {
-        /** 라이브 매치 + 세트 번호로 만든다 */
+        /** 라이브 매치 + 세트 번호로 만든다 (리그·대회는 설정값 폴백) */
         public static MatchContext of(DataCacheService.LiveMatch m, String gameId, Integer bestOf) {
+            return of(m, gameId, bestOf, null);
+        }
+
+        /**
+         * 라이브 매치 + 세트 번호로 만든다.
+         *
+         * @param origin getEventDetails 로 확인한 실제 리그·대회. null 이면 설정값을 쓴다
+         */
+        public static MatchContext of(DataCacheService.LiveMatch m, String gameId, Integer bestOf,
+                                      HistoricalGameService.MatchOrigin origin) {
             int number = 1;
             String blueTeamId = null;
             String redTeamId = null;
@@ -638,7 +659,10 @@ public class GamePersistService {
                 }
             }
             List<ScheduleResponse.Team> teams = m.teams() != null ? m.teams() : List.of();
-            return new MatchContext(m.matchId(), m.leagueName(), m.blockName(), m.startTime(),
+            return new MatchContext(m.matchId(), m.leagueName(),
+                    origin != null ? origin.leagueId() : null,
+                    origin != null ? origin.tournamentId() : null,
+                    m.blockName(), m.startTime(),
                     matchStateOf(teams, bestOf), bestOf, number, teams, blueTeamId, redTeamId);
         }
 

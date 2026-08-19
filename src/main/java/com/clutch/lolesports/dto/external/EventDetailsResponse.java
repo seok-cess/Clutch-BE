@@ -17,7 +17,13 @@ public record EventDetailsResponse(Data data) {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record Event(String id, String type, ScheduleResponse.League league, Match match) {
+    public record Event(String id, String type, ScheduleResponse.League league,
+                        Tournament tournament, Match match) {
+    }
+
+    /** 이 매치가 속한 대회. LCK 는 시즌이 스플릿으로 나뉘어 매치마다 달라진다 */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record Tournament(String id) {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)

@@ -110,11 +110,21 @@ public class LiveStatsClient {
         }
     }
 
+    /** paused 구간을 훑을 최대 횟수 (10초 창 × 30 = 5분). 로딩이 이보다 길지는 않다 */
+    private static final int GAME_START_MAX_WINDOWS = 30;
+
     /**
-     * startingTime 없이 호출하면 게임 시작 첫 프레임이 온다 (2026-08-08 실검증).
-     * 피드에 게임 경과 시간 필드가 없어서, 이 첫 프레임 시각을 경과 시간의 기준점으로 쓴다.
+     * 게임 경과 시간의 기준점 — 실제 게임이 시작된 프레임 시각.
      *
-     * @return 첫 프레임의 rfc460Timestamp, 없으면 null
+     * 피드에 게임 시계 필드가 없어 "프레임 시각 - 이 값"으로 경과 시간을 계산한다.
+     * 첫 프레임을 그대로 쓰면 안 된다. 로딩·대기 구간이 gameState=paused 로 먼저 오고
+     * (2026-08-19 GEN vs KT 실측: paused 가 약 90초), 그 시각을 기준으로 삼으면 화면
+     * 시계가 인게임보다 그만큼 빨라진다.
+     *
+     * 그래서 paused 가 아닌 첫 프레임을 찾을 때까지 10초 창을 앞으로 넘긴다.
+     * 게임당 1회만 호출되므로 폴링 부하에는 영향이 없다.
+     *
+     * @return in_game 첫 프레임의 rfc460Timestamp, 없으면 null
      */
     public String getGameStartTimestamp(String gameId) {
         try {
@@ -126,11 +136,44 @@ public class LiveStatsClient {
             if (res == null || res.frames() == null || res.frames().isEmpty()) {
                 return null;
             }
+            String started = firstStartedFrame(res);
+            if (started != null) {
+                return started;
+            }
+
+            // 첫 창이 통째로 paused — 10초씩 넘기며 게임이 시작된 프레임을 찾는다
+            Instant cursor = Instant.parse(
+                    res.frames().get(res.frames().size() - 1).rfc460Timestamp());
+            for (int i = 0; i < GAME_START_MAX_WINDOWS; i++) {
+                cursor = cursor.plusSeconds(10);
+                WindowResponse next = getWindowAt(gameId, cursor);
+                if (next == null || next.frames() == null || next.frames().isEmpty()) {
+                    break;
+                }
+                started = firstStartedFrame(next);
+                if (started != null) {
+                    return started;
+                }
+                cursor = Instant.parse(
+                        next.frames().get(next.frames().size() - 1).rfc460Timestamp());
+            }
+            // 끝내 못 찾으면 첫 프레임으로 폴백한다 (시계가 빠를 수는 있어도 화면은 뜬다)
+            log.warn("게임 {} 시작 프레임을 찾지 못해 첫 프레임을 기준으로 쓴다", gameId);
             return res.frames().get(0).rfc460Timestamp();
         } catch (Exception e) {
             log.warn("게임 시작 시각 조회 실패 (gameId={}): {}", gameId, e.toString());
             return null;
         }
+    }
+
+    /** 이 응답에서 paused 가 아닌 첫 프레임 시각 — 없으면 null */
+    private static String firstStartedFrame(WindowResponse res) {
+        for (WindowResponse.Frame f : res.frames()) {
+            if (f.rfc460Timestamp() != null && !"paused".equalsIgnoreCase(f.gameState())) {
+                return f.rfc460Timestamp();
+            }
+        }
+        return null;
     }
 
     /**

@@ -1,5 +1,7 @@
 package com.clutch.lolesports.config;
 
+import java.util.List;
+
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
@@ -31,6 +33,15 @@ public record LolesportsProperties(
          * 사용자가 최종 결과를 확인할 여유를 주는 값이다.
          */
         long liveRetainAfterFinishSeconds,
+        /**
+         * livestats 를 제공하지 않는 리그명 목록.
+         *
+         * getLive 는 전 세계 리그를 주는데 일부 리그는 세트 내내 404 를 반환한다
+         * (예: LRN — getLive 응답의 streams[].statsStatus 가 disabled).
+         * 이런 리그는 물어봐야 소용이 없으므로 인게임 폴링 대상에서 아예 제외한다.
+         * 리그명은 getSchedule/getLive 의 league.name 과 정확히 일치해야 한다.
+         */
+        List<String> statsDisabledLeagues,
         Poll poll
 ) {
 
@@ -60,6 +71,8 @@ public record LolesportsProperties(
         if (liveRetainAfterFinishSeconds <= 0) {
             liveRetainAfterFinishSeconds = 300;   // 5분
         }
+        statsDisabledLeagues = statsDisabledLeagues == null
+                ? List.of() : List.copyOf(statsDisabledLeagues);
         if (poll == null) {
             poll = new Poll(0, 0, 0, 0, 0);   // Poll 의 기본값 보정에 위임
         }
