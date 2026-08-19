@@ -146,7 +146,33 @@ public class GamePersistService {
                 liveMatch.bestOf()
         );
         EsportsMatch match = upsertMatch(context);
-        upsertMatchTeams(match, context);
+        Map<String, MatchTeam> teamsByExternalId = upsertMatchTeams(match, context);
+        persistLateDecidedWinners(liveMatch, teamsByExternalId);
+    }
+
+    /**
+     * 세트 통계 적재 후 늦게 확정된 승자를 기존 esports_game 행에 반영한다.
+     *
+     * <p>livestats 종료 직후에는 gameWins가 아직 오르지 않아 승자 없이 적재될 수 있다.
+     * 이후 라이브 메타 폴링에서 승자가 확인되면 이 경로가 같은 트랜잭션에서 보완해,
+     * 서버 재시작 뒤에도 DB 기반 승자 복구가 가능하게 한다.</p>
+     */
+    private void persistLateDecidedWinners(
+            DataCacheService.LiveMatch liveMatch,
+            Map<String, MatchTeam> teamsByExternalId
+    ) {
+        if (liveMatch.games() == null) {
+            return;
+        }
+        liveMatch.games().stream()
+                .filter(game -> game.id() != null)
+                .filter(game -> "completed".equalsIgnoreCase(game.state()))
+                .forEach(game -> gameRepo.findByExternalGameId(game.id())
+                        .ifPresent(persistedGame -> applyWinner(
+                                persistedGame,
+                                liveMatch.matchId(),
+                                teamsByExternalId
+                        )));
     }
 
     // ---- 매치 / 팀 ----
@@ -263,7 +289,7 @@ public class GamePersistService {
         }
 
         game.updateObjectives(buildObjectivesJson(externalGameId, start));
-        applyWinner(game, ctx, teamsByExternalId);
+        applyWinner(game, ctx.matchId(), teamsByExternalId);
         return game;
     }
 
@@ -276,12 +302,15 @@ public class GamePersistService {
      *
      * 진영 매핑(blue/red match_team)이 없으면 승자를 세트에 귀속할 수 없어 저장하지 않는다.
      */
-    private void applyWinner(EsportsGame game, MatchContext ctx,
+    private void applyWinner(EsportsGame game, String externalMatchId,
                              Map<String, MatchTeam> teamsByExternalId) {
         if (game.isWinnerDecided()) {
             return;   // 이미 확정된 값은 덮어쓰지 않는다
         }
-        String winnerExternalTeamId = setWinners.winnerOf(ctx.matchId(), game.getExternalGameId());
+        String winnerExternalTeamId = setWinners.winnerOf(
+                externalMatchId,
+                game.getExternalGameId()
+        );
         if (winnerExternalTeamId == null) {
             return;   // 아직 gameWins 가 오르지 않았다 — 다음 기회에 채운다
         }
@@ -590,7 +619,7 @@ public class GamePersistService {
             String redTeamId = null;
             if (m.games() != null) {
                 for (EventDetailsResponse.Game g : m.games()) {
-                    if (!gameId.equals(g.id())) {
+                    if (gameId == null || !gameId.equals(g.id())) {
                         continue;
                     }
                     if (g.number() != null) {

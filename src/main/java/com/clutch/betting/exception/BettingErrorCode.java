@@ -30,6 +30,8 @@ public enum BettingErrorCode {
     WINNER_TEAM_ID_REQUIRED(Message.WINNER_TEAM_ID_REQUIRED),
     /** 이벤트 참가 팀이 아닌 팀을 승자로 지정했다. */
     WINNER_NOT_PARTICIPANT(Message.WINNER_NOT_PARTICIPANT),
+    /** 이미 확정된 승자와 다른 팀으로 결과를 복구하려 했다. */
+    WINNER_ALREADY_DECIDED(Message.WINNER_ALREADY_DECIDED),
     /** 승자 확정과 이벤트 종료 조건을 충족하지 못한 상태에서 정산했다. */
     EVENT_NOT_SETTLEABLE(Message.EVENT_NOT_SETTLEABLE),
     /** 사용자 배팅이 참조할 이벤트 ID가 전달되지 않았다. */
@@ -113,6 +115,7 @@ public enum BettingErrorCode {
         public static final String CURRENT_TIME_REQUIRED = "현재 시각은 필수입니다.";
         public static final String WINNER_TEAM_ID_REQUIRED = "승리 팀 ID는 필수입니다.";
         public static final String WINNER_NOT_PARTICIPANT = "승리 팀은 배팅 이벤트 참가 팀이어야 합니다.";
+        public static final String WINNER_ALREADY_DECIDED = "이미 다른 승리 팀이 확정된 배팅 이벤트입니다.";
         public static final String EVENT_NOT_SETTLEABLE = "승리 팀이 확정된 종료 이벤트만 정산할 수 있습니다.";
         public static final String BETTING_EVENT_ID_REQUIRED = "배팅 이벤트 ID는 필수입니다.";
         public static final String USER_ID_REQUIRED = "사용자 ID는 필수입니다.";

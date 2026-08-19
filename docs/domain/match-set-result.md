@@ -68,6 +68,25 @@ LoL Esports 는 **세트 승자를 직접 주지 않는다.** window 피드, `ge
 **포인트 지급과 배팅 정산은 이 컬럼이 `NOT NULL` 인 세트만 사용한다.**
 확정 전에는 지급을 보류한다 — 잘못 지급하면 회수가 어렵다.
 
+### 승자 추적과 복구
+
+- `gameWins` 증가와 세트 `completed` 반영 순서가 어긋나도 증가분을 보류했다가 귀속한다.
+- 서버 재시작 첫 관측에서도 미확정 세트가 하나이거나 한 팀의 연속 승리만 남은 경우에는
+  누적 승수와 이미 확정된 결과를 대조해 복구한다.
+- 늦게 확정된 승자는 기존 `esports_game` 행에 반영해 다음 재시작의 복구 근거로 사용한다.
+- 여러 미확정 세트에 양 팀 승리가 섞여 순서를 특정할 수 없으면 임의 판정하지 않는다.
+  운영자가 공식 결과를 확인한 뒤 아래 관리자 API로 승자 기록과 정산을 원자적으로 수행한다.
+
+```http
+PUT /api/admin/betting-events/{bettingEventId}/winner
+Content-Type: application/json
+
+{"winnerTeamId":"외부 팀 ID"}
+```
+
+이미 다른 승자가 확정된 이벤트에는 `409 Conflict`를 반환하며, `OPEN` 또는 `CANCELLED`인
+이벤트에는 복구 결과를 입력할 수 없다.
+
 ## 최종 승리 팀
 
 매치 전체의 승패는 `match_team.outcome`(`win` / `loss`)과 `match_team.game_wins` 에 있다.
