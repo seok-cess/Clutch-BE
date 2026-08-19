@@ -200,7 +200,7 @@ class CouponIssuanceKafkaE2eTest {
                 couponIssuanceService,
                 timeout(10_000).times(2)
         ).issue(
-                argThat(acceptedEvent ->
+                argThat((CouponClaimAcceptedEvent acceptedEvent) ->
                         claimId.equals(
                                 acceptedEvent.claimId()
                         )

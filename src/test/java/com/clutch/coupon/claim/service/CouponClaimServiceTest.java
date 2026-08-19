@@ -6,7 +6,6 @@ import com.clutch.coupon.claim.domain.ClaimRequestStatus;
 import com.clutch.coupon.claim.domain.CouponClaimRequest;
 import com.clutch.coupon.claim.outbox.CouponBenefitSnapshot;
 import com.clutch.coupon.claim.outbox.CouponBenefitSnapshotRepository;
-import com.clutch.coupon.claim.outbox.CouponClaimOutboxWriter;
 import com.clutch.coupon.claim.repository.CouponClaimRequestRepository;
 import com.clutch.coupon.event.domain.CouponEvent;
 import com.clutch.coupon.event.domain.CouponEventItem;
@@ -17,6 +16,10 @@ import com.clutch.coupon.event.repository.CouponEventRepository;
 import com.clutch.coupon.claim.redis.CouponClaimRedisExecutor;
 import com.clutch.coupon.claim.redis.CouponClaimRedisResult;
 import com.clutch.coupon.claim.redis.CouponStockInitializer;
+import com.clutch.coupon.contract.issuance.CouponIssuanceCommand;
+import com.clutch.coupon.contract.issuance.CouponIssuanceResult;
+import com.clutch.coupon.contract.issuance.CouponIssuer;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -26,14 +29,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import java.math.BigDecimal;
-import java.time.Instant;
+
 import java.time.LocalDateTime;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -48,6 +50,7 @@ class CouponClaimServiceTest {
     private static final Long COUPON_EVENT_ID = 10L;
     private static final Long COUPON_EVENT_OCCURRENCE_ID = 15L;
     private static final Long COUPON_EVENT_ITEM_ID = 20L;
+    private static final Long COUPON_ID = 200L;
     private static final CouponBenefitSnapshot BENEFIT_SNAPSHOT =
             new CouponBenefitSnapshot(
                     "RATE",
@@ -71,7 +74,7 @@ class CouponClaimServiceTest {
             couponBenefitSnapshotRepository;
 
     @Mock
-    private CouponClaimOutboxWriter couponClaimOutboxWriter;
+    private CouponIssuer couponIssuer;
 
     @Mock
     private CouponClaimItemSelector couponClaimItemSelector;
@@ -135,6 +138,11 @@ class CouponClaimServiceTest {
                 .save(any(CouponClaimRequest.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
+        when(couponIssuer.issue(
+                any(CouponIssuanceCommand.class)
+        )).thenReturn(
+                new CouponIssuanceResult(COUPON_ID)
+        );
 
         // when
         CouponClaimCreateResponse response =
@@ -151,8 +159,10 @@ class CouponClaimServiceTest {
                 .isEqualTo(COUPON_EVENT_OCCURRENCE_ID);
         assertThat(response.couponEventItemId())
                 .isEqualTo(COUPON_EVENT_ITEM_ID);
+        assertThat(response.couponId())
+                .isEqualTo(COUPON_ID);
         assertThat(response.requestStatus())
-                .isEqualTo(ClaimRequestStatus.PENDING);
+                .isEqualTo(ClaimRequestStatus.SUCCEEDED);
 
         ArgumentCaptor<CouponClaimRequest> captor =
                 ArgumentCaptor.forClass(
@@ -170,14 +180,11 @@ class CouponClaimServiceTest {
         assertThat(savedClaimRequest.getCouponEventOccurrenceId())
                 .isEqualTo(COUPON_EVENT_OCCURRENCE_ID);
         assertThat(savedClaimRequest.getRequestStatus())
-                .isEqualTo(ClaimRequestStatus.PENDING);
+                .isEqualTo(ClaimRequestStatus.SUCCEEDED);
 
-        verify(couponClaimOutboxWriter)
-                .writeAcceptedEvent(
-                        eq(savedClaimRequest),
-                        eq(BENEFIT_SNAPSHOT),
-                        any(Instant.class)
-                );
+        verify(couponIssuer).issue(
+                any(CouponIssuanceCommand.class)
+        );
 
         verify(couponClaimRedisExecutor).claim(
                 COUPON_EVENT_ITEM_ID,

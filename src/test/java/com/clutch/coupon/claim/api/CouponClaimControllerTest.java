@@ -52,6 +52,7 @@ class CouponClaimControllerTest {
         CouponClaimCreateResponse response =
                 new CouponClaimCreateResponse(
                         100L,
+                        200L,
                         COUPON_EVENT_ID,
                         COUPON_EVENT_OCCURRENCE_ID,
                         COUPON_EVENT_ITEM_ID,
@@ -83,6 +84,7 @@ class CouponClaimControllerTest {
 
                 )
                 .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.couponId").value(200))
                 .andExpect(jsonPath("$.claimId").value(100))
                 .andExpect(jsonPath("$.couponEventId").value(10))
                 .andExpect(

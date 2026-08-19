@@ -1,5 +1,8 @@
 package com.clutch.wallet.service;
 
+import com.clutch.coupon.contract.issuance.CouponIssuanceCommand;
+import com.clutch.coupon.contract.issuance.CouponIssuanceResult;
+import com.clutch.coupon.contract.issuance.CouponIssuer;
 import com.clutch.coupon.contract.kafka.CouponClaimAcceptedEvent;
 import com.clutch.coupon.contract.kafka.CouponIssueResultEvent;
 import com.clutch.coupon.contract.kafka.CouponIssueResultStatus;
@@ -15,8 +18,11 @@ import tools.jackson.databind.ObjectMapper;
 import java.time.Instant;
 import java.util.UUID;
 
+/**
+ * 쿠폰 생성 서비스
+ */
 @Service
-public class CouponIssuanceService {
+public class CouponIssuanceService implements CouponIssuer {
 
     private static final int EVENT_VERSION = 1;
 
@@ -24,56 +30,141 @@ public class CouponIssuanceService {
     private final WalletOutboxRepository walletOutboxRepository;
     private final ObjectMapper objectMapper;
 
-    public CouponIssuanceService(UserCouponRepository userCouponRepository,
-                                 WalletOutboxRepository walletOutboxRepository,
-                                 ObjectMapper objectMapper) {
+    public CouponIssuanceService(
+            UserCouponRepository userCouponRepository,
+            WalletOutboxRepository walletOutboxRepository,
+            ObjectMapper objectMapper
+    ) {
         this.userCouponRepository = userCouponRepository;
         this.walletOutboxRepository = walletOutboxRepository;
         this.objectMapper = objectMapper;
     }
 
+    /**
+     * 동기 쿠폰 발급
+     *
+     * @param command 쿠폰 발급 명령
+     * @return 쿠폰 발급 결과
+     */
+    @Override
     @Transactional
-    public void issue(CouponClaimAcceptedEvent event) {
+    public CouponIssuanceResult issue(
+            CouponIssuanceCommand command
+    ) {
         UserCoupon coupon = new UserCoupon(
-                event.claimId(),
-                event.userId(),
-                event.couponEventId(),
-                event.couponEventOccurrenceId(),
-                event.couponEventItemId(),
+                command.claimId(),
+                command.userId(),
+                command.couponEventId(),
+                command.couponEventOccurrenceId(),
+                command.couponEventItemId(),
                 generateCouponCode(),
-                event.discountType(),
-                event.discountValue(),
-                event.expiresAt()
+                command.discountType(),
+                command.discountValue(),
+                command.expiresAt()
         );
-        userCouponRepository.saveAndFlush(coupon);
 
-        writeResultOutbox(event.claimId(), coupon.getId(), CouponIssueResultStatus.SUCCEEDED, null);
+        UserCoupon savedCoupon =
+                userCouponRepository.saveAndFlush(coupon);
+
+        writeResultOutbox(
+                command.claimId(),
+                savedCoupon.getId(),
+                CouponIssueResultStatus.SUCCEEDED,
+                null
+        );
+
+        return new CouponIssuanceResult(
+                savedCoupon.getId()
+        );
     }
 
-    private void writeResultOutbox(Long claimId, Long couponId, CouponIssueResultStatus status, String failureReason) {
-        CouponIssueResultEvent resultEvent = new CouponIssueResultEvent(
-                EVENT_VERSION,
-                UUID.randomUUID().toString(),
-                claimId,
-                couponId,
-                status,
-                failureReason,
-                Instant.now()
+    /**
+     * Kafka 쿠폰 발급 이벤트 호환 처리
+     *
+     * @param event 쿠폰 발급 접수 이벤트
+     */
+    @Transactional
+    public void issue(
+            CouponClaimAcceptedEvent event
+    ) {
+        issue(
+                new CouponIssuanceCommand(
+                        event.claimId(),
+                        event.userId(),
+                        event.couponEventId(),
+                        event.couponEventOccurrenceId(),
+                        event.couponEventItemId(),
+                        event.discountType(),
+                        event.discountValue(),
+                        event.expiresAt()
+                )
         );
-        WalletOutbox outbox = WalletOutbox.create(claimId, CouponKafkaTopics.ISSUE_RESULT, serialize(resultEvent));
+    }
+
+    /**
+     * 쿠폰 생성 결과 Outbox 저장
+     *
+     * @param claimId 쿠폰 발급 요청 식별자
+     * @param couponId 발급 쿠폰 식별자
+     * @param status 쿠폰 생성 결과 상태
+     * @param failureReason 쿠폰 생성 실패 사유
+     */
+    private void writeResultOutbox(
+            Long claimId,
+            Long couponId,
+            CouponIssueResultStatus status,
+            String failureReason
+    ) {
+        CouponIssueResultEvent resultEvent =
+                new CouponIssueResultEvent(
+                        EVENT_VERSION,
+                        UUID.randomUUID().toString(),
+                        claimId,
+                        couponId,
+                        status,
+                        failureReason,
+                        Instant.now()
+                );
+
+        WalletOutbox outbox = WalletOutbox.create(
+                claimId,
+                CouponKafkaTopics.ISSUE_RESULT,
+                serialize(resultEvent)
+        );
+
         walletOutboxRepository.save(outbox);
     }
 
+    /**
+     * 쿠폰 코드 생성
+     *
+     * @return 쿠폰 코드
+     */
     private String generateCouponCode() {
-        return "CPN-" + UUID.randomUUID().toString().replace("-", "").
-                substring(0, 12).toUpperCase();
+        return "CPN-"
+                + UUID.randomUUID()
+                .toString()
+                .replace("-", "")
+                .substring(0, 12)
+                .toUpperCase();
     }
 
-    private String serialize(CouponIssueResultEvent event) {
+    /**
+     * 결과 이벤트 직렬화
+     *
+     * @param event 쿠폰 생성 결과 이벤트
+     * @return 이벤트 JSON
+     */
+    private String serialize(
+            CouponIssueResultEvent event
+    ) {
         try {
             return objectMapper.writeValueAsString(event);
-        } catch (Exception e) {
-            throw new IllegalStateException("발급 결과 이벤트 직렬화 실패", e);
+        } catch (Exception exception) {
+            throw new IllegalStateException(
+                    "발급 결과 이벤트 직렬화 실패",
+                    exception
+            );
         }
     }
 }
