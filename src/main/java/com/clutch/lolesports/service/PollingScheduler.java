@@ -65,16 +65,38 @@ public class PollingScheduler {
      */
     private final Map<String, DataCacheService.LiveMatch> lastKnownMatches = new ConcurrentHashMap<>();
     /**
-     * 통계 404 를 받은 게임 → 재시도 가능 시각(epoch ms).
+     * 통계 404 를 받은 게임 → 재시도 대기 상태 (시각 + 연속 실패 횟수).
      *
      * 404 는 영구 상태가 아니다. 경기 시작 전에는 "Stats are disabled" 가 오다가
      * 실제 인게임이 시작되면 정상 응답으로 바뀐다 (2026-08-08 DCG vs MVK 확인).
      * 그래서 영구 제외하지 않고 일정 시간 뒤 다시 시도한다.
      */
-    private final Map<String, Long> statsRetryAt = new ConcurrentHashMap<>();
+    private final Map<String, StatsMiss> statsRetryAt = new ConcurrentHashMap<>();
 
-    /** 404 를 받은 게임을 다시 시도하기까지의 간격 */
-    private static final long STATS_RETRY_INTERVAL_MS = 60_000;
+    /**
+     * 404 를 받은 게임의 재시도 대기 상태.
+     *
+     * @param retryAt 이 시각 전에는 폴링에서 제외한다
+     * @param failures 연속 404 횟수 (성공 한 번이면 항목째로 사라진다)
+     */
+    private record StatsMiss(long retryAt, int failures) {
+    }
+
+    /**
+     * 404 재시도 간격 — 첫 실패는 짧게, 계속 실패하면 두 배씩 늘려 상한까지 간다.
+     *
+     * 404 의 원인이 두 가지라 고정값 하나로는 맞출 수 없다.
+     *   - 경기 시작 직전: 곧 정상 응답으로 바뀌므로 빨리 다시 물어봐야 한다
+     *   - 리그가 livestats 미지원: 영영 안 열리므로 간격을 늘려 부하를 줄여야 한다
+     */
+    private static final long STATS_RETRY_MIN_MS = 5_000;
+    private static final long STATS_RETRY_MAX_MS = 60_000;
+
+    /**
+     * 화면에 "데이터 미제공" 을 띄우기까지 필요한 연속 실패 횟수.
+     * 한 번의 404 로 덮으면 시작 직전에 잠깐 뜨는 404 까지 미제공으로 보인다.
+     */
+    private static final int STATS_UNAVAILABLE_AFTER_FAILURES = 3;
 
     public PollingScheduler(LolesportsApiClient api,
                             LiveStatsClient liveStats,
@@ -449,6 +471,7 @@ public class PollingScheduler {
             // 응답의 모든 프레임(초 단위 수십 개)을 버퍼에 적재. 중복은 버퍼가 걸러줌
             List<WindowResponse.Frame> added =
                     cache.addWindowFrames(gameId, window.gameMetadata(), window.frames());
+            clearStatsUnavailable(gameId);
             resolveGameStart(gameId);
             for (WindowResponse.Frame frame : added) {
                 pentakillDetector.onNewWindowFrame(gameId, frame);
@@ -475,6 +498,7 @@ public class PollingScheduler {
                 return true;
             }
             cache.addDetailsFrames(gameId, res.frames());
+            clearStatsUnavailable(gameId);
             return true;
         } catch (WebClientResponseException.NotFound e) {
             markStatsUnavailable(gameId, e);
@@ -507,10 +531,30 @@ public class PollingScheduler {
 
     /** 통계 404 게임을 일정 시간 폴링에서 제외 (영구 제외 아님 — 경기 시작 후 열릴 수 있다) */
     private void markStatsUnavailable(String gameId, WebClientResponseException e) {
-        boolean first = statsRetryAt.put(gameId, System.currentTimeMillis() + STATS_RETRY_INTERVAL_MS) == null;
-        if (first) {
-            log.info("게임 {} 통계 미제공 — {}초 뒤 재시도 ({})",
-                    gameId, STATS_RETRY_INTERVAL_MS / 1000, e.getResponseBodyAsString());
+        StatsMiss updated = statsRetryAt.compute(gameId, (id, prev) -> {
+            int failures = prev == null ? 1 : prev.failures() + 1;
+            // 5s → 10s → 20s → 40s → 60s(상한). 실패가 쌓일수록 천천히 물어본다
+            long delay = Math.min(STATS_RETRY_MAX_MS, STATS_RETRY_MIN_MS << Math.min(failures - 1, 16));
+            return new StatsMiss(System.currentTimeMillis() + delay, failures);
+        });
+        // 첫 실패와 미제공 확정 시점만 남긴다 — 매 재시도마다 찍으면 로그가 넘친다
+        if (updated.failures() == 1 || updated.failures() == STATS_UNAVAILABLE_AFTER_FAILURES) {
+            log.info("게임 {} 통계 미제공 {}회 — {}초 뒤 재시도 ({})",
+                    gameId, updated.failures(),
+                    Math.max(0, updated.retryAt() - System.currentTimeMillis()) / 1000,
+                    e.getResponseBodyAsString());
+        }
+    }
+
+    /**
+     * 통계가 정상 응답으로 돌아왔다 — 대기 상태를 즉시 해제한다.
+     *
+     * 이게 없으면 404 를 한 번 받은 게임은 그 뒤 데이터가 들어와도 계속
+     * statsUnavailable=true 로 남아, 프론트가 폴링을 아예 하지 않는다.
+     */
+    private void clearStatsUnavailable(String gameId) {
+        if (statsRetryAt.remove(gameId) != null) {
+            log.info("게임 {} 통계 복구 — 정상 폴링으로 전환", gameId);
         }
     }
 
@@ -522,17 +566,22 @@ public class PollingScheduler {
      * (2026-08-18 LRN 3V vs LYON 실측). 그런 경기는 화면이 영영 빈 스코어보드가 되므로,
      * 폴링이 이미 파악한 상태를 노출해 프론트가 안내로 대체하고 요청을 멈추게 한다.
      *
-     * 재시도 시각과 무관하게 "한 번이라도 미제공이었나"로 판단한다 —
-     * 60초마다 잠깐 풀리는 순간에 화면이 깜빡이면 안 된다.
+     * 판단 기준은 "연속 몇 번 실패했나" 다. 재시도 시각으로 판단하면 대기가 풀리는
+     * 순간마다 화면이 깜빡이고, 한 번이라도 실패했나로 판단하면 경기 시작 직전의
+     * 일시적인 404 때문에 정상 경기까지 영영 미제공으로 굳는다.
      */
     public boolean isStatsUnavailable(String gameId) {
-        return gameId != null && statsRetryAt.containsKey(gameId);
+        if (gameId == null) {
+            return false;
+        }
+        StatsMiss miss = statsRetryAt.get(gameId);
+        return miss != null && miss.failures() >= STATS_UNAVAILABLE_AFTER_FAILURES;
     }
 
     /** 통계 404 로 대기 중인 게임인지 (재시도 시각이 지났으면 다시 폴링 대상) */
     private boolean isStatsOnHold(String gameId) {
-        Long retryAt = statsRetryAt.get(gameId);
-        return retryAt != null && retryAt > System.currentTimeMillis();
+        StatsMiss miss = statsRetryAt.get(gameId);
+        return miss != null && miss.retryAt() > System.currentTimeMillis();
     }
 
     // ---- 3) 일정/순위 (앱 시작시 1회 + 5분) ----

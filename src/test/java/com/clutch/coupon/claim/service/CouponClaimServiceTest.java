@@ -189,6 +189,7 @@ class CouponClaimServiceTest {
                 .increaseSuccessCountAtomically(
                         COUPON_EVENT_ITEM_ID
                 );
+        verify(couponEventOccurrence).isOpenAt(any(LocalDateTime.class));
     }
 
     /**
