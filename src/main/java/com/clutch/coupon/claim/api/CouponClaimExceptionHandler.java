@@ -14,7 +14,10 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
  * 쿠폰 발급 요청 예외 처리기
  */
 @RestControllerAdvice(
-        assignableTypes = CouponClaimController.class
+        assignableTypes = {
+                CouponClaimController.class,
+                CouponStockController.class
+        }
 )
 public class CouponClaimExceptionHandler {
 

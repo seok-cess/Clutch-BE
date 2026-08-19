@@ -53,7 +53,11 @@ public enum CouponClaimErrorCode {
     ),
     COUPON_STOCK_NOT_INITIALIZED(
             HttpStatus.SERVICE_UNAVAILABLE,
-        "쿠폰 재고가 준비되지 않았습니다."
+            "쿠폰 재고가 준비되지 않았습니다."
+    ),
+    COUPON_STOCK_READ_FAILED(
+            HttpStatus.SERVICE_UNAVAILABLE,
+            "쿠폰 재고를 조회할 수 없습니다."
     );
 
 
