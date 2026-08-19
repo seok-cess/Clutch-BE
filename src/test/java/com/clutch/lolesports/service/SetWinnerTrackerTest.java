@@ -53,6 +53,27 @@ class SetWinnerTrackerTest {
         assertThat(tracker.winnerOf("match-1", "game-2")).isNull();
     }
 
+    @Test
+    void duplicateWinnerRestoreDoesNotConsumePendingWinnerForAnotherGame() {
+        tracker.restoreWinner("match-1", "game-1", "team-a");
+        tracker.observe("match-1", teams(0, 0), List.of(
+                game("game-1", 1, "completed"),
+                game("game-2", 2, "inProgress")
+        ));
+        tracker.observe("match-1", teams(1, 0), List.of(
+                game("game-1", 1, "completed"),
+                game("game-2", 2, "inProgress")
+        ));
+
+        tracker.restoreWinner("match-1", "game-1", "team-a");
+        tracker.observe("match-1", teams(1, 0), List.of(
+                game("game-1", 1, "completed"),
+                game("game-2", 2, "completed")
+        ));
+
+        assertThat(tracker.winnerOf("match-1", "game-2")).isEqualTo("team-a");
+    }
+
     private List<ScheduleResponse.Team> teams(int firstWins, int secondWins) {
         return List.of(
                 team("team-a", firstWins),

@@ -181,8 +181,11 @@ public class SetWinnerTracker {
         if (matchId == null || gameId == null || winnerTeamId == null) {
             return;
         }
-        winners.computeIfAbsent(matchId, key -> new ConcurrentHashMap<>())
-                .putIfAbsent(gameId, winnerTeamId);
+        boolean inserted = winners.computeIfAbsent(matchId, key -> new ConcurrentHashMap<>())
+                .putIfAbsent(gameId, winnerTeamId) == null;
+        if (!inserted) {
+            return;
+        }
         Map<String, Integer> pending = pendingWins.get(matchId);
         if (pending != null) {
             pending.computeIfPresent(winnerTeamId, (key, count) -> count > 1 ? count - 1 : null);
