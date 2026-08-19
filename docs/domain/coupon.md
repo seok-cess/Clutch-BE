@@ -85,6 +85,15 @@
 - 기존 `coupon.claim.accepted` 소비 경로는 호환을 위해 유지하며 신규 발급 요청의 핵심 경로에서는 사용하지 않는다.
 - 상세 결정과 대안은 `docs/adr/001-synchronous-coupon-issuance.md`를 따른다.
 
+## 실시간 잔여 재고
+
+- 사용자 잔여 재고 조회와 SSE 갱신은 Redis 재고를 기준으로 하며 갱신마다 MySQL을
+  반복 조회하지 않는다.
+- 재고 소진은 정상 상태로 `0`을 전달하고 Redis 키 누락 또는 조회 장애와 구분한다.
+- 발급에 따른 SSE 알림은 실제 쿠폰 발급 transaction이 commit된 뒤 전송한다.
+- SSE 재연결 시 Redis의 최신 스냅샷을 즉시 전달하여 연결 단절 중 놓친 상태를 복구한다.
+- 상세 HTTP와 SSE 계약은 `docs/api/coupon-stock.md`를 따른다.
+
 ## 관련 코드
 
 - `com.clutch.coupon.claim`
