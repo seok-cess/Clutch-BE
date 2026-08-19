@@ -25,6 +25,14 @@ public enum CouponEventErrorCode {
     COUPON_EVENT_NOT_DELETABLE(
             HttpStatus.CONFLICT,
             "발생 또는 발급 이력이 없는 대기 상태의 쿠폰 이벤트만 삭제할 수 있습니다."
+    ),
+    COUPON_TYPE_NOT_FOUND(
+            HttpStatus.NOT_FOUND,
+            "존재하지 않는 쿠폰 종류가 포함되어 있습니다."
+    ),
+    COUPON_TYPE_INACTIVE(
+            HttpStatus.CONFLICT,
+            "비활성 쿠폰 종류는 신규 쿠폰 이벤트에서 사용할 수 없습니다."
     );
 
     private final HttpStatus httpStatus;

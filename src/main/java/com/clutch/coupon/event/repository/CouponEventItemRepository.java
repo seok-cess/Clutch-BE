@@ -6,8 +6,10 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * 쿠폰 이벤트 항목 저장소
@@ -38,7 +40,6 @@ public interface CouponEventItemRepository
     );
 
     /**
-     /**
      * 쿠폰 발급 성공 수량을 재고 범위 안에서 원자적으로 증가시킨다.
      *
      * @param couponEventItemId 쿠폰 이벤트 항목 ID
@@ -63,6 +64,29 @@ public interface CouponEventItemRepository
      */
     List<CouponEventItem> findAllByCouponEventIdIn(
             List<Long> couponEventIds
+    );
+
+    /**
+     * 쿠폰 종류가 쿠폰 이벤트에서 사용된 적이 있는지 확인한다.
+     *
+     * @param couponTypeId 쿠폰 종류 ID
+     * @return 이벤트 항목이 존재하면 {@code true}
+     */
+    boolean existsByCouponTypeId(Long couponTypeId);
+
+    /**
+     * 여러 쿠폰 종류 중 이벤트 사용 이력이 있는 ID만 조회한다.
+     *
+     * @param couponTypeIds 확인할 쿠폰 종류 ID 목록
+     * @return 이벤트에서 사용된 쿠폰 종류 ID 집합
+     */
+    @Query("""
+            select distinct item.couponTypeId
+              from CouponEventItem item
+             where item.couponTypeId in :couponTypeIds
+            """)
+    Set<Long> findUsedCouponTypeIds(
+            @Param("couponTypeIds") Collection<Long> couponTypeIds
     );
 
     /**
