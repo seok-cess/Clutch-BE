@@ -38,8 +38,8 @@ public class SetWinnerTracker {
     private final Map<String, Map<String, Integer>> lastWins = new ConcurrentHashMap<>();
     /** matchId → (gameId → 승리 팀 id). 한 번 확정되면 덮어쓰지 않는다 */
     private final Map<String, Map<String, String>> winners = new ConcurrentHashMap<>();
-    /** matchId → 이미 승자를 귀속한 세트 수 (completed 순서와 대조용) */
-    private final Map<String, Integer> resolvedCount = new ConcurrentHashMap<>();
+    /** matchId → (teamId → 아직 세트에 귀속하지 못한 gameWins 증가 수) */
+    private final Map<String, Map<String, Integer>> pendingWins = new ConcurrentHashMap<>();
 
     /**
      * 라이브 폴링마다 호출. gameWins 가 오른 팀을 찾아 그 세트의 승자로 기록한다.
@@ -47,8 +47,8 @@ public class SetWinnerTracker {
      * @param teams 매치의 팀 목록 (result.gameWins 포함)
      * @param games 세트 목록 (state 포함, 번호순)
      */
-    public void observe(String matchId, List<ScheduleResponse.Team> teams,
-                        List<EventDetailsResponse.Game> games) {
+    public synchronized void observe(String matchId, List<ScheduleResponse.Team> teams,
+                                     List<EventDetailsResponse.Game> games) {
         if (matchId == null || teams == null || games == null) {
             return;
         }
@@ -63,62 +63,95 @@ public class SetWinnerTracker {
             return;
         }
 
-        Map<String, Integer> previous = lastWins.get(matchId);
-        lastWins.put(matchId, current);
+        Map<String, Integer> previous = lastWins.put(matchId, current);
         if (previous == null) {
-            // 첫 관측 — 증가분을 알 수 없다. 기준값만 잡고 넘어간다.
-            // (서버가 매치 도중 재시작되면 그 이전 세트는 backfill 로 채운다)
-            backfillFromCompleted(matchId, current, games);
+            restorePendingFromAggregate(matchId, current);
+            assignPendingWinners(matchId, games);
             return;
         }
 
-        // gameWins 가 오른 팀 = 방금 끝난 세트의 승자
-        String winnerTeamId = null;
-        int delta = 0;
         for (Map.Entry<String, Integer> e : current.entrySet()) {
             int before = previous.getOrDefault(e.getKey(), e.getValue());
             if (e.getValue() > before) {
-                winnerTeamId = e.getKey();
-                delta = e.getValue() - before;
+                pendingWins.computeIfAbsent(matchId, key -> new ConcurrentHashMap<>())
+                        .merge(e.getKey(), e.getValue() - before, Integer::sum);
             }
         }
-        if (winnerTeamId == null) {
-            return;
-        }
-        if (delta > 1) {
-            // 폴링을 여러 번 놓쳐 두 세트가 한꺼번에 반영된 경우 — 어느 세트인지 특정할 수 없다
-            log.warn("매치 {} gameWins 가 한 번에 {} 증가 — 세트 귀속을 건너뛴다", matchId, delta);
-            return;
-        }
-
-        String gameId = nextUnresolvedCompletedGame(matchId, games);
-        if (gameId == null) {
-            log.warn("매치 {} 승자({})를 귀속할 completed 세트를 찾지 못했다", matchId, winnerTeamId);
-            return;
-        }
-        winners.computeIfAbsent(matchId, k -> new ConcurrentHashMap<>()).put(gameId, winnerTeamId);
-        resolvedCount.merge(matchId, 1, Integer::sum);
-        log.info("세트 승자 확정 — matchId={} gameId={} winner={}", matchId, gameId, winnerTeamId);
+        assignPendingWinners(matchId, games);
     }
 
     /**
-     * 첫 관측인데 이미 끝난 세트가 있으면(서버 재시작 등) 그 세트들은 승자를 알 수 없다.
-     * 이후 증가분이 엉뚱한 세트에 붙지 않도록 커서만 맞춰둔다.
+     * 첫 관측에서는 현재 누적 승수에서 이미 확정된 승자 수를 빼 미귀속 증가분을 복원한다.
+     * 한 세트만 미확정이거나 한 팀만 연속 승리한 경우에만 순서를 안전하게 확정할 수 있다.
      */
-    private void backfillFromCompleted(String matchId, Map<String, Integer> current,
-                                       List<EventDetailsResponse.Game> games) {
-        int completed = (int) games.stream()
-                .filter(g -> "completed".equalsIgnoreCase(g.state()))
-                .count();
-        if (completed > 0) {
-            resolvedCount.put(matchId, completed);
-            log.info("매치 {} 관측 시작 시점에 이미 {}세트 종료 — 해당 세트 승자는 미확정으로 둔다",
-                    matchId, completed);
+    private void restorePendingFromAggregate(String matchId, Map<String, Integer> current) {
+        Map<String, Long> decidedByTeam = new HashMap<>();
+        winners.getOrDefault(matchId, Map.of()).values()
+                .forEach(teamId -> decidedByTeam.merge(teamId, 1L, Long::sum));
+
+        Map<String, Integer> pending = pendingWins.computeIfAbsent(
+                matchId,
+                key -> new ConcurrentHashMap<>()
+        );
+        for (Map.Entry<String, Integer> entry : current.entrySet()) {
+            int decided = Math.toIntExact(decidedByTeam.getOrDefault(entry.getKey(), 0L));
+            int unresolved = entry.getValue() - decided;
+            if (unresolved > 0) {
+                pending.put(entry.getKey(), unresolved);
+            }
         }
     }
 
-    /** 아직 승자를 귀속하지 않은 completed 세트 중 가장 앞선 것 */
-    private String nextUnresolvedCompletedGame(String matchId, List<EventDetailsResponse.Game> games) {
+    /** 순서를 확정할 수 있는 미귀속 승수만 completed 세트에 반영한다. */
+    private void assignPendingWinners(
+            String matchId,
+            List<EventDetailsResponse.Game> games
+    ) {
+        Map<String, Integer> pending = pendingWins.getOrDefault(matchId, Map.of());
+        int pendingCount = pending.values().stream().mapToInt(Integer::intValue).sum();
+        if (pendingCount == 0) {
+            return;
+        }
+
+        List<EventDetailsResponse.Game> unresolvedGames = unresolvedCompletedGames(matchId, games);
+        if (unresolvedGames.isEmpty()) {
+            return;
+        }
+
+        List<Map.Entry<String, Integer>> winningTeams = pending.entrySet().stream()
+                .filter(entry -> entry.getValue() > 0)
+                .toList();
+        boolean singleWinnerForAllPending = winningTeams.size() == 1;
+        boolean exactlyOneResolvableGame = pendingCount == 1 && unresolvedGames.size() == 1;
+        if (!singleWinnerForAllPending && !exactlyOneResolvableGame) {
+            log.warn(
+                    "매치 {} 미확정 세트 {}건과 승수 증가 {}건의 순서를 특정할 수 없어 보류한다",
+                    matchId,
+                    unresolvedGames.size(),
+                    pendingCount
+            );
+            return;
+        }
+        if (pendingCount > unresolvedGames.size()) {
+            return;
+        }
+
+        String winnerTeamId = winningTeams.getFirst().getKey();
+        for (int index = 0; index < pendingCount; index++) {
+            String gameId = unresolvedGames.get(index).id();
+            winners.computeIfAbsent(matchId, key -> new ConcurrentHashMap<>())
+                    .putIfAbsent(gameId, winnerTeamId);
+            log.info("세트 승자 확정 — matchId={} gameId={} winner={}",
+                    matchId, gameId, winnerTeamId);
+        }
+        pendingWins.remove(matchId);
+    }
+
+    /** 아직 승자를 귀속하지 않은 completed 세트를 번호순으로 반환한다. */
+    private List<EventDetailsResponse.Game> unresolvedCompletedGames(
+            String matchId,
+            List<EventDetailsResponse.Game> games
+    ) {
         Map<String, String> known = winners.getOrDefault(matchId, Map.of());
         List<EventDetailsResponse.Game> completed = new ArrayList<>();
         for (EventDetailsResponse.Game g : games) {
@@ -130,12 +163,9 @@ public class SetWinnerTracker {
                 a.number() != null ? a.number() : 0,
                 b.number() != null ? b.number() : 0));
 
-        for (EventDetailsResponse.Game g : completed) {
-            if (!known.containsKey(g.id())) {
-                return g.id();
-            }
-        }
-        return null;
+        return completed.stream()
+                .filter(game -> !known.containsKey(game.id()))
+                .toList();
     }
 
     /** 세트 승리 팀 id — 미확정이면 null */
@@ -147,12 +177,22 @@ public class SetWinnerTracker {
     }
 
     /** DB에 저장된 세트 승자를 재시작된 메모리 추적기에 복원한다. */
-    public void restoreWinner(String matchId, String gameId, String winnerTeamId) {
+    public synchronized void restoreWinner(String matchId, String gameId, String winnerTeamId) {
         if (matchId == null || gameId == null || winnerTeamId == null) {
             return;
         }
-        winners.computeIfAbsent(matchId, key -> new ConcurrentHashMap<>())
-                .putIfAbsent(gameId, winnerTeamId);
+        boolean inserted = winners.computeIfAbsent(matchId, key -> new ConcurrentHashMap<>())
+                .putIfAbsent(gameId, winnerTeamId) == null;
+        if (!inserted) {
+            return;
+        }
+        Map<String, Integer> pending = pendingWins.get(matchId);
+        if (pending != null) {
+            pending.computeIfPresent(winnerTeamId, (key, count) -> count > 1 ? count - 1 : null);
+            if (pending.isEmpty()) {
+                pendingWins.remove(matchId);
+            }
+        }
     }
 
     /** 매치의 확정된 세트 승자 전체 (gameId → teamId) */
@@ -164,7 +204,7 @@ public class SetWinnerTracker {
     public void clearMatch(String matchId) {
         lastWins.remove(matchId);
         winners.remove(matchId);
-        resolvedCount.remove(matchId);
+        pendingWins.remove(matchId);
     }
 
     /** /api/debug 노출용 */
