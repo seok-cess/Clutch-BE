@@ -19,6 +19,9 @@ import com.clutch.coupon.event.repository.CouponEventOccurrenceRepository;
 import com.clutch.coupon.event.repository.CouponEventPhaseRepository;
 import com.clutch.coupon.event.repository.CouponEventRepository;
 import com.clutch.coupon.claim.repository.CouponClaimRequestRepository;
+import com.clutch.coupon.type.domain.CouponDiscountType;
+import com.clutch.coupon.type.domain.CouponType;
+import com.clutch.coupon.type.repository.CouponTypeRepository;
 import com.clutch.wallet.repository.UserCouponRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -32,6 +35,8 @@ import org.springframework.data.domain.SliceImpl;
 
 import java.util.List;
 import java.util.Optional;
+import java.math.BigDecimal;
+import java.util.stream.StreamSupport;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -39,6 +44,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -64,6 +71,9 @@ class CouponEventServiceTest {
     @Mock
     private UserCouponRepository userCouponRepository;
 
+    @Mock
+    private CouponTypeRepository couponTypeRepository;
+
     private CouponEventService couponEventService;
 
     @BeforeEach
@@ -74,8 +84,21 @@ class CouponEventServiceTest {
                 couponEventPhaseRepository,
                 couponEventOccurrenceRepository,
                 couponClaimRequestRepository,
-                userCouponRepository
+                userCouponRepository,
+                couponTypeRepository
         );
+        lenient().doAnswer(invocation -> StreamSupport.stream(
+                                ((Iterable<?>) invocation.getArgument(0))
+                                        .spliterator(),
+                                false
+                        )
+                        .map(id -> CouponType.create(
+                                "테스트 쿠폰 " + id,
+                                CouponDiscountType.RATE,
+                                BigDecimal.TEN
+                        ))
+                        .toList())
+                .when(couponTypeRepository).findAllById(any());
     }
 
     @Test
@@ -534,6 +557,54 @@ class CouponEventServiceTest {
                         CouponEventException.class,
                         exception -> assertThat(exception.getErrorCode())
                                 .isEqualTo(CouponEventErrorCode.COUPON_EVENT_DUPLICATED)
+                );
+        verify(couponEventRepository, never()).save(any());
+    }
+
+    @Test
+    void 존재하지_않는_쿠폰_종류로_이벤트를_등록할_수_없다() {
+        CouponEventCreateRequest request = gameTriggeredRequest();
+        doReturn(List.of())
+                .when(couponTypeRepository).findAllById(any());
+
+        assertThatThrownBy(() -> couponEventService.create(request))
+                .isInstanceOfSatisfying(
+                        CouponEventException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(CouponEventErrorCode.COUPON_TYPE_NOT_FOUND)
+                );
+        verify(couponEventRepository, never()).save(any());
+    }
+
+    @Test
+    void 비활성_쿠폰_종류로_이벤트를_등록할_수_없다() {
+        CouponEventCreateRequest request = gameTriggeredRequest();
+        CouponType inactiveCouponType = CouponType.create(
+                "비활성 쿠폰",
+                CouponDiscountType.RATE,
+                BigDecimal.TEN
+        );
+        inactiveCouponType.deactivate();
+        doReturn(List.of(
+                        inactiveCouponType,
+                        CouponType.create(
+                                "20% 쿠폰",
+                                CouponDiscountType.RATE,
+                                BigDecimal.valueOf(20)
+                        ),
+                        CouponType.create(
+                                "30% 쿠폰",
+                                CouponDiscountType.RATE,
+                                BigDecimal.valueOf(30)
+                        )
+                ))
+                .when(couponTypeRepository).findAllById(any());
+
+        assertThatThrownBy(() -> couponEventService.create(request))
+                .isInstanceOfSatisfying(
+                        CouponEventException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(CouponEventErrorCode.COUPON_TYPE_INACTIVE)
                 );
         verify(couponEventRepository, never()).save(any());
     }

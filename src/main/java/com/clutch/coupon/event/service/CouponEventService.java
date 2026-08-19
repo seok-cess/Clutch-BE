@@ -24,6 +24,8 @@ import com.clutch.coupon.event.repository.CouponEventOccurrenceRepository;
 import com.clutch.coupon.event.repository.CouponEventPhaseRepository;
 import com.clutch.coupon.event.repository.CouponEventRepository;
 import com.clutch.coupon.claim.repository.CouponClaimRequestRepository;
+import com.clutch.coupon.type.domain.CouponType;
+import com.clutch.coupon.type.repository.CouponTypeRepository;
 import com.clutch.wallet.repository.UserCouponRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -57,6 +59,7 @@ public class CouponEventService {
     private final CouponEventOccurrenceRepository couponEventOccurrenceRepository;
     private final CouponClaimRequestRepository couponClaimRequestRepository;
     private final UserCouponRepository userCouponRepository;
+    private final CouponTypeRepository couponTypeRepository;
 
     /**
      * 경기와 트리거에 연결된 쿠폰 이벤트를 등록한다.
@@ -467,6 +470,35 @@ public class CouponEventService {
         validateTrigger(request);
         validateIssueMode(request);
         validateItems(request);
+        validateCouponTypes(request);
+    }
+
+    /**
+     * 이벤트 항목이 참조하는 쿠폰 종류의 존재 여부와 활성 상태를 검증한다.
+     *
+     * <p>존재하지 않거나 {@code INACTIVE} 상태인 쿠폰 종류는 신규 이벤트에
+     * 연결할 수 없다.</p>
+     *
+     * @param request 등록 또는 수정할 쿠폰 이벤트 요청
+     */
+    private void validateCouponTypes(CouponEventCreateRequest request) {
+        Set<Long> requestedCouponTypeIds = request.items().stream()
+                .map(CouponEventItemCreateRequest::couponTypeId)
+                .collect(Collectors.toSet());
+        List<CouponType> couponTypes = couponTypeRepository.findAllById(
+                requestedCouponTypeIds
+        );
+
+        if (couponTypes.size() != requestedCouponTypeIds.size()) {
+            throw new CouponEventException(
+                    CouponEventErrorCode.COUPON_TYPE_NOT_FOUND
+            );
+        }
+        if (couponTypes.stream().anyMatch(couponType -> !couponType.isActive())) {
+            throw new CouponEventException(
+                    CouponEventErrorCode.COUPON_TYPE_INACTIVE
+            );
+        }
     }
 
     private void validateTrigger(CouponEventCreateRequest request) {
