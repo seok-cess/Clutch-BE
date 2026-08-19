@@ -26,6 +26,8 @@ import com.clutch.wallet.repository.UserCouponRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.Mock;
 import org.mockito.InOrder;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -33,6 +35,9 @@ import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.SliceImpl;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.math.BigDecimal;
@@ -85,7 +90,11 @@ class CouponEventServiceTest {
                 couponEventOccurrenceRepository,
                 couponClaimRequestRepository,
                 userCouponRepository,
-                couponTypeRepository
+                couponTypeRepository,
+                Clock.fixed(
+                        Instant.parse("2026-08-19T03:00:00Z"),
+                        ZoneOffset.UTC
+                )
         );
         lenient().doAnswer(invocation -> StreamSupport.stream(
                                 ((Iterable<?>) invocation.getArgument(0))
@@ -135,6 +144,48 @@ class CouponEventServiceTest {
                 });
         verify(couponEventRepository)
                 .existsByEsportsMatchIdAndTriggerType(1L, "FIRST_BLOOD");
+    }
+
+    // CLUTCH-216: 수동 테스트 기본값이 실제 저장 트리거로 변환되는지 검증한다.
+    @ParameterizedTest
+    @CsvSource({
+            "0, MANUAL_TEST_20260819_001",
+            "2, MANUAL_TEST_20260819_003"
+    })
+    void 수동_테스트_트리거를_한국_날짜와_당일_순번으로_등록한다(
+            int lastSequence,
+            String expectedTriggerType
+    ) {
+        CouponEventCreateRequest request = new CouponEventCreateRequest(
+                316L,
+                "수동 테스트 이벤트",
+                CouponIssueMode.SINGLE_FIRST_COME,
+                "MANUAL_TEST",
+                30,
+                List.of(new CouponEventItemCreateRequest(1L, 500, 0))
+        );
+        when(couponEventRepository.findMaxManualTestSequence(
+                "MANUAL_TEST_20260819_"
+        )).thenReturn(lastSequence);
+        when(couponEventRepository.existsByEsportsMatchIdAndTriggerType(
+                316L,
+                expectedTriggerType
+        )).thenReturn(false);
+        when(couponEventRepository.save(any(CouponEvent.class)))
+                .thenAnswer(invocation -> withId(invocation.getArgument(0), 1L));
+        when(couponEventItemRepository.save(any(CouponEventItem.class)))
+                .thenAnswer(invocation -> withId(invocation.getArgument(0), 10L));
+        when(couponEventPhaseRepository.save(any(CouponEventPhase.class)))
+                .thenAnswer(invocation -> withId(invocation.getArgument(0), 20L));
+
+        CouponEventCreateResponse response = couponEventService.create(request);
+
+        assertThat(response.triggerType())
+                .isEqualTo(expectedTriggerType);
+        verify(couponEventRepository).existsByEsportsMatchIdAndTriggerType(
+                316L,
+                expectedTriggerType
+        );
     }
 
     @Test
