@@ -2,8 +2,10 @@ package com.clutch.coupon.claim.service;
 
 import com.clutch.coupon.claim.outbox.CouponBenefitSnapshot;
 import com.clutch.coupon.claim.outbox.CouponBenefitSnapshotRepository;
-import com.clutch.coupon.claim.outbox.CouponClaimOutboxWriter;
 import com.clutch.coupon.claim.api.dto.CouponClaimCreateResponse;
+import com.clutch.coupon.contract.issuance.CouponIssuanceCommand;
+import com.clutch.coupon.contract.issuance.CouponIssuanceResult;
+import com.clutch.coupon.contract.issuance.CouponIssuer;
 import com.clutch.coupon.claim.domain.CouponClaimRequest;
 import com.clutch.coupon.claim.exception.CouponClaimException;
 import com.clutch.coupon.claim.redis.CouponClaimRedisExecutor;
@@ -23,6 +25,8 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
+
 
 import static com.clutch.coupon.claim.exception.CouponClaimErrorCode.*;
 
@@ -32,6 +36,8 @@ import static com.clutch.coupon.claim.exception.CouponClaimErrorCode.*;
 @Service
 @RequiredArgsConstructor
 public class CouponClaimService {
+
+    private static final int COUPON_VALID_DAYS = 7;
 
     private final CouponEventRepository couponEventRepository;
     private final CouponEventOccurrenceRepository couponEventOccurrenceRepository;
@@ -44,7 +50,7 @@ public class CouponClaimService {
     private final CouponBenefitSnapshotRepository
             couponBenefitSnapshotRepository;
 
-    private final CouponClaimOutboxWriter couponClaimOutboxWriter;
+    private final CouponIssuer couponIssuer;
 
     /**
      * 쿠폰 발급 요청 처리
@@ -157,13 +163,36 @@ public class CouponClaimService {
             );
         }
 
-        couponClaimOutboxWriter.writeAcceptedEvent(
-                savedClaimRequest,
-                benefitSnapshot,
-                Instant.now()
+        Instant issuedAt = Instant.now();
+
+        CouponIssuanceResult issuanceResult =
+                couponIssuer.issue(
+                        new CouponIssuanceCommand(
+                                savedClaimRequest.getId(),
+                                userId,
+                                couponEventId,
+                                couponEventOccurrenceId,
+                                couponEventItem.getId(),
+                                benefitSnapshot.discountType(),
+                                benefitSnapshot.discountValue(),
+                                issuedAt.plus(
+                                        COUPON_VALID_DAYS,
+                                        ChronoUnit.DAYS
+                                )
+                        )
+                );
+
+        savedClaimRequest.succeed(
+                LocalDateTime.ofInstant(
+                        issuedAt,
+                        ZoneOffset.UTC
+                )
         );
 
-        return CouponClaimCreateResponse.from(savedClaimRequest);
+        return CouponClaimCreateResponse.from(
+                savedClaimRequest,
+                issuanceResult.couponId()
+        );
     }
 
     /**

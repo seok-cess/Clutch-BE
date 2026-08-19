@@ -9,6 +9,7 @@ import java.time.LocalDateTime;
  * 쿠폰 발급 요청 생성 응답 DTO
  *
  * @param claimId 쿠폰 발급 요청 식별자
+ * @param couponId 발급 쿠폰 식별자
  * @param couponEventId 쿠폰 이벤트 식별자
  * @param couponEventOccurrenceId 쿠폰 이벤트 회차 식별자
  * @param couponEventItemId 쿠폰 이벤트 항목 식별자
@@ -17,6 +18,7 @@ import java.time.LocalDateTime;
  */
 public record CouponClaimCreateResponse(
         Long claimId,
+        Long couponId,
         Long couponEventId,
         Long couponEventOccurrenceId,
         Long couponEventItemId,
@@ -28,13 +30,16 @@ public record CouponClaimCreateResponse(
      * 쿠폰 발급 요청 생성 응답 변환
      *
      * @param claimRequest 쿠폰 발급 요청 엔티티
+     * @param couponId 발급 쿠폰 식별자
      * @return 쿠폰 발급 요청 생성 응답
      */
     public static CouponClaimCreateResponse from(
-            CouponClaimRequest claimRequest
+            CouponClaimRequest claimRequest,
+            Long couponId
     ) {
         return new CouponClaimCreateResponse(
                 claimRequest.getId(),
+                couponId,
                 claimRequest.getCouponEventId(),
                 claimRequest.getCouponEventOccurrenceId(),
                 claimRequest.getCouponEventItemId(),
