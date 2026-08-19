@@ -92,6 +92,10 @@ lolesports:
   # 매치 종료 판정 후 라이브 목록에 남겨둘 시간(초).
   # 소스 getLive 는 경기가 끝나도 언제 내려갈지 예측할 수 없어 우리가 직접 내린다.
   live-retain-after-finish-seconds: 300
+  # livestats 를 제공하지 않는 리그 (getLive 는 전 리그를 주므로 여기서 걸러 부하를 줄인다).
+  # 리그명은 getLive/getSchedule 의 league.name 과 정확히 일치해야 한다.
+  stats-disabled-leagues:
+    - LRN
   poll:
     live-check-ms: 60000    # getLive 감시 주기
     in-game-ms: 1000        # window/details 인게임 폴링 주기

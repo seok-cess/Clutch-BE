@@ -57,6 +57,9 @@ public class HistoricalGameService {
     /** gameId → 이 시각까지 재시도 금지 (네거티브 캐시) */
     private final Map<String, Long> failedUntil = new ConcurrentHashMap<>();
 
+    /** matchId → 실제 리그·대회. 매치당 한 번만 조회하면 되므로 캐시한다 */
+    private final Map<String, MatchOrigin> matchOrigins = new ConcurrentHashMap<>();
+
     public HistoricalGameService(LolesportsApiClient api, LiveStatsClient liveStats, DataCacheService cache) {
         this.api = api;
         this.liveStats = liveStats;
@@ -140,6 +143,57 @@ public class HistoricalGameService {
             log.warn("매치 팀 정보 조회 실패 (matchId={}): {}", matchId, e.toString());
             return List.of();
         }
+    }
+
+    /**
+     * 이 게임의 온디맨드 로드 상태를 초기화한다.
+     *
+     * timelineLoaded 는 "타임라인을 이미 모았다"는 표시라 캐시가 살아 있는 동안만 유효하다.
+     * 백필은 세트마다 적재 후 evictGame 으로 캐시를 비우는데, 이 표시가 남아 있으면 같은
+     * 세트를 다시 처리할 때 loadTimeline 이 곧바로 리턴해 프레임이 채워지지 않는다.
+     * (all=true 재적재가 통째로 실패하던 원인)
+     */
+    public void resetLoadState(String gameId) {
+        timelineLoaded.remove(gameId);
+        failedUntil.remove(gameId);
+    }
+
+    /**
+     * 매치가 실제로 속한 리그·대회 식별자.
+     *
+     * getSchedule/getLive 는 리그 id 를 주지 않아, 적재가 설정의 단일 리그 id 를 쓰면
+     * getLive 로 들어온 타 리그 경기까지 LCK 로 저장된다. getEventDetails 는 둘 다 주므로
+     * 여기서 받아 그대로 쓴다. 매치 단위라 세트마다 다시 부를 필요가 없다.
+     *
+     * @return 조회 실패 시 null — 호출측이 설정값으로 폴백한다
+     */
+    public MatchOrigin getOrigin(String matchId) {
+        MatchOrigin cached = matchOrigins.get(matchId);
+        if (cached != null) {
+            return cached;
+        }
+        try {
+            EventDetailsResponse res = api.getEventDetails(matchId);
+            if (res == null || res.data() == null || res.data().event() == null) {
+                return null;
+            }
+            EventDetailsResponse.Event ev = res.data().event();
+            String leagueId = ev.league() != null ? ev.league().id() : null;
+            String tournamentId = ev.tournament() != null ? ev.tournament().id() : null;
+            if (leagueId == null && tournamentId == null) {
+                return null;
+            }
+            MatchOrigin origin = new MatchOrigin(leagueId, tournamentId);
+            matchOrigins.put(matchId, origin);
+            return origin;
+        } catch (Exception e) {
+            log.warn("매치 리그/대회 조회 실패 (matchId={}): {}", matchId, e.toString());
+            return null;
+        }
+    }
+
+    /** 매치가 속한 리그·대회 */
+    public record MatchOrigin(String leagueId, String tournamentId) {
     }
 
     /** 매치의 게임(세트) 목록. 진행중 매치는 캐시하지 않고 매번 조회한다. */
