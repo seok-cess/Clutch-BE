@@ -33,6 +33,10 @@ import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -53,6 +57,13 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class CouponEventService {
 
+    // CLUTCH-216: 관리자 수동 테스트 요청을 일자별 순번 트리거로 변환한다.
+    private static final String MANUAL_TEST_TRIGGER = "MANUAL_TEST";
+    private static final String MANUAL_TEST_TRIGGER_FORMAT =
+            "MANUAL_TEST_%s_%03d";
+    private static final ZoneId MANUAL_TEST_DATE_ZONE =
+            ZoneId.of("Asia/Seoul");
+
     private final CouponEventRepository couponEventRepository;
     private final CouponEventItemRepository couponEventItemRepository;
     private final CouponEventPhaseRepository couponEventPhaseRepository;
@@ -60,6 +71,7 @@ public class CouponEventService {
     private final CouponClaimRequestRepository couponClaimRequestRepository;
     private final UserCouponRepository userCouponRepository;
     private final CouponTypeRepository couponTypeRepository;
+    private final Clock clock;
 
     /**
      * 경기와 트리거에 연결된 쿠폰 이벤트를 등록한다.
@@ -72,13 +84,17 @@ public class CouponEventService {
     @Transactional
     public CouponEventCreateResponse create(CouponEventCreateRequest request) {
         validateRequest(request);
-        validateDuplicateTriggerEvent(request);
+        String triggerType = resolveCreateTriggerType(request.triggerType());
+        validateDuplicateTriggerEvent(
+                request.esportsMatchId(),
+                triggerType
+        );
 
         CouponEvent event = CouponEvent.create(
                 request.esportsMatchId(),
                 request.eventName(),
                 request.issueMode(),
-                normalizeTriggerType(request.triggerType()),
+                triggerType,
                 request.claimWindowSeconds()
         );
         CouponEvent savedEvent = couponEventRepository.save(event);
@@ -554,10 +570,13 @@ public class CouponEventService {
         }
     }
 
-    private void validateDuplicateTriggerEvent(CouponEventCreateRequest request) {
+    private void validateDuplicateTriggerEvent(
+            Long esportsMatchId,
+            String triggerType
+    ) {
         if (couponEventRepository.existsByEsportsMatchIdAndTriggerType(
-                request.esportsMatchId(),
-                request.triggerType().trim()
+                esportsMatchId,
+                triggerType
         )) {
             throw new CouponEventException(
                     CouponEventErrorCode.COUPON_EVENT_DUPLICATED
@@ -583,6 +602,28 @@ public class CouponEventService {
 
     private String normalizeTriggerType(String triggerType) {
         return triggerType == null ? null : triggerType.trim();
+    }
+
+    /**
+     * CLUTCH-216: 수동 테스트 기본값을 한국 날짜 기준 일자별 순번으로 변환한다.
+     */
+    private String resolveCreateTriggerType(String requestedTriggerType) {
+        String normalizedTriggerType = normalizeTriggerType(
+                requestedTriggerType
+        );
+        if (!MANUAL_TEST_TRIGGER.equals(normalizedTriggerType)) {
+            return normalizedTriggerType;
+        }
+
+        String date = LocalDate.ofInstant(
+                clock.instant(),
+                MANUAL_TEST_DATE_ZONE
+        ).format(DateTimeFormatter.BASIC_ISO_DATE);
+        String triggerPrefix = MANUAL_TEST_TRIGGER + "_" + date + "_";
+        int nextSequence = couponEventRepository
+                .findMaxManualTestSequence(triggerPrefix) + 1;
+
+        return MANUAL_TEST_TRIGGER_FORMAT.formatted(date, nextSequence);
     }
 
     private void invalid(String message) {
