@@ -1,6 +1,7 @@
 package com.clutch.lolesports.api;
 
 import com.clutch.lolesports.service.BackfillService;
+import com.clutch.lolesports.service.MatchOriginRepairService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -22,9 +23,11 @@ import java.util.Map;
 public class AdminController {
 
     private final BackfillService backfill;
+    private final MatchOriginRepairService originRepair;
 
-    public AdminController(BackfillService backfill) {
+    public AdminController(BackfillService backfill, MatchOriginRepairService originRepair) {
         this.backfill = backfill;
+        this.originRepair = originRepair;
     }
 
     /**
@@ -49,6 +52,21 @@ public class AdminController {
         out.put("limit", limit);
         out.put("statusUrl", "/api/admin/backfill/status");
         return ResponseEntity.accepted().body(out);
+    }
+
+    /**
+     * 이미 적재된 매치의 리그·대회·승패를 소스와 대조해 보정한다 (일회성).
+     *
+     * 적재 로직은 이미 고쳤고 그전에 쌓인 행만 남은 문제라, 스키마 변경이 아니므로
+     * 마이그레이션이 아닌 이 API 로 처리한다. 환경마다 적재 시점이 달라 각 DB 에서
+     * 한 번씩 돌려야 한다.
+     *
+     * @param dryRun 기본 true — 무엇이 바뀌는지만 세고 저장하지 않는다
+     */
+    @PostMapping("/repair/match-origin")
+    public ResponseEntity<Map<String, Object>> repairMatchOrigin(
+            @RequestParam(defaultValue = "true") boolean dryRun) {
+        return ResponseEntity.ok(originRepair.repair(dryRun));
     }
 
     /** 백필 진행 상황 */
