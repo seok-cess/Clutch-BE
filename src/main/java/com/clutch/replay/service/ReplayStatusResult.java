@@ -6,6 +6,7 @@ import java.util.List;
 public record ReplayStatusResult(
         String runId,
         String matchId,
+        Long esportsMatchId,
         List<String> gameIds,
         long elapsedSeconds,
         long totalSeconds,

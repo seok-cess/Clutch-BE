@@ -1,0 +1,17 @@
+# 실제 서버의 운영자 전환 기능 전용 설정.
+# 서버는 항상 REAL 소스로 시작하며, 운영자 API가 STUB 전환을 명시적으로 수행한다.
+lolesports:
+  esports-api-base-url: https://esports-api.lolesports.com/persisted/gw
+  live-stats-base-url: https://feed.lolesports.com/livestats/v1
+
+external-source:
+  enabled: true
+  initial-mode: REAL
+  # Compose 기본값은 replay 서비스다. Docker 밖에서 Spring을 실행할 때만
+  # REPLAY_SERVER_URL=http://localhost:4000을 명시한다.
+  stub-esports-api-base-url: ${REPLAY_SERVER_URL:http://replay:4000}
+  stub-live-stats-base-url: ${REPLAY_SERVER_URL:http://replay:4000}
+
+replay:
+  enabled: true
+  control-base-url: ${REPLAY_SERVER_URL:http://replay:4000}

@@ -2,6 +2,7 @@ package com.clutch.replay.api;
 
 import com.clutch.replay.service.ReplayControlService;
 import com.clutch.replay.service.ReplayStartResult;
+import com.clutch.replay.service.ReplaySourceModeException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -18,7 +19,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(ReplayController.class)
-@ActiveProfiles("replay")
+@ActiveProfiles("operator-routing")
 class ReplayControllerTest {
 
     @Autowired
@@ -43,10 +44,20 @@ class ReplayControllerTest {
     }
 
     @Test
+    void 실제_소스에서는_test_경기를_시작할_수_없다() throws Exception {
+        given(replayControlService.start()).willThrow(new ReplaySourceModeException());
+
+        mockMvc.perform(post("/api/replay/start"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("STUB 소스 모드에서만 test 경기를 시작할 수 있다"));
+    }
+
+    @Test
     void returnsReplayTimelinePosition() throws Exception {
         given(replayControlService.status()).willReturn(new com.clutch.replay.service.ReplayStatusResult(
                 "a8f31c",
                 "replay-a8f31c-m1",
+                321L,
                 List.of("replay-a8f31c-g1"),
                 1350,
                 8400,
@@ -57,6 +68,7 @@ class ReplayControllerTest {
 
         mockMvc.perform(get("/api/replay/status"))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.esportsMatchId").value(321))
                 .andExpect(jsonPath("$.elapsedSeconds").value(1350))
                 .andExpect(jsonPath("$.totalSeconds").value(8400))
                 .andExpect(jsonPath("$.progressPercent").value(16.1));
@@ -67,6 +79,7 @@ class ReplayControllerTest {
         given(replayControlService.changeSpeed(5.0)).willReturn(new com.clutch.replay.service.ReplayStatusResult(
                 "a8f31c",
                 "replay-a8f31c-m1",
+                321L,
                 List.of("replay-a8f31c-g1"),
                 1350,
                 8400,

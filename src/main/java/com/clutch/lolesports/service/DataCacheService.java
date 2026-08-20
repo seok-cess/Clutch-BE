@@ -139,6 +139,21 @@ public class DataCacheService {
     }
 
     /**
+     * 외부 데이터 소스가 바뀔 때 이전 소스의 인메모리 응답을 전부 비운다.
+     * DB에 적재된 경기·배팅·포인트 데이터는 의도적으로 유지한다.
+     */
+    public void clearExternalSourceData() {
+        schedule.set(null);
+        standings.set(null);
+        liveMatches.set(List.of());
+        bettingMatches.set(List.of());
+        windows.clear();
+        details.clear();
+        feedFinishedAt.clear();
+        lastAccess.clear();
+    }
+
+    /**
      * 라이브 경기와 가까운 예정 경기를 합친 배팅 전용 매치 캐시를 교체한다.
      *
      * @param matches 배팅 이벤트 동기화에 사용할 매치 목록

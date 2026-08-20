@@ -8,8 +8,9 @@ import com.clutch.lolesports.dto.external.WindowResponse;
 import com.clutch.lolesports.config.LolesportsProperties;
 import com.clutch.lolesports.service.DataCacheService;
 import com.clutch.lolesports.service.HistoricalGameService;
+import com.clutch.lolesports.source.ExternalSourceMode;
+import com.clutch.lolesports.source.ExternalSourceState;
 import org.springframework.http.ResponseEntity;
-import org.springframework.core.env.Environment;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -36,7 +37,7 @@ public class ApiController {
     private final com.clutch.lolesports.service.SetWinnerTracker setWinners;
     private final com.clutch.lolesports.service.SeasonStatsService seasonStats;
     private final com.clutch.lolesports.service.PollingScheduler polling;
-    private final boolean replayMode;
+    private final ExternalSourceState sourceState;
 
     public ApiController(DataCacheService cache, HistoricalGameService historical,
                          LolesportsProperties props, com.clutch.lolesports.client.LiveStatsClient liveStats,
@@ -45,7 +46,7 @@ public class ApiController {
                          com.clutch.lolesports.service.SetWinnerTracker setWinners,
                          com.clutch.lolesports.service.SeasonStatsService seasonStats,
                          com.clutch.lolesports.service.PollingScheduler polling,
-                         Environment environment) {
+                         ExternalSourceState sourceState) {
         this.cache = cache;
         this.historical = historical;
         this.props = props;
@@ -55,7 +56,7 @@ public class ApiController {
         this.setWinners = setWinners;
         this.seasonStats = seasonStats;
         this.polling = polling;
-        this.replayMode = environment.matchesProfiles("replay");
+        this.sourceState = sourceState;
     }
 
     /**
@@ -68,14 +69,14 @@ public class ApiController {
      * 최신만 보면 그 안의 초 단위 변화가 전부 버려진다 (2026-08-08 라이브 실측).
      */
     private WindowResponse.Frame pickWindowFrame(String gameId, Long lag) {
-        if (replayMode || (lag != null && lag <= 0)) {
+        if (sourceState.mode() == ExternalSourceMode.STUB || (lag != null && lag <= 0)) {
             return cache.getNewestWindowFrame(gameId);
         }
         return cache.getWindowFrameAt(gameId, displayTarget(lag));
     }
 
     private DetailsResponse.Frame pickDetailsFrame(String gameId, Long lag) {
-        if (replayMode || (lag != null && lag <= 0)) {
+        if (sourceState.mode() == ExternalSourceMode.STUB || (lag != null && lag <= 0)) {
             return cache.getNewestDetailsFrame(gameId);
         }
         return cache.getDetailsFrameAt(gameId, displayTarget(lag));
@@ -365,7 +366,7 @@ public class ApiController {
             }
             historical.ensureGameLoaded(gameId);
         }
-        java.time.Instant until = (replayMode || (lag != null && lag <= 0))
+        java.time.Instant until = (sourceState.mode() == ExternalSourceMode.STUB || (lag != null && lag <= 0))
                 ? java.time.Instant.MAX
                 : displayTarget(lag);
 

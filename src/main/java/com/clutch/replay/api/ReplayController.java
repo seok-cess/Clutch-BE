@@ -3,7 +3,8 @@ package com.clutch.replay.api;
 import com.clutch.replay.service.ReplayControlException;
 import com.clutch.replay.service.ReplayControlService;
 import com.clutch.replay.service.ReplayStartResult;
-import org.springframework.context.annotation.Profile;
+import com.clutch.replay.service.ReplaySourceModeException;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -14,9 +15,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
 
-/** 로컬 replay profile에서만 노출되는 재생 제어 API. */
+/** replay 제어가 활성화된 환경에서만 노출되는 재생 제어 API. */
 @RestController
-@Profile("replay")
+@ConditionalOnProperty(prefix = "replay", name = "enabled", havingValue = "true")
 @RequestMapping("/api/replay")
 public class ReplayController {
 
@@ -32,6 +33,9 @@ public class ReplayController {
         try {
             ReplayStartResult result = replayControlService.start();
             return ResponseEntity.ok(result);
+        } catch (ReplaySourceModeException exception) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(Map.of("error", exception.getMessage()));
         } catch (ReplayControlException exception) {
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                     .body(Map.of("error", exception.getMessage()));

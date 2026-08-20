@@ -4,9 +4,8 @@ import com.clutch.lolesports.config.LolesportsProperties;
 import com.clutch.lolesports.dto.external.EventDetailsResponse;
 import com.clutch.lolesports.dto.external.ScheduleResponse;
 import com.clutch.lolesports.dto.external.StandingsResponse;
-import org.springframework.beans.factory.annotation.Qualifier;
+import com.clutch.lolesports.source.ExternalSourceRouter;
 import org.springframework.stereotype.Component;
-import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.Duration;
 
@@ -19,11 +18,11 @@ public class LolesportsApiClient {
 
     private static final Duration TIMEOUT = Duration.ofSeconds(10);
 
-    private final WebClient client;
+    private final ExternalSourceRouter sourceRouter;
     private final LolesportsProperties props;
 
-    public LolesportsApiClient(@Qualifier("esportsWebClient") WebClient client, LolesportsProperties props) {
-        this.client = client;
+    public LolesportsApiClient(ExternalSourceRouter sourceRouter, LolesportsProperties props) {
+        this.sourceRouter = sourceRouter;
         this.props = props;
     }
 
@@ -37,7 +36,7 @@ public class LolesportsApiClient {
      * (응답의 pages.older 토큰 — 상대 전적 표본 확보용).
      */
     public ScheduleResponse getSchedule(String pageToken) {
-        return client.get()
+        return sourceRouter.esportsClient().get()
                 .uri(uri -> {
                     var b = uri.path("/getSchedule")
                             .queryParam("hl", props.locale())
@@ -54,7 +53,7 @@ public class LolesportsApiClient {
 
     /** 순위 */
     public StandingsResponse getStandings() {
-        return client.get()
+        return sourceRouter.esportsClient().get()
                 .uri(uri -> uri.path("/getStandings")
                         .queryParam("hl", props.locale())
                         .queryParam("tournamentId", props.tournamentId())
@@ -66,7 +65,7 @@ public class LolesportsApiClient {
 
     /** 진행중 경기 목록 (전체 리그 대상) — 응답 구조가 getSchedule 과 동일하여 DTO 공용 */
     public ScheduleResponse getLive() {
-        return client.get()
+        return sourceRouter.esportsClient().get()
                 .uri(uri -> uri.path("/getLive")
                         .queryParam("hl", props.locale())
                         .build())
@@ -77,7 +76,7 @@ public class LolesportsApiClient {
 
     /** 매치 상세 — match.games[] 에서 gameId 획득 */
     public EventDetailsResponse getEventDetails(String matchId) {
-        return client.get()
+        return sourceRouter.esportsClient().get()
                 .uri(uri -> uri.path("/getEventDetails")
                         .queryParam("hl", props.locale())
                         .queryParam("id", matchId)
