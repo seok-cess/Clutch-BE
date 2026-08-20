@@ -1,6 +1,9 @@
 spring:
   application:
     name: clutch
+  profiles:
+    # 로컬 기본 실행은 replay 스텁 서버를 사용한다. 실제 외부 API를 쓸 때만 active profile을 별도로 지정한다.
+    default: replay
   datasource:
     url: ${DB_URL:jdbc:mysql://localhost:3306/clutch?serverTimezone=UTC&characterEncoding=UTF-8}
     username: ${DB_USERNAME:clutch}
@@ -82,8 +85,10 @@ betting:
 lolesports:
   # lolesports.com 프론트엔드에 공개된 공용 키
   api-key: ${LOLESPORTS_API_KEY:0TvQnueqKa5mxJntVWt0w4LpLfEkrV1Ta8rQBb9Z}
-  esports-api-base-url: https://esports-api.lolesports.com/persisted/gw
-  live-stats-base-url: https://feed.lolesports.com/livestats/v1
+  #  esports-api-base-url: https://esports-api.lolesports.com/persisted/gw
+  #  live-stats-base-url: https://feed.lolesports.com/livestats/v1
+  esports-api-base-url: http://localhost:4000
+  live-stats-base-url: http://localhost:4000
   locale: ko-KR
   # getLeagues 실호출로 확인한 LCK id
   league-id: "98767991310872058"
