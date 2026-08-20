@@ -86,6 +86,9 @@ class CouponClaimServiceTest {
     private CouponClaimRedisExecutor couponClaimRedisExecutor;
 
     @Mock
+    private CouponStockStreamService couponStockStreamService;
+
+    @Mock
     private CouponEvent couponEvent;
 
     @Mock
@@ -196,6 +199,9 @@ class CouponClaimServiceTest {
                 .increaseSuccessCountAtomically(
                         COUPON_EVENT_ITEM_ID
                 );
+        verify(couponStockStreamService).publish(
+                COUPON_EVENT_ITEM_ID
+        );
         verify(couponEventOccurrence).isOpenAt(any(LocalDateTime.class));
     }
 
@@ -415,6 +421,102 @@ class CouponClaimServiceTest {
                 .increaseSuccessCountAtomically(
                         COUPON_EVENT_ITEM_ID
                 );
+    }
+
+    /** 트랜잭션 커밋 이후 재고 알림 검증 */
+    @Test
+    void stockNotificationIsPublishedOnlyAfterCommit() {
+        // given
+        givenSuccessfulClaim();
+        TransactionSynchronizationManager.initSynchronization();
+
+        try {
+            // when
+            couponClaimService.claim(
+                    USER_ID,
+                    COUPON_EVENT_ID,
+                    COUPON_EVENT_OCCURRENCE_ID
+            );
+
+            // then
+            verify(couponStockStreamService, never())
+                    .publish(COUPON_EVENT_ITEM_ID);
+
+            TransactionSynchronizationManager
+                    .getSynchronizations()
+                    .forEach(TransactionSynchronization::afterCommit);
+
+            verify(couponStockStreamService)
+                    .publish(COUPON_EVENT_ITEM_ID);
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
+
+    /** 트랜잭션 롤백 시 재고 알림 미전송 검증 */
+    @Test
+    void stockNotificationIsNotPublishedAfterRollback() {
+        // given
+        givenSuccessfulClaim();
+        TransactionSynchronizationManager.initSynchronization();
+
+        try {
+            // when
+            couponClaimService.claim(
+                    USER_ID,
+                    COUPON_EVENT_ID,
+                    COUPON_EVENT_OCCURRENCE_ID
+            );
+
+            TransactionSynchronizationManager
+                    .getSynchronizations()
+                    .forEach(synchronization ->
+                            synchronization.afterCompletion(
+                                    TransactionSynchronization
+                                            .STATUS_ROLLED_BACK
+                            )
+                    );
+
+            // then
+            verify(couponStockStreamService, never())
+                    .publish(COUPON_EVENT_ITEM_ID);
+            verify(couponClaimRedisExecutor).rollback(
+                    COUPON_EVENT_ITEM_ID,
+                    COUPON_EVENT_OCCURRENCE_ID,
+                    USER_ID
+            );
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
+
+    /** 정상 발급 공통 조건 */
+    private void givenSuccessfulClaim() {
+        givenOpenEventAndItem();
+        when(couponEventItem.getId())
+                .thenReturn(COUPON_EVENT_ITEM_ID);
+        when(couponBenefitSnapshotRepository
+                .findByCouponEventItemId(COUPON_EVENT_ITEM_ID))
+                .thenReturn(Optional.of(BENEFIT_SNAPSHOT));
+        when(couponClaimRequestRepository
+                .existsByUserIdAndCouponEventOccurrenceId(
+                        USER_ID,
+                        COUPON_EVENT_OCCURRENCE_ID
+                ))
+                .thenReturn(false);
+        when(couponClaimRedisExecutor.claim(
+                COUPON_EVENT_ITEM_ID,
+                COUPON_EVENT_OCCURRENCE_ID,
+                USER_ID
+        )).thenReturn(CouponClaimRedisResult.SUCCESS);
+        when(couponEventItemRepository
+                .increaseSuccessCountAtomically(COUPON_EVENT_ITEM_ID))
+                .thenReturn(1);
+        when(couponClaimRequestRepository
+                .save(any(CouponClaimRequest.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(couponIssuer.issue(any(CouponIssuanceCommand.class)))
+                .thenReturn(new CouponIssuanceResult(COUPON_ID));
     }
 
     /**

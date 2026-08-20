@@ -19,6 +19,15 @@ public class CouponClaimException extends RuntimeException {
         this.errorCode = errorCode;
     }
 
+    /** 하위 시스템 원인을 포함한 쿠폰 발급 예외 생성 */
+    public CouponClaimException(
+            CouponClaimErrorCode errorCode,
+            Throwable cause
+    ) {
+        super(errorCode.getMessage(), cause);
+        this.errorCode = errorCode;
+    }
+
     /**
      * 쿠폰 발급 요청 오류 코드 반환
      *

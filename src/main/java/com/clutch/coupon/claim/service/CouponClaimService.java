@@ -18,6 +18,8 @@ import com.clutch.coupon.event.repository.CouponEventItemRepository;
 import com.clutch.coupon.event.repository.CouponEventOccurrenceRepository;
 import com.clutch.coupon.event.repository.CouponEventRepository;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -37,6 +39,9 @@ import static com.clutch.coupon.claim.exception.CouponClaimErrorCode.*;
 @RequiredArgsConstructor
 public class CouponClaimService {
 
+    private static final Logger log =
+            LoggerFactory.getLogger(CouponClaimService.class);
+
     private static final int COUPON_VALID_DAYS = 7;
 
     private final CouponEventRepository couponEventRepository;
@@ -51,6 +56,7 @@ public class CouponClaimService {
             couponBenefitSnapshotRepository;
 
     private final CouponIssuer couponIssuer;
+    private final CouponStockStreamService couponStockStreamService;
 
     /**
      * 쿠폰 발급 요청 처리
@@ -189,10 +195,42 @@ public class CouponClaimService {
                 )
         );
 
+        registerStockNotification(couponEventItem.getId());
+
         return CouponClaimCreateResponse.from(
                 savedClaimRequest,
                 issuanceResult.couponId()
         );
+    }
+
+    /** 트랜잭션 커밋 후 재고 알림 등록 */
+    private void registerStockNotification(Long couponEventItemId) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            publishStockSafely(couponEventItemId);
+            return;
+        }
+
+        TransactionSynchronizationManager.registerSynchronization(
+                new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        publishStockSafely(couponEventItemId);
+                    }
+                }
+        );
+    }
+
+    /** 발급 결과와 분리된 재고 알림 전송 */
+    private void publishStockSafely(Long couponEventItemId) {
+        try {
+            couponStockStreamService.publish(couponEventItemId);
+        } catch (RuntimeException exception) {
+            log.warn(
+                    "쿠폰 재고 SSE 알림 실패: couponEventItemId={}",
+                    couponEventItemId,
+                    exception
+            );
+        }
     }
 
     /**
