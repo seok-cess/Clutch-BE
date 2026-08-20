@@ -16,6 +16,11 @@ public enum CouponTypeErrorCode {
             HttpStatus.BAD_REQUEST,
             "쿠폰 종류 설정이 올바르지 않습니다."
     ),
+    /** 쿠폰 종류 목록의 커서 또는 페이지 크기가 올바르지 않음. */
+    INVALID_COUPON_TYPE_LIST_CONDITION(
+            HttpStatus.BAD_REQUEST,
+            "쿠폰 종류 목록 조회 조건이 올바르지 않습니다."
+    ),
     /** 이벤트 사용 이력이 있어 쿠폰 혜택 정의를 수정할 수 없음. */
     COUPON_TYPE_NOT_EDITABLE(
             HttpStatus.CONFLICT,
