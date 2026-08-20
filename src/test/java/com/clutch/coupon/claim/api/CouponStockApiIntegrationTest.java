@@ -1,9 +1,11 @@
 package com.clutch.coupon.claim.api;
 
 import com.clutch.coupon.claim.redis.CouponClaimRedisKeys;
+import com.clutch.coupon.claim.recovery.CouponStockRecoveryStateManager;
 import com.clutch.coupon.claim.service.CouponStockStreamService;
 import com.clutch.lolesports.service.PollingScheduler;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -38,11 +40,20 @@ class CouponStockApiIntegrationTest {
     @Autowired
     private CouponStockStreamService couponStockStreamService;
 
+    @Autowired
+    private CouponStockRecoveryStateManager recoveryStateManager;
+
     @MockitoBean
     private PollingScheduler pollingScheduler;
 
+    @BeforeEach
+    void setUp() {
+        recoveryStateManager.markReady();
+    }
+
     @AfterEach
     void tearDown() {
+        recoveryStateManager.markReady();
         stringRedisTemplate.delete(STOCK_KEY);
     }
 

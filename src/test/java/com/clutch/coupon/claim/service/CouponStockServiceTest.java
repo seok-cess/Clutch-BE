@@ -4,6 +4,7 @@ import com.clutch.coupon.claim.api.dto.CouponStockResponse;
 import com.clutch.coupon.claim.exception.CouponClaimErrorCode;
 import com.clutch.coupon.claim.exception.CouponClaimException;
 import com.clutch.coupon.claim.redis.CouponClaimRedisKeys;
+import com.clutch.coupon.claim.recovery.CouponStockRecoveryStateManager;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -16,6 +17,8 @@ import org.springframework.data.redis.core.ValueOperations;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /** Redis 쿠폰 재고 조회 서비스 테스트 */
@@ -29,6 +32,9 @@ class CouponStockServiceTest {
 
     @Mock
     private ValueOperations<String, String> valueOperations;
+
+    @Mock
+    private CouponStockRecoveryStateManager recoveryStateManager;
 
     @InjectMocks
     private CouponStockService couponStockService;
@@ -70,6 +76,7 @@ class CouponStockServiceTest {
                         exception -> assertThat(exception.getErrorCode())
                                 .isEqualTo(CouponClaimErrorCode.COUPON_STOCK_READ_FAILED)
                 );
+        verify(recoveryStateManager).markUnavailable();
     }
 
     @Test
@@ -84,5 +91,25 @@ class CouponStockServiceTest {
                         exception -> assertThat(exception.getErrorCode())
                                 .isEqualTo(CouponClaimErrorCode.COUPON_STOCK_NOT_INITIALIZED)
                 );
+        verify(recoveryStateManager).markUnavailable();
+    }
+
+    @Test
+    void blocksStockReadWhileRecoveryIsRunning() {
+        doThrow(new CouponClaimException(
+                CouponClaimErrorCode.COUPON_STOCK_RECOVERING
+        )).when(recoveryStateManager).requireReady();
+
+        assertThatThrownBy(() -> couponStockService.getStock(ITEM_ID))
+                .isInstanceOfSatisfying(
+                        CouponClaimException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(
+                                        CouponClaimErrorCode
+                                                .COUPON_STOCK_RECOVERING
+                                )
+                );
+
+        verifyNoInteractions(stringRedisTemplate);
     }
 }

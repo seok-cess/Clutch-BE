@@ -89,3 +89,64 @@ Redis 연결 실패 또는 유효하지 않은 재고 값인 경우:
 
 두 경우 모두 HTTP 503이다. 정상적인 재고 소진은
 `remainingStock: 0`, `exhausted: true`인 HTTP 200 응답이므로 Redis 장애와 구분된다.
+
+## 발급 API 장애 응답
+
+Redis 연결 장애:
+
+```json
+{
+  "code": "COUPON_REDIS_UNAVAILABLE",
+  "message": "쿠폰 발급 시스템에 일시적으로 연결할 수 없습니다."
+}
+```
+
+Redis 재고 복구 중:
+
+```json
+{
+  "code": "COUPON_STOCK_RECOVERING",
+  "message": "쿠폰 재고를 복구하고 있습니다."
+}
+```
+
+두 응답 모두 HTTP 503이다. 클라이언트는 발급 요청을 계속 반복하지 않고 복구 상태가
+`READY`가 된 뒤 사용자가 다시 요청할 수 있게 한다.
+
+## 관리자 복구 API
+
+현재 복구 상태 조회:
+
+```http
+GET /api/v1/admin/coupon-stock-recovery
+```
+
+```json
+{
+  "state": "RECOVERING",
+  "recoveredOccurrences": 0,
+  "recoveredItems": 0,
+  "recoveredUsers": 0
+}
+```
+
+복구 수동 실행 또는 재시도:
+
+```http
+POST /api/v1/admin/coupon-stock-recovery
+```
+
+```json
+{
+  "state": "READY",
+  "recoveredOccurrences": 1,
+  "recoveredItems": 2,
+  "recoveredUsers": 3427
+}
+```
+
+복구 상태는 `READY`, `UNAVAILABLE`, `RECOVERING`, `FAILED` 중 하나다. MySQL의
+성공 수량, 성공 요청 수와 실제 쿠폰 수가 다르면 HTTP 503
+`COUPON_STOCK_INCONSISTENT`를 반환하고 `FAILED` 상태를 유지한다.
+
+현재 복구 상태와 자동 실행은 단일 애플리케이션 인스턴스를 기준으로 한다.
