@@ -13,6 +13,7 @@
 
 ```bash
 node replay/replay-server.js --dir replay/fixtures/sample-match-bo3-001 --speed 3
+./gradlew bootRun --args='--spring.profiles.active=replay'
 ```
 
 `fixtures/smoke-test/`는 손으로 만든 가짜 경기(세트 1개, bestOf 1) 픽스처다. 실제 녹화 파일이 없어도
