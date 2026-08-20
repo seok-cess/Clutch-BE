@@ -161,6 +161,26 @@ public class ApiController {
         return ResponseEntity.ok(out);
     }
 
+    /**
+     * 리그 팀 순위표 (매치 기준).
+     *
+     * 대회(스플릿) 목록을 쿼리로 받는다. LCK 는 한 시즌이 여러 스플릿으로 나뉘는데
+     * 무엇을 합쳐 보여줄지는 화면 판단이라 서버가 고정하지 않는다.
+     * 미지정이면 설정의 현재 대회 하나만 집계한다.
+     *
+     * 예: /api/standings/teams?tournamentIds=115548128960088078,115548147890329817
+     */
+    @GetMapping("/standings/teams")
+    public ResponseEntity<ApiDtos.TeamStandingsBoard> teamStandings(
+            @org.springframework.web.bind.annotation.RequestParam(value = "season", required = false) String season,
+            @org.springframework.web.bind.annotation.RequestParam(value = "leagueId", required = false) String leagueId,
+            @org.springframework.web.bind.annotation.RequestParam(value = "tournamentIds", required = false) List<String> tournamentIds) {
+        String league = (leagueId == null || leagueId.isBlank()) ? props.leagueId() : leagueId;
+        List<String> tournaments = (tournamentIds == null || tournamentIds.isEmpty())
+                ? List.of(props.tournamentId()) : tournamentIds;
+        return ResponseEntity.ok(seasonStats.teamStandings(season, league, tournaments));
+    }
+
     // ---- 라이브 요약 ----
 
     @GetMapping("/live")

@@ -221,7 +221,7 @@ public class GamePersistService {
                     team.code(),
                     team.name(),
                     team.image(),
-                    team.result() != null ? team.result().outcome() : null,
+                    outcomeOf(team, ctx),
                     team.result() != null ? team.result().gameWins() : null,
                     team.record() != null ? team.record().wins() : null,
                     team.record() != null ? team.record().losses() : null));
@@ -236,9 +236,37 @@ public class GamePersistService {
         for (ScheduleResponse.Team team : ctx.teams()) {
             MatchTeam mt = team.id() != null ? byExternalId.get(team.id()) : null;
             if (mt != null && team.result() != null) {
-                mt.updateResult(team.result().outcome(), team.result().gameWins());
+                mt.updateResult(outcomeOf(team, ctx), team.result().gameWins());
             }
         }
+    }
+
+    /**
+     * 매치 승패.
+     *
+     * 소스가 outcome 을 채우지 않고 gameWins 만 주는 경우가 있다
+     * (2026-08-19 실측: 8/11~8/18 LCK 7경기가 completed 인데 outcome=null).
+     * 그대로 두면 순위표 승수가 실제보다 적게 나오므로, 과반 세트를 가져간 팀이
+     * 있으면 그것으로 승패를 유도한다. 판정 기준은 matchStateOf 와 같다.
+     *
+     * 진행 중인 매치는 유도하지 않는다 — Bo3 의 1:0 은 아직 승부가 나지 않았다.
+     *
+     * @return 소스 값이 있으면 그대로, 없고 과반이 갈렸으면 win/loss, 아니면 null
+     */
+    private static String outcomeOf(ScheduleResponse.Team team, MatchContext ctx) {
+        String given = team.result() != null ? team.result().outcome() : null;
+        if (given != null && !given.isBlank()) {
+            return given;
+        }
+        int needed = (ctx.bestOf() == null ? 1 : ctx.bestOf()) / 2 + 1;
+        boolean decided = ctx.teams().stream()
+                .anyMatch(t -> t.result() != null && t.result().gameWins() != null
+                        && t.result().gameWins() >= needed);
+        if (!decided) {
+            return null;
+        }
+        Integer wins = team.result() != null ? team.result().gameWins() : null;
+        return wins != null && wins >= needed ? "win" : "loss";
     }
 
     // ---- 세트 ----

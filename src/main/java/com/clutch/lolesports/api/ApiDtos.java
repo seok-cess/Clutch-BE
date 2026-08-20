@@ -120,6 +120,31 @@ public final class ApiDtos {
     public record RankedTeam(String name, String code, String image, Integer wins, Integer losses) {
     }
 
+    /**
+     * 리그 순위표 한 행 (매치 기준).
+     *
+     * @param setDiff 딴 세트 - 내준 세트
+     * @param winRate 0~1. 승패가 하나도 없으면 null
+     */
+    public record TeamStandingRow(
+            Integer rank,
+            String teamCode,
+            String teamName,
+            String teamImageUrl,
+            int games,
+            int wins,
+            int losses,
+            int setsWon,
+            int setsLost,
+            int setDiff,
+            Double winRate
+    ) {
+    }
+
+    /** /api/standings/teams 응답 */
+    public record TeamStandingsBoard(String seasonKey, List<TeamStandingRow> rows) {
+    }
+
     // ---- /api/live ----
 
     public record LiveSummary(boolean live, List<LiveMatchItem> matches) {
