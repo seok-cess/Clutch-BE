@@ -107,6 +107,7 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: kafka:19092
       # lolesports 비공식 피드 (공용 키 — 미지정 시 application.yaml 기본값 사용)
       LOLESPORTS_API_KEY: ${LOLESPORTS_API_KEY:-0TvQnueqKa5mxJntVWt0w4LpLfEkrV1Ta8rQBb9Z}
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,prometheus # 프로메테우스 환경설정
     ports:
       - "${APP_PORT:-8080}:8080"
     depends_on:

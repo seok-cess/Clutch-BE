@@ -179,6 +179,10 @@ public class BackfillService {
         String gameId = game.id();
         long began = System.currentTimeMillis();
         try {
+            // 앞선 세트에서 evictGame 으로 캐시를 비웠으므로 로드 표시도 함께 되돌린다.
+            // (남아 있으면 loadTimeline 이 건너뛰어 프레임이 비고 적재가 실패한다)
+            historical.resetLoadState(gameId);
+
             // 소스에서 전 구간 프레임을 받아 캐시에 채운다 (골드 추이 그래프용)
             historical.ensureGameLoaded(gameId);
 
@@ -201,9 +205,13 @@ public class BackfillService {
             }
 
             // 백필 대상은 이미 끝난 매치라 completed 가 맞다
+            // 일정 응답에는 리그 id 가 없어 실제 소속을 따로 확인한다
+            HistoricalGameService.MatchOrigin origin = historical.getOrigin(event.match().id());
             GamePersistService.MatchContext ctx = new GamePersistService.MatchContext(
                     event.match().id(),
                     event.league() != null ? event.league().name() : null,
+                    origin != null ? origin.leagueId() : null,
+                    origin != null ? origin.tournamentId() : null,
                     event.blockName(),
                     event.startTime(),
                     "completed",

@@ -6,7 +6,6 @@ import com.clutch.coupon.claim.domain.ClaimRequestStatus;
 import com.clutch.coupon.claim.domain.CouponClaimRequest;
 import com.clutch.coupon.claim.outbox.CouponBenefitSnapshot;
 import com.clutch.coupon.claim.outbox.CouponBenefitSnapshotRepository;
-import com.clutch.coupon.claim.outbox.CouponClaimOutboxWriter;
 import com.clutch.coupon.claim.repository.CouponClaimRequestRepository;
 import com.clutch.coupon.event.domain.CouponEvent;
 import com.clutch.coupon.event.domain.CouponEventItem;
@@ -16,7 +15,11 @@ import com.clutch.coupon.event.repository.CouponEventOccurrenceRepository;
 import com.clutch.coupon.event.repository.CouponEventRepository;
 import com.clutch.coupon.claim.redis.CouponClaimRedisExecutor;
 import com.clutch.coupon.claim.redis.CouponClaimRedisResult;
-import com.clutch.coupon.claim.redis.CouponStockInitializer;
+import com.clutch.coupon.claim.recovery.CouponStockRecoveryStateManager;
+import com.clutch.coupon.contract.issuance.CouponIssuanceCommand;
+import com.clutch.coupon.contract.issuance.CouponIssuanceResult;
+import com.clutch.coupon.contract.issuance.CouponIssuer;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -25,19 +28,23 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.dao.DataAccessResourceFailureException;
 import java.math.BigDecimal;
-import java.time.Instant;
+
 import java.time.LocalDateTime;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static com.clutch.coupon.claim.exception.CouponClaimErrorCode.COUPON_EVENT_ITEM_NOT_AVAILABLE;
+import static com.clutch.coupon.claim.exception.CouponClaimErrorCode.COUPON_REDIS_UNAVAILABLE;
+import static com.clutch.coupon.claim.exception.CouponClaimErrorCode.COUPON_STOCK_RECOVERING;
 /**
  * 쿠폰 발급 요청 서비스 테스트
  */
@@ -48,6 +55,7 @@ class CouponClaimServiceTest {
     private static final Long COUPON_EVENT_ID = 10L;
     private static final Long COUPON_EVENT_OCCURRENCE_ID = 15L;
     private static final Long COUPON_EVENT_ITEM_ID = 20L;
+    private static final Long COUPON_ID = 200L;
     private static final CouponBenefitSnapshot BENEFIT_SNAPSHOT =
             new CouponBenefitSnapshot(
                     "RATE",
@@ -71,16 +79,19 @@ class CouponClaimServiceTest {
             couponBenefitSnapshotRepository;
 
     @Mock
-    private CouponClaimOutboxWriter couponClaimOutboxWriter;
+    private CouponIssuer couponIssuer;
 
     @Mock
     private CouponClaimItemSelector couponClaimItemSelector;
 
     @Mock
-    private CouponStockInitializer couponStockInitializer;
+    private CouponClaimRedisExecutor couponClaimRedisExecutor;
 
     @Mock
-    private CouponClaimRedisExecutor couponClaimRedisExecutor;
+    private CouponStockRecoveryStateManager recoveryStateManager;
+
+    @Mock
+    private CouponStockStreamService couponStockStreamService;
 
     @Mock
     private CouponEvent couponEvent;
@@ -135,6 +146,11 @@ class CouponClaimServiceTest {
                 .save(any(CouponClaimRequest.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
+        when(couponIssuer.issue(
+                any(CouponIssuanceCommand.class)
+        )).thenReturn(
+                new CouponIssuanceResult(COUPON_ID)
+        );
 
         // when
         CouponClaimCreateResponse response =
@@ -151,8 +167,10 @@ class CouponClaimServiceTest {
                 .isEqualTo(COUPON_EVENT_OCCURRENCE_ID);
         assertThat(response.couponEventItemId())
                 .isEqualTo(COUPON_EVENT_ITEM_ID);
+        assertThat(response.couponId())
+                .isEqualTo(COUPON_ID);
         assertThat(response.requestStatus())
-                .isEqualTo(ClaimRequestStatus.PENDING);
+                .isEqualTo(ClaimRequestStatus.SUCCEEDED);
 
         ArgumentCaptor<CouponClaimRequest> captor =
                 ArgumentCaptor.forClass(
@@ -170,14 +188,11 @@ class CouponClaimServiceTest {
         assertThat(savedClaimRequest.getCouponEventOccurrenceId())
                 .isEqualTo(COUPON_EVENT_OCCURRENCE_ID);
         assertThat(savedClaimRequest.getRequestStatus())
-                .isEqualTo(ClaimRequestStatus.PENDING);
+                .isEqualTo(ClaimRequestStatus.SUCCEEDED);
 
-        verify(couponClaimOutboxWriter)
-                .writeAcceptedEvent(
-                        eq(savedClaimRequest),
-                        eq(BENEFIT_SNAPSHOT),
-                        any(Instant.class)
-                );
+        verify(couponIssuer).issue(
+                any(CouponIssuanceCommand.class)
+        );
 
         verify(couponClaimRedisExecutor).claim(
                 COUPON_EVENT_ITEM_ID,
@@ -189,6 +204,9 @@ class CouponClaimServiceTest {
                 .increaseSuccessCountAtomically(
                         COUPON_EVENT_ITEM_ID
                 );
+        verify(couponStockStreamService).publish(
+                COUPON_EVENT_ITEM_ID
+        );
         verify(couponEventOccurrence).isOpenAt(any(LocalDateTime.class));
     }
 
@@ -408,6 +426,151 @@ class CouponClaimServiceTest {
                 .increaseSuccessCountAtomically(
                         COUPON_EVENT_ITEM_ID
                 );
+    }
+
+    /** Redis 연결 장애 발급 차단 검증 */
+    @Test
+    void redisFailureMarksStockUnavailable() {
+        givenOpenEventAndItem();
+        when(couponEventItem.getId()).thenReturn(COUPON_EVENT_ITEM_ID);
+        when(couponBenefitSnapshotRepository
+                .findByCouponEventItemId(COUPON_EVENT_ITEM_ID))
+                .thenReturn(Optional.of(BENEFIT_SNAPSHOT));
+        when(couponClaimRedisExecutor.claim(
+                COUPON_EVENT_ITEM_ID,
+                COUPON_EVENT_OCCURRENCE_ID,
+                USER_ID
+        )).thenThrow(new DataAccessResourceFailureException("down"));
+
+        assertThatThrownBy(() -> couponClaimService.claim(
+                USER_ID,
+                COUPON_EVENT_ID,
+                COUPON_EVENT_OCCURRENCE_ID
+        )).isInstanceOfSatisfying(
+                CouponClaimException.class,
+                exception -> assertThat(exception.getErrorCode())
+                        .isEqualTo(COUPON_REDIS_UNAVAILABLE)
+        );
+
+        verify(recoveryStateManager).markUnavailable();
+        verify(couponClaimRequestRepository, never())
+                .save(any(CouponClaimRequest.class));
+    }
+
+    /** Redis 복구 중 발급 선차단 검증 */
+    @Test
+    void recoveringStockBlocksClaimBeforeDatabaseLookup() {
+        doThrow(new CouponClaimException(COUPON_STOCK_RECOVERING))
+                .when(recoveryStateManager)
+                .requireReady();
+
+        assertThatThrownBy(() -> couponClaimService.claim(
+                USER_ID,
+                COUPON_EVENT_ID,
+                COUPON_EVENT_OCCURRENCE_ID
+        )).isInstanceOfSatisfying(
+                CouponClaimException.class,
+                exception -> assertThat(exception.getErrorCode())
+                        .isEqualTo(COUPON_STOCK_RECOVERING)
+        );
+
+        verifyNoInteractions(couponEventRepository);
+    }
+
+    /** 트랜잭션 커밋 이후 재고 알림 검증 */
+    @Test
+    void stockNotificationIsPublishedOnlyAfterCommit() {
+        // given
+        givenSuccessfulClaim();
+        TransactionSynchronizationManager.initSynchronization();
+
+        try {
+            // when
+            couponClaimService.claim(
+                    USER_ID,
+                    COUPON_EVENT_ID,
+                    COUPON_EVENT_OCCURRENCE_ID
+            );
+
+            // then
+            verify(couponStockStreamService, never())
+                    .publish(COUPON_EVENT_ITEM_ID);
+
+            TransactionSynchronizationManager
+                    .getSynchronizations()
+                    .forEach(TransactionSynchronization::afterCommit);
+
+            verify(couponStockStreamService)
+                    .publish(COUPON_EVENT_ITEM_ID);
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
+
+    /** 트랜잭션 롤백 시 재고 알림 미전송 검증 */
+    @Test
+    void stockNotificationIsNotPublishedAfterRollback() {
+        // given
+        givenSuccessfulClaim();
+        TransactionSynchronizationManager.initSynchronization();
+
+        try {
+            // when
+            couponClaimService.claim(
+                    USER_ID,
+                    COUPON_EVENT_ID,
+                    COUPON_EVENT_OCCURRENCE_ID
+            );
+
+            TransactionSynchronizationManager
+                    .getSynchronizations()
+                    .forEach(synchronization ->
+                            synchronization.afterCompletion(
+                                    TransactionSynchronization
+                                            .STATUS_ROLLED_BACK
+                            )
+                    );
+
+            // then
+            verify(couponStockStreamService, never())
+                    .publish(COUPON_EVENT_ITEM_ID);
+            verify(couponClaimRedisExecutor).rollback(
+                    COUPON_EVENT_ITEM_ID,
+                    COUPON_EVENT_OCCURRENCE_ID,
+                    USER_ID
+            );
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
+
+    /** 정상 발급 공통 조건 */
+    private void givenSuccessfulClaim() {
+        givenOpenEventAndItem();
+        when(couponEventItem.getId())
+                .thenReturn(COUPON_EVENT_ITEM_ID);
+        when(couponBenefitSnapshotRepository
+                .findByCouponEventItemId(COUPON_EVENT_ITEM_ID))
+                .thenReturn(Optional.of(BENEFIT_SNAPSHOT));
+        when(couponClaimRequestRepository
+                .existsByUserIdAndCouponEventOccurrenceId(
+                        USER_ID,
+                        COUPON_EVENT_OCCURRENCE_ID
+                ))
+                .thenReturn(false);
+        when(couponClaimRedisExecutor.claim(
+                COUPON_EVENT_ITEM_ID,
+                COUPON_EVENT_OCCURRENCE_ID,
+                USER_ID
+        )).thenReturn(CouponClaimRedisResult.SUCCESS);
+        when(couponEventItemRepository
+                .increaseSuccessCountAtomically(COUPON_EVENT_ITEM_ID))
+                .thenReturn(1);
+        when(couponClaimRequestRepository
+                .save(any(CouponClaimRequest.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(couponIssuer.issue(any(CouponIssuanceCommand.class)))
+                .thenReturn(new CouponIssuanceResult(COUPON_ID));
     }
 
     /**

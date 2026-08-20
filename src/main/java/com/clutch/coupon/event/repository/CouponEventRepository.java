@@ -5,6 +5,8 @@ import com.clutch.coupon.event.domain.CouponEventStatus;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 /**
  * 쿠폰 이벤트의 저장과 관리자 목록 조회를 담당하는 저장소.
@@ -36,6 +38,31 @@ public interface CouponEventRepository
             Long esportsMatchId,
             String triggerType,
             Long couponEventId
+    );
+
+    /**
+     * CLUTCH-216: 지정한 수동 테스트 트리거 접두사의 마지막 순번을 조회한다.
+     *
+     * @param triggerPrefix 날짜까지 포함한 수동 테스트 트리거 접두사
+     * @return 현재 저장된 가장 큰 수동 테스트 순번, 없으면 0
+     */
+    @Query(
+            value = """
+                    SELECT COALESCE(
+                        MAX(CAST(SUBSTRING_INDEX(trigger_type, '_', -1)
+                            AS UNSIGNED)),
+                        0
+                    )
+                    FROM coupon_event
+                    WHERE trigger_type LIKE CONCAT(:triggerPrefix, '%')
+                      AND trigger_type REGEXP CONCAT(
+                          '^', :triggerPrefix, '[0-9]+$'
+                      )
+                    """,
+            nativeQuery = true
+    )
+    int findMaxManualTestSequence(
+            @Param("triggerPrefix") String triggerPrefix
     );
 
     /**

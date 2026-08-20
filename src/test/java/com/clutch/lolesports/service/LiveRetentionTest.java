@@ -35,9 +35,9 @@ class LiveRetentionTest {
     /** retainSeconds 만 바꾼 스케줄러 (나머지 협력자는 이 테스트에서 쓰지 않는다) */
     private static PollingScheduler scheduler(long retainSeconds) {
         LolesportsProperties props = new LolesportsProperties(
-                null, null, null, null, null, null, 0, 0, retainSeconds, null);
+                null, null, null, null, null, null, 0, 0, retainSeconds, List.of(), null);
         return new PollingScheduler(null, null, null, null, null,
-                new SetWinnerTracker(), props);
+                new SetWinnerTracker(), null, props);
     }
 
     @Test

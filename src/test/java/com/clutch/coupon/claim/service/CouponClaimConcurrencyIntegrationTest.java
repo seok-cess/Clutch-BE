@@ -2,6 +2,7 @@ package com.clutch.coupon.claim.service;
 
 import com.clutch.coupon.claim.exception.CouponClaimException;
 import com.clutch.coupon.claim.redis.CouponClaimRedisKeys;
+import com.clutch.coupon.claim.recovery.CouponStockRecoveryStateManager;
 import com.clutch.lolesports.service.PollingScheduler;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -10,6 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -23,12 +25,16 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.clutch.coupon.claim.exception.CouponClaimErrorCode.COUPON_STOCK_EXHAUSTED;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * 쿠폰 발급 요청 동시성 통합 테스트
  */
 @SpringBootTest(
-        properties = "spring.datasource.hikari.maximum-pool-size=30"
+        properties = {
+                "spring.datasource.hikari.maximum-pool-size=30",
+                "wallet.outbox.enabled=false"
+        }
 )
 class CouponClaimConcurrencyIntegrationTest {
 
@@ -64,6 +70,9 @@ class CouponClaimConcurrencyIntegrationTest {
     @Autowired
     private StringRedisTemplate stringRedisTemplate;
 
+    @Autowired
+    private CouponStockRecoveryStateManager recoveryStateManager;
+
     /**
      * 경기 데이터 수집 스케줄러 모의 객체
      */
@@ -75,6 +84,7 @@ class CouponClaimConcurrencyIntegrationTest {
      */
     @BeforeEach
     void setUp() {
+        recoveryStateManager.markReady();
         cleanUpTestData();
 
 
@@ -177,6 +187,11 @@ class CouponClaimConcurrencyIntegrationTest {
                 0
         );
 
+        stringRedisTemplate.opsForValue().set(
+                CouponClaimRedisKeys.stock(COUPON_EVENT_ITEM_ID),
+                String.valueOf(STOCK_QUANTITY)
+        );
+
         jdbcTemplate.update(
                 """
                         INSERT INTO coupon_event_phase (
@@ -199,6 +214,7 @@ class CouponClaimConcurrencyIntegrationTest {
      */
     @AfterEach
     void tearDown() {
+        recoveryStateManager.markReady();
         cleanUpTestData();
     }
 
@@ -320,18 +336,43 @@ class CouponClaimConcurrencyIntegrationTest {
         }
 
         // then
-        Integer pendingClaimCount = jdbcTemplate.queryForObject(
+        Integer successfulClaimCount = jdbcTemplate.queryForObject(
                 """
                         SELECT COUNT(*)
                         FROM coupon_claim_request
                         WHERE coupon_event_occurrence_id = ?
-                          AND request_status = 'PENDING'
+                          AND request_status = 'SUCCEEDED'
                         """,
                 Integer.class,
                 COUPON_EVENT_OCCURRENCE_ID
         );
 
-        Integer pendingOutboxCount = jdbcTemplate.queryForObject(
+        Integer issuedCouponCount = jdbcTemplate.queryForObject(
+                """
+                        SELECT COUNT(*)
+                        FROM user_coupon
+                        WHERE coupon_event_occurrence_id = ?
+                          AND coupon_status = 'ISSUED'
+                        """,
+                Integer.class,
+                COUPON_EVENT_OCCURRENCE_ID
+        );
+
+        Integer walletOutboxCount = jdbcTemplate.queryForObject(
+                """
+                        SELECT COUNT(*)
+                        FROM wallet_outbox
+                        WHERE aggregate_id IN (
+                            SELECT coupon_claim_request_id
+                            FROM coupon_claim_request
+                            WHERE coupon_event_occurrence_id = ?
+                        )
+                        """,
+                Integer.class,
+                COUPON_EVENT_OCCURRENCE_ID
+        );
+
+        Integer claimOutboxCount = jdbcTemplate.queryForObject(
                 """
                         SELECT COUNT(*)
                         FROM coupon_claim_outbox
@@ -340,7 +381,6 @@ class CouponClaimConcurrencyIntegrationTest {
                             FROM coupon_claim_request
                             WHERE coupon_event_occurrence_id = ?
                         )
-                          AND status = 'PENDING'
                         """,
                 Integer.class,
                 COUPON_EVENT_OCCURRENCE_ID
@@ -376,13 +416,14 @@ class CouponClaimConcurrencyIntegrationTest {
 
         log.info(
                 "Redis 동시성 결과 - 요청: {}, 성공 응답: {}, "
-                        + "재고 소진 응답: {}, DB 발급: {}, "
-                        + "DB 성공 수량: {}, Redis 재고: {}, "
+                        + "재고 소진 응답: {}, 성공 요청: {}, "
+                        + "실제 쿠폰: {}, DB 성공 수량: {}, Redis 재고: {}, "
                         + "Redis 당첨자: {}",
                 REQUEST_COUNT,
                 successResponseCount.get(),
                 failureResponseCount.get(),
-                pendingClaimCount,
+                successfulClaimCount,
+                issuedCouponCount,
                 successCount,
                 remainingRedisStock,
                 claimedUserCount
@@ -402,11 +443,16 @@ class CouponClaimConcurrencyIntegrationTest {
                         + failureResponseCount.get()
         ).isEqualTo(REQUEST_COUNT);
 
-        assertThat(pendingClaimCount)
+        assertThat(successfulClaimCount)
                 .isEqualTo(STOCK_QUANTITY);
 
-        assertThat(pendingOutboxCount)
+        assertThat(issuedCouponCount)
                 .isEqualTo(STOCK_QUANTITY);
+
+        assertThat(walletOutboxCount)
+                .isEqualTo(STOCK_QUANTITY);
+
+        assertThat(claimOutboxCount).isZero();
 
         assertThat(successCount)
                 .isEqualTo(STOCK_QUANTITY);
@@ -417,6 +463,99 @@ class CouponClaimConcurrencyIntegrationTest {
         assertThat(claimedUserCount)
                 .isEqualTo((long)
                         STOCK_QUANTITY);
+    }
+
+    /**
+     * 쿠폰 생성 실패 시 DB 및 Redis 보상 검증
+     */
+    @Test
+    void couponCreationFailureRollsBackDatabaseAndRedis() {
+        // given
+        long userId = USER_ID_BASE + REQUEST_COUNT + 1;
+
+        jdbcTemplate.update(
+                """
+                        INSERT INTO user_coupon (
+                            user_id,
+                            coupon_event_id,
+                            coupon_event_occurrence_id,
+                            coupon_event_item_id,
+                            claim_id,
+                            coupon_code,
+                            coupon_status,
+                            discount_type,
+                            discount_value,
+                            expires_at
+                        )
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                userId,
+                COUPON_EVENT_ID,
+                COUPON_EVENT_OCCURRENCE_ID,
+                COUPON_EVENT_ITEM_ID,
+                9_299_999L,
+                "CPN-ROLLBACK-TEST",
+                "ISSUED",
+                "RATE",
+                10,
+                LocalDateTime.now(ZoneOffset.UTC).plusDays(7)
+        );
+
+        // when, then
+        assertThatThrownBy(() ->
+                couponClaimService.claim(
+                        userId,
+                        COUPON_EVENT_ID,
+                        COUPON_EVENT_OCCURRENCE_ID
+                )
+        ).isInstanceOf(DataIntegrityViolationException.class);
+
+        Integer claimCount = jdbcTemplate.queryForObject(
+                """
+                        SELECT COUNT(*)
+                        FROM coupon_claim_request
+                        WHERE user_id = ?
+                          AND coupon_event_occurrence_id = ?
+                        """,
+                Integer.class,
+                userId,
+                COUPON_EVENT_OCCURRENCE_ID
+        );
+
+        Integer successCount = jdbcTemplate.queryForObject(
+                """
+                        SELECT success_count
+                        FROM coupon_event_item
+                        WHERE coupon_event_item_id = ?
+                        """,
+                Integer.class,
+                COUPON_EVENT_ITEM_ID
+        );
+
+        String remainingRedisStock =
+                stringRedisTemplate
+                        .opsForValue()
+                        .get(
+                                CouponClaimRedisKeys.stock(
+                                        COUPON_EVENT_ITEM_ID
+                                )
+                        );
+
+        Boolean remainsClaimed =
+                stringRedisTemplate
+                        .opsForSet()
+                        .isMember(
+                                CouponClaimRedisKeys.claimedUsers(
+                                        COUPON_EVENT_OCCURRENCE_ID
+                                ),
+                                String.valueOf(userId)
+                        );
+
+        assertThat(claimCount).isZero();
+        assertThat(successCount).isZero();
+        assertThat(remainingRedisStock)
+                .isEqualTo(String.valueOf(STOCK_QUANTITY));
+        assertThat(remainsClaimed).isFalse();
     }
 
     /**
@@ -432,6 +571,38 @@ class CouponClaimConcurrencyIntegrationTest {
                                 COUPON_EVENT_OCCURRENCE_ID
                         )
                 )
+        );
+
+        jdbcTemplate.update(
+                """
+                        DELETE FROM wallet_outbox
+                        WHERE aggregate_id IN (
+                            SELECT coupon_claim_request_id
+                            FROM coupon_claim_request
+                            WHERE coupon_event_item_id = ?
+                        )
+                        """,
+                COUPON_EVENT_ITEM_ID
+        );
+
+        jdbcTemplate.update(
+                """
+                        DELETE FROM user_coupon
+                        WHERE coupon_event_occurrence_id = ?
+                        """,
+                COUPON_EVENT_OCCURRENCE_ID
+        );
+
+        jdbcTemplate.update(
+                """
+                        DELETE FROM coupon_claim_outbox
+                        WHERE aggregate_id IN (
+                            SELECT coupon_claim_request_id
+                            FROM coupon_claim_request
+                            WHERE coupon_event_item_id = ?
+                        )
+                        """,
+                COUPON_EVENT_ITEM_ID
         );
 
         jdbcTemplate.update(

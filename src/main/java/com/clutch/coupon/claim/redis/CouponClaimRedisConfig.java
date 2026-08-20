@@ -31,4 +31,20 @@ public class CouponClaimRedisConfig {
 
         return script;
     }
+
+    /** 쿠폰 재고 복구 Lua 스크립트 */
+    @Bean
+    public RedisScript<Long> couponStockRecoveryScript() {
+        DefaultRedisScript<Long> script =
+                new DefaultRedisScript<>();
+
+        script.setLocation(
+                new ClassPathResource(
+                        "redis/coupon-stock-recovery.lua"
+                )
+        );
+        script.setResultType(Long.class);
+
+        return script;
+    }
 }

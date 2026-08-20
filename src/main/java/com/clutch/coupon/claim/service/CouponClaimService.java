@@ -2,13 +2,15 @@ package com.clutch.coupon.claim.service;
 
 import com.clutch.coupon.claim.outbox.CouponBenefitSnapshot;
 import com.clutch.coupon.claim.outbox.CouponBenefitSnapshotRepository;
-import com.clutch.coupon.claim.outbox.CouponClaimOutboxWriter;
 import com.clutch.coupon.claim.api.dto.CouponClaimCreateResponse;
+import com.clutch.coupon.contract.issuance.CouponIssuanceCommand;
+import com.clutch.coupon.contract.issuance.CouponIssuanceResult;
+import com.clutch.coupon.contract.issuance.CouponIssuer;
 import com.clutch.coupon.claim.domain.CouponClaimRequest;
 import com.clutch.coupon.claim.exception.CouponClaimException;
 import com.clutch.coupon.claim.redis.CouponClaimRedisExecutor;
 import com.clutch.coupon.claim.redis.CouponClaimRedisResult;
-import com.clutch.coupon.claim.redis.CouponStockInitializer;
+import com.clutch.coupon.claim.recovery.CouponStockRecoveryStateManager;
 import com.clutch.coupon.claim.repository.CouponClaimRequestRepository;
 import com.clutch.coupon.event.domain.CouponEventItem;
 import com.clutch.coupon.event.domain.CouponEventOccurrence;
@@ -16,13 +18,18 @@ import com.clutch.coupon.event.repository.CouponEventItemRepository;
 import com.clutch.coupon.event.repository.CouponEventOccurrenceRepository;
 import com.clutch.coupon.event.repository.CouponEventRepository;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.dao.DataAccessException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
+
 
 import static com.clutch.coupon.claim.exception.CouponClaimErrorCode.*;
 
@@ -33,18 +40,24 @@ import static com.clutch.coupon.claim.exception.CouponClaimErrorCode.*;
 @RequiredArgsConstructor
 public class CouponClaimService {
 
+    private static final Logger log =
+            LoggerFactory.getLogger(CouponClaimService.class);
+
+    private static final int COUPON_VALID_DAYS = 7;
+
     private final CouponEventRepository couponEventRepository;
     private final CouponEventOccurrenceRepository couponEventOccurrenceRepository;
     private final CouponClaimRequestRepository couponClaimRequestRepository;
     private final CouponClaimItemSelector couponClaimItemSelector;
-    private final CouponStockInitializer couponStockInitializer;
     private final CouponClaimRedisExecutor couponClaimRedisExecutor;
+    private final CouponStockRecoveryStateManager recoveryStateManager;
     private final CouponEventItemRepository couponEventItemRepository;
 
     private final CouponBenefitSnapshotRepository
             couponBenefitSnapshotRepository;
 
-    private final CouponClaimOutboxWriter couponClaimOutboxWriter;
+    private final CouponIssuer couponIssuer;
+    private final CouponStockStreamService couponStockStreamService;
 
     /**
      * 쿠폰 발급 요청 처리
@@ -60,6 +73,8 @@ public class CouponClaimService {
             Long couponEventId,
             Long couponEventOccurrenceId
     ){
+
+        recoveryStateManager.requireReady();
 
         couponEventRepository
                 .findById(couponEventId)
@@ -119,7 +134,6 @@ public class CouponClaimService {
 
         CouponClaimRedisResult redisResult =
                 executeRedisClaim(
-                        couponEventId,
                         couponEventItem.getId(),
                         couponEventOccurrenceId,
                         userId
@@ -157,13 +171,68 @@ public class CouponClaimService {
             );
         }
 
-        couponClaimOutboxWriter.writeAcceptedEvent(
-                savedClaimRequest,
-                benefitSnapshot,
-                Instant.now()
+        Instant issuedAt = Instant.now();
+
+        CouponIssuanceResult issuanceResult =
+                couponIssuer.issue(
+                        new CouponIssuanceCommand(
+                                savedClaimRequest.getId(),
+                                userId,
+                                couponEventId,
+                                couponEventOccurrenceId,
+                                couponEventItem.getId(),
+                                benefitSnapshot.discountType(),
+                                benefitSnapshot.discountValue(),
+                                issuedAt.plus(
+                                        COUPON_VALID_DAYS,
+                                        ChronoUnit.DAYS
+                                )
+                        )
+                );
+
+        savedClaimRequest.succeed(
+                LocalDateTime.ofInstant(
+                        issuedAt,
+                        ZoneOffset.UTC
+                )
         );
 
-        return CouponClaimCreateResponse.from(savedClaimRequest);
+        registerStockNotification(couponEventItem.getId());
+
+        return CouponClaimCreateResponse.from(
+                savedClaimRequest,
+                issuanceResult.couponId()
+        );
+    }
+
+    /** 트랜잭션 커밋 후 재고 알림 등록 */
+    private void registerStockNotification(Long couponEventItemId) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            publishStockSafely(couponEventItemId);
+            return;
+        }
+
+        TransactionSynchronizationManager.registerSynchronization(
+                new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        publishStockSafely(couponEventItemId);
+                    }
+                }
+        );
+    }
+
+    /** 발급 결과와 분리된 재고 알림 전송 */
+    private void publishStockSafely(Long couponEventItemId) {
+        try {
+            couponStockStreamService.publish(couponEventItemId);
+        } catch (RuntimeException exception) {
+            log.warn(
+                    "쿠폰 재고 SSE 알림 실패: couponEventItemId={}",
+                    couponEventItemId,
+                    exception
+            );
+        }
     }
 
     /**
@@ -193,12 +262,24 @@ public class CouponClaimService {
                             ) {
                                 if (status
                                         == STATUS_ROLLED_BACK) {
-                                    couponClaimRedisExecutor
-                                            .rollback(
+                                    try {
+                                        couponClaimRedisExecutor.rollback(
                                                     couponEventItemId,
                                                     couponEventOccurrenceId,
                                                     userId
-                                            );
+                                        );
+                                    } catch (DataAccessException exception) {
+                                        recoveryStateManager.markUnavailable();
+                                        log.warn(
+                                                "Redis 재고 보상 실패: "
+                                                        + "couponEventItemId={}, "
+                                                        + "occurrenceId={}, userId={}",
+                                                couponEventItemId,
+                                                couponEventOccurrenceId,
+                                                userId,
+                                                exception
+                                        );
+                                    }
                                 }
                             }
                         }
@@ -208,40 +289,35 @@ public class CouponClaimService {
     /**
      * 쿠폰 발급 Redis 실행
      *
-     * @param couponEventId           쿠폰 이벤트 식별자
      * @param couponEventItemId       쿠폰 이벤트 항목 식별자
      * @param couponEventOccurrenceId 쿠폰 이벤트 회차 식별자
      * @param userId                  사용자 식별자
      * @return 쿠폰 발급 Redis 실행 결과
      */
     private CouponClaimRedisResult executeRedisClaim(
-            Long couponEventId,
             Long couponEventItemId,
             Long couponEventOccurrenceId,
             Long userId
     ) {
-        CouponClaimRedisResult result =
-                couponClaimRedisExecutor.claim(
-                        couponEventItemId,
-                        couponEventOccurrenceId,
-                        userId
-                );
-
-        if (result
-                == CouponClaimRedisResult
-                .STOCK_NOT_INITIALIZED) {
-            couponStockInitializer.initialize(
-                    couponEventId
-            );
-
-            result = couponClaimRedisExecutor.claim(
+        try {
+            CouponClaimRedisResult result =
+                    couponClaimRedisExecutor.claim(
                     couponEventItemId,
                     couponEventOccurrenceId,
                     userId
             );
-        }
 
-        return result;
+            if (result == CouponClaimRedisResult.STOCK_NOT_INITIALIZED) {
+                recoveryStateManager.markUnavailable();
+            }
+            return result;
+        } catch (DataAccessException exception) {
+            recoveryStateManager.markUnavailable();
+            throw new CouponClaimException(
+                    COUPON_REDIS_UNAVAILABLE,
+                    exception
+            );
+        }
     }
 
     /**

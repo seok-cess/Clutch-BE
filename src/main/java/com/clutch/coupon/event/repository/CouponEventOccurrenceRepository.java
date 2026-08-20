@@ -1,9 +1,11 @@
 package com.clutch.coupon.event.repository;
 
 import com.clutch.coupon.event.domain.CouponEventOccurrence;
+import com.clutch.coupon.event.domain.CouponEventOccurrenceStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;
+import java.util.List;
 
 /**
  * 쿠폰 이벤트 회차 저장소
@@ -40,4 +42,9 @@ public interface CouponEventOccurrenceRepository
      * @return 발생 이력이 있으면 {@code true}
      */
     boolean existsByCouponEventId(Long couponEventId);
+
+    /** 상태별 쿠폰 이벤트 회차 목록 */
+    List<CouponEventOccurrence> findAllByOccurrenceStatus(
+            CouponEventOccurrenceStatus occurrenceStatus
+    );
 }

@@ -78,6 +78,54 @@ public interface SeasonStatsRepository extends JpaRepository<GamePlayerStat, Lon
             """, nativeQuery = true)
     List<ChampionTotals> championTotals(@Param("seasonKey") String seasonKey);
 
+    /**
+     * 리그 순위표 한 행 — 매치 단위 전적.
+     *
+     * 세트가 아니라 매치 기준이다 (네이버·FlashScore 와 같은 기준).
+     * 득실차는 "딴 세트 - 내준 세트" 로, 상대 팀의 game_wins 를 빼서 구한다.
+     */
+    interface TeamStanding {
+        String getTeamCode();
+        String getTeamName();
+        String getTeamImageUrl();
+        Long getWins();
+        Long getLosses();
+        Long getSetsWon();
+        Long getSetsLost();
+    }
+
+    /**
+     * 정규시즌 팀 순위.
+     *
+     * 대회(스플릿)를 인자로 받는다 — LCK 는 한 시즌이 여러 스플릿으로 나뉘고
+     * 화면에 무엇을 합쳐 보여줄지는 운영 판단이라 여기서 고정하지 않는다.
+     * 플레이오프·플레이-인은 block_name 이 "N주 차" 가 아니라 자연히 빠진다.
+     *
+     * outcome 이 NULL 인 매치(진행 중)는 승패 집계에서 제외된다.
+     */
+    @Query(value = """
+            SELECT mt.team_code       AS teamCode,
+                   MAX(mt.team_name)  AS teamName,
+                   MAX(mt.team_image_url) AS teamImageUrl,
+                   SUM(mt.outcome = 'win')  AS wins,
+                   SUM(mt.outcome = 'loss') AS losses,
+                   SUM(COALESCE(mt.game_wins, 0))  AS setsWon,
+                   SUM(COALESCE(opp.game_wins, 0)) AS setsLost
+            FROM match_team mt
+            JOIN esports_match m ON m.esports_match_id = mt.match_id
+            JOIN match_team opp  ON opp.match_id = mt.match_id
+                                AND opp.match_team_id <> mt.match_team_id
+            WHERE m.season_key = :seasonKey
+              AND m.league_external_id = :leagueId
+              AND m.tournament_external_id IN (:tournamentIds)
+              AND m.block_name REGEXP '^[0-9]+주 차'
+              AND mt.team_code IS NOT NULL
+            GROUP BY mt.team_code
+            """, nativeQuery = true)
+    List<TeamStanding> teamStandings(@Param("seasonKey") String seasonKey,
+                                     @Param("leagueId") String leagueId,
+                                     @Param("tournamentIds") List<String> tournamentIds);
+
     /** 픽률의 분모. 프로 경기는 한 세트에 같은 챔피언이 중복되지 않아 픽 수의 상한이 된다 */
     @Query(value = """
             SELECT COUNT(*)

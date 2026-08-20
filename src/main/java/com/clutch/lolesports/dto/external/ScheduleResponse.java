@@ -37,7 +37,11 @@ public record ScheduleResponse(Data data) {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record League(String name, String slug) {
+    /**
+     * getSchedule/getLive 는 id 를 주지 않고 name·slug 만 준다.
+     * getEventDetails 는 id 까지 주므로, 적재는 그쪽 값을 써야 실제 리그를 알 수 있다.
+     */
+    public record League(String id, String name, String slug) {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)

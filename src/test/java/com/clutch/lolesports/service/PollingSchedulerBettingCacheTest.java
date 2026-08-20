@@ -36,6 +36,7 @@ class PollingSchedulerBettingCacheTest {
                 mock(PentakillDetector.class),
                 persistService,
                 setWinnerTracker,
+                mock(HistoricalGameService.class),
                 properties()
         );
 
@@ -79,6 +80,7 @@ class PollingSchedulerBettingCacheTest {
                 mock(PentakillDetector.class),
                 persistService,
                 mock(SetWinnerTracker.class),
+                mock(HistoricalGameService.class),
                 properties()
         );
         ScheduleResponse.Event liveEvent = event("live-match", Instant.now(), "inProgress");
@@ -108,8 +110,7 @@ class PollingSchedulerBettingCacheTest {
                 0,
                 0,
                 0,
-                null
-        );
+                List.of(), null);
     }
 
     /**
@@ -130,7 +131,7 @@ class PollingSchedulerBettingCacheTest {
                 state,
                 "match",
                 "week",
-                new ScheduleResponse.League("LCK", "lck"),
+                new ScheduleResponse.League(null, "LCK", "lck"),
                 new ScheduleResponse.Match(
                         matchId,
                         List.of(),
@@ -169,7 +170,8 @@ class PollingSchedulerBettingCacheTest {
                         new EventDetailsResponse.Event(
                                 matchId,
                                 "match",
-                                new ScheduleResponse.League("LCK", "lck"),
+                                new ScheduleResponse.League(null, "LCK", "lck"),
+                                null,
                                 new EventDetailsResponse.Match(
                                         teams,
                                         List.of(),
