@@ -12,7 +12,7 @@
 ## 빠르게 시작하기 (녹화 데이터 없이 동작 확인)
 
 ```bash
-node replay/replay-server.js --dir replay/fixtures/smoke-test --port 4000 --speed 5
+node replay/replay-server.js --dir replay/fixtures/sample-match-bo3-001 --speed 3
 ```
 
 `fixtures/smoke-test/`는 손으로 만든 가짜 경기(세트 1개, bestOf 1) 픽스처다. 실제 녹화 파일이 없어도
@@ -60,6 +60,31 @@ lolesports:
 
 `./gradlew bootRun`으로 백엔드를 켜면 끝이다. 확인 끝나면 두 값을 원래 실제 주소
 (`https://esports-api.lolesports.com/persisted/gw`, `https://feed.lolesports.com/livestats/v1`)로 되돌린다.
+
+`replay` profile을 쓰면 주소를 직접 바꾸지 않아도 된다. 스텁 서버를 먼저 실행한 뒤 아래처럼
+백엔드를 켠다.
+
+```bash
+./gradlew bootRun --args='--spring.profiles.active=replay'
+```
+
+이 profile에서만 `POST /api/replay/start`와 `GET /api/replay/status`가 열린다. 프론트는 상태 API가
+정상 응답할 때만 테스트 시작 버튼을 표시하며, 별도 `VITE_REPLAY_MODE` 환경 변수는 필요 없다. 버튼은
+시작 API를 호출하면
+된다. 요청할 때마다 스텁 서버가 새 `matchId`/`gameId`를 만들고 타임라인을 처음부터 재생한 뒤,
+백엔드도 즉시 한 번 라이브 폴링을 수행하므로,
+기존 테스트 경기 데이터와 충돌하지 않는다. 스텁 서버 프로세스 자체는 이 API가 실행하지 않으므로
+먼저 `node replay/replay-server.js ...`로 켜져 있어야 한다.
+
+`GET /api/replay/status`는 JSONL 전체의 첫·마지막 `capturedAt`을 기준으로 현재 재생 위치를 반환한다.
+예를 들어 `elapsedSeconds: 1350`, `totalSeconds: 8400`이면 fixture 140분 중 22분 30초 지점이다.
+
+재생 중 배속을 바꾸려면 `POST /api/replay/speed?value=5`처럼 1~20배속을 요청한다. 타임라인은
+변경 순간의 JSONL 시각을 유지하므로 배속 변경으로 재생 위치가 점프하지 않는다.
+
+replay profile은 `getLive`도 실제 1초마다 확인한다. 따라서 20배속에서도 세트 시작·종료 상태를
+기본 운영 주기(60초) 때문에 건너뛰지 않는다. 화면은 리플레이 중에는 가장 최신 프레임을 표시하고,
+세트 종료 시에는 캐시에 받은 전체 프레임을 DB 타임라인·오브젝트 데이터로 적재한다.
 
 ## 녹화 계약 — 다른 팀원이 만드는 녹화 기능이 지켜야 할 형식
 
@@ -121,8 +146,11 @@ lolesports:
 
 ## 이 도구가 일부러 안 하는 것
 
-- `startingTime` 쿼리 파라미터의 실제 10초 윈도우 규칙을 재현하지 않는다 — "재생 시각에 가장 가까운
-  녹화 스냅샷"만 돌려준다. 이걸로 충분한 이유는 백엔드가 프레임 중복 제거를 요청 파라미터가 아니라
-  프레임 자체의 시각(`rfc460Timestamp`)으로 하기 때문이다.
-- 재생 시작/배속 조절용 관리자 화면은 없다. `--speed` 인자로 배속만 조절한다 (기본 1배 = 실시간).
+- `startingTime` 쿼리 파라미터의 실제 10초 윈도우 규칙을 그대로 재현하지는 않는다. 대신 `window`와
+  `details`는 endpoint·game별 마지막 전달 위치를 기억했다가, 다음 폴링 때 그 뒤부터 현재 재생 시점까지의
+  녹화 프레임을 한 응답으로 합쳐 돌려준다. 따라서 20배속처럼 한 번의 백엔드 폴링 사이에 여러 초가 지나도
+  그 구간의 프레임은 누락되지 않고 백엔드 캐시·DB 적재 대상으로 들어간다. 프레임 중복 제거는 백엔드가
+  `rfc460Timestamp` 기준으로 수행한다.
+- 재생 제어 UI는 replay profile의 프론트 라이브 화면에서만 제공한다. mock 서버 프로세스 자체를
+  실행·종료하는 기능은 제공하지 않는다.
 - 한 번에 매치 하나만 재생한다. 여러 매치를 동시에 재생하려면 서버를 여러 포트로 여러 개 띄우면 된다.
