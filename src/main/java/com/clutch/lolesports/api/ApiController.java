@@ -161,6 +161,60 @@ public class ApiController {
         return ResponseEntity.ok(out);
     }
 
+    /**
+     * 리그 팀 순위표 (매치 기준).
+     *
+     * 대회(스플릿) 목록을 쿼리로 받는다. LCK 는 한 시즌이 여러 스플릿으로 나뉘는데
+     * 무엇을 합쳐 보여줄지는 화면 판단이라 서버가 고정하지 않는다.
+     * 미지정이면 설정의 현재 대회 하나만 집계한다.
+     *
+     * 예: /api/standings/teams?tournamentIds=115548128960088078,115548147890329817
+     */
+    @GetMapping("/standings/teams")
+    public ResponseEntity<ApiDtos.TeamStandingsBoard> teamStandings(
+            @org.springframework.web.bind.annotation.RequestParam(value = "season", required = false) String season,
+            @org.springframework.web.bind.annotation.RequestParam(value = "leagueId", required = false) String leagueId,
+            @org.springframework.web.bind.annotation.RequestParam(value = "tournamentIds", required = false) List<String> tournamentIds) {
+        String league = (leagueId == null || leagueId.isBlank()) ? props.leagueId() : leagueId;
+        List<String> tournaments = (tournamentIds == null || tournamentIds.isEmpty())
+                ? List.of(props.tournamentId()) : tournamentIds;
+        return ResponseEntity.ok(
+                seasonStats.teamStandings(season, league, tournaments, groupByTeamCode()));
+    }
+
+    /**
+     * 팀 코드 → 소속 그룹명 (예: GEN → "레전드 그룹").
+     *
+     * LCK 는 정규시즌을 두 그룹으로 나눠 운영하는데 그 편성은 우리가 판단할 수 없다.
+     * 캐시된 getStandingsV3 응답이 조 편성을 담고 있어 거기서 가져온다.
+     * 순위표가 아직 캐시되지 않았으면 빈 맵 — 그때는 단일 순위표로 응답한다.
+     */
+    private java.util.Map<String, String> groupByTeamCode() {
+        StandingsResponse cached = cache.getStandings();
+        if (cached == null || cached.data() == null || cached.data().standings() == null) {
+            return java.util.Map.of();
+        }
+        java.util.Map<String, String> out = new java.util.LinkedHashMap<>();
+        for (StandingsResponse.Standing standing : cached.data().standings()) {
+            if (standing.stages() == null) continue;
+            for (StandingsResponse.Stage stage : standing.stages()) {
+                if (stage.sections() == null) continue;
+                for (StandingsResponse.Section section : stage.sections()) {
+                    if (section.rankings() == null || section.name() == null) continue;
+                    for (StandingsResponse.Ranking ranking : section.rankings()) {
+                        if (ranking.teams() == null) continue;
+                        for (StandingsResponse.Team team : ranking.teams()) {
+                            if (team.code() != null) {
+                                out.putIfAbsent(team.code(), section.name());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return out;
+    }
+
     // ---- 라이브 요약 ----
 
     @GetMapping("/live")
