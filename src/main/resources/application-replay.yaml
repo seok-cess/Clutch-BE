@@ -1,0 +1,12 @@
+# 로컬 replay profile 전용 설정. 운영 profile에는 적용되지 않는다.
+lolesports:
+  esports-api-base-url: ${REPLAY_SERVER_URL:http://localhost:4000}
+  live-stats-base-url: ${REPLAY_SERVER_URL:http://localhost:4000}
+  # 20배속에서도 getLive 상태 전환(세트 시작·종료)을 건너뛰지 않도록 실제 1초마다 확인한다.
+  # 리플레이 스텁 서버만 호출하므로 운영 LoL Esports API에는 영향을 주지 않는다.
+  poll:
+    live-check-ms: 1000
+    in-game-ms: 1000
+
+replay:
+  control-base-url: ${REPLAY_SERVER_URL:http://localhost:4000}
