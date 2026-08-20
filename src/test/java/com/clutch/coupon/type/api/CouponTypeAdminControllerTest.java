@@ -1,6 +1,9 @@
 package com.clutch.coupon.type.api;
 
 import com.clutch.coupon.type.api.dto.CouponTypeResponse;
+import com.clutch.coupon.type.api.dto.CouponTypeListResponse;
+import com.clutch.coupon.type.api.dto.CouponTypeOptionListResponse;
+import com.clutch.coupon.type.api.dto.CouponTypeOptionResponse;
 import com.clutch.coupon.type.api.dto.CouponTypeUpdateRequest;
 import com.clutch.coupon.type.domain.CouponDiscountType;
 import com.clutch.coupon.type.domain.CouponTypeStatus;
@@ -63,20 +66,52 @@ class CouponTypeAdminControllerTest {
 
     @Test
     void 활성_쿠폰_종류_목록을_조회한다() throws Exception {
-        when(couponTypeService.findAll(CouponTypeStatus.ACTIVE))
-                .thenReturn(List.of(response(
-                        1L,
-                        "10% 할인 쿠폰",
-                        CouponTypeStatus.ACTIVE,
-                        true
-                )));
+        when(couponTypeService.findAll(
+                CouponTypeStatus.ACTIVE,
+                null,
+                20
+        )).thenReturn(new CouponTypeListResponse(
+                List.of(response(
+                                1L,
+                                "10% 할인 쿠폰",
+                                CouponTypeStatus.ACTIVE,
+                                true
+                        )),
+                1L,
+                true
+        ));
 
         mockMvc.perform(get("/api/v1/admin/coupon-types")
                         .param("status", "ACTIVE"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].couponName")
+                .andExpect(jsonPath("$.couponTypes[0].couponName")
                         .value("10% 할인 쿠폰"))
-                .andExpect(jsonPath("$[0].used").value(true));
+                .andExpect(jsonPath("$.couponTypes[0].used").value(true))
+                .andExpect(jsonPath("$.nextCursor").value(1))
+                .andExpect(jsonPath("$.hasNext").value(true));
+    }
+
+    @Test
+    void 이벤트_생성용_활성_쿠폰_종류를_검색한다() throws Exception {
+        when(couponTypeService.findOptions("할인", null, 20))
+                .thenReturn(new CouponTypeOptionListResponse(
+                        List.of(new CouponTypeOptionResponse(
+                                1L,
+                                "10% 할인 쿠폰",
+                                CouponDiscountType.RATE,
+                                BigDecimal.TEN
+                        )),
+                        null,
+                        false
+                ));
+
+        mockMvc.perform(get("/api/v1/admin/coupon-types/options")
+                        .param("keyword", "할인"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.options[0].couponTypeId").value(1))
+                .andExpect(jsonPath("$.options[0].couponName")
+                        .value("10% 할인 쿠폰"))
+                .andExpect(jsonPath("$.hasNext").value(false));
     }
 
     @Test

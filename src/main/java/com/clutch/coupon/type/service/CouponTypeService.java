@@ -2,6 +2,9 @@ package com.clutch.coupon.type.service;
 
 import com.clutch.coupon.event.repository.CouponEventItemRepository;
 import com.clutch.coupon.type.api.dto.CouponTypeCreateRequest;
+import com.clutch.coupon.type.api.dto.CouponTypeListResponse;
+import com.clutch.coupon.type.api.dto.CouponTypeOptionListResponse;
+import com.clutch.coupon.type.api.dto.CouponTypeOptionResponse;
 import com.clutch.coupon.type.api.dto.CouponTypeResponse;
 import com.clutch.coupon.type.api.dto.CouponTypeUpdateRequest;
 import com.clutch.coupon.type.domain.CouponDiscountType;
@@ -12,6 +15,8 @@ import com.clutch.coupon.type.exception.CouponTypeException;
 import com.clutch.coupon.type.repository.CouponTypeRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -53,22 +58,93 @@ public class CouponTypeService {
      * @return 쿠폰 종류 목록
      */
     @Transactional(readOnly = true)
-    public List<CouponTypeResponse> findAll(CouponTypeStatus status) {
-        List<CouponType> couponTypes = status == null
-                ? couponTypeRepository.findAllByOrderByIdDesc()
-                : couponTypeRepository.findAllByStatusOrderByIdDesc(status);
+    public CouponTypeListResponse findAll(
+            CouponTypeStatus status,
+            Long cursor,
+            int size
+    ) {
+        validateListCondition(cursor, size);
+        Slice<CouponType> couponTypeSlice = findCouponTypeSlice(
+                status,
+                cursor,
+                PageRequest.of(0, size)
+        );
+        List<CouponType> couponTypes = couponTypeSlice.getContent();
         Set<Long> usedCouponTypeIds = couponTypes.isEmpty()
                 ? Set.of()
                 : couponEventItemRepository.findUsedCouponTypeIds(
                         couponTypes.stream().map(CouponType::getId).toList()
                 );
 
-        return couponTypes.stream()
+        List<CouponTypeResponse> responses = couponTypes.stream()
                 .map(couponType -> toResponse(
                         couponType,
                         usedCouponTypeIds.contains(couponType.getId())
                 ))
                 .toList();
+        return new CouponTypeListResponse(
+                responses,
+                nextCursor(couponTypeSlice, couponTypes),
+                couponTypeSlice.hasNext()
+        );
+    }
+
+    /**
+     * 이벤트 생성 화면에서 선택할 활성 쿠폰 종류를 검색한다.
+     *
+     * @param keyword 쿠폰 이름 검색어
+     * @param cursor 이 값보다 작은 ID를 조회하며 첫 조회 시 {@code null}
+     * @param size 조회할 선택 항목 수, 1 이상 100 이하
+     * @return 활성 쿠폰 종류 선택 항목과 다음 커서 정보
+     */
+    @Transactional(readOnly = true)
+    public CouponTypeOptionListResponse findOptions(
+            String keyword,
+            Long cursor,
+            int size
+    ) {
+        validateListCondition(cursor, size);
+        String normalizedKeyword = keyword == null ? "" : keyword.trim();
+        PageRequest pageable = PageRequest.of(0, size);
+        Slice<CouponType> couponTypeSlice;
+        if (normalizedKeyword.isEmpty()) {
+            couponTypeSlice = cursor == null
+                    ? couponTypeRepository.findByStatusOrderByIdDesc(
+                            CouponTypeStatus.ACTIVE,
+                            pageable
+                    )
+                    : couponTypeRepository
+                            .findByStatusAndIdLessThanOrderByIdDesc(
+                                    CouponTypeStatus.ACTIVE,
+                                    cursor,
+                                    pageable
+                            );
+        } else {
+            couponTypeSlice = cursor == null
+                    ? couponTypeRepository
+                            .findByStatusAndCouponNameContainingIgnoreCaseOrderByIdDesc(
+                                    CouponTypeStatus.ACTIVE,
+                                    normalizedKeyword,
+                                    pageable
+                            )
+                    : couponTypeRepository
+                            .findByStatusAndCouponNameContainingIgnoreCaseAndIdLessThanOrderByIdDesc(
+                                    CouponTypeStatus.ACTIVE,
+                                    normalizedKeyword,
+                                    cursor,
+                                    pageable
+                            );
+        }
+
+        List<CouponType> couponTypes = couponTypeSlice.getContent();
+        List<CouponTypeOptionResponse> options = couponTypes.stream()
+                .map(this::toOptionResponse)
+                .toList();
+        return new CouponTypeOptionListResponse(
+                options,
+                nextCursor(couponTypeSlice, couponTypes),
+                couponTypeSlice.hasNext()
+        );
     }
 
     /**
@@ -184,6 +260,66 @@ public class CouponTypeService {
                 .orElseThrow(() -> new CouponTypeException(
                         CouponTypeErrorCode.COUPON_TYPE_NOT_FOUND
                 ));
+    }
+
+    private Slice<CouponType> findCouponTypeSlice(
+            CouponTypeStatus status,
+            Long cursor,
+            PageRequest pageable
+    ) {
+        if (status == null && cursor == null) {
+            return couponTypeRepository.findAllByOrderByIdDesc(pageable);
+        }
+        if (status == null) {
+            return couponTypeRepository.findByIdLessThanOrderByIdDesc(
+                    cursor,
+                    pageable
+            );
+        }
+        if (cursor == null) {
+            return couponTypeRepository.findByStatusOrderByIdDesc(
+                    status,
+                    pageable
+            );
+        }
+        return couponTypeRepository.findByStatusAndIdLessThanOrderByIdDesc(
+                status,
+                cursor,
+                pageable
+        );
+    }
+
+    private void validateListCondition(Long cursor, int size) {
+        if (cursor != null && cursor <= 0) {
+            throw new CouponTypeException(
+                    CouponTypeErrorCode.INVALID_COUPON_TYPE_LIST_CONDITION,
+                    "커서는 1 이상이어야 합니다."
+            );
+        }
+        if (size < 1 || size > 100) {
+            throw new CouponTypeException(
+                    CouponTypeErrorCode.INVALID_COUPON_TYPE_LIST_CONDITION,
+                    "조회 크기는 1 이상 100 이하여야 합니다."
+            );
+        }
+    }
+
+    private Long nextCursor(
+            Slice<CouponType> couponTypeSlice,
+            List<CouponType> couponTypes
+    ) {
+        return couponTypeSlice.hasNext() && !couponTypes.isEmpty()
+                ? couponTypes.getLast().getId()
+                : null;
+    }
+
+    private CouponTypeOptionResponse toOptionResponse(CouponType couponType) {
+        return new CouponTypeOptionResponse(
+                couponType.getId(),
+                couponType.getCouponName(),
+                couponType.getDiscountType(),
+                couponType.getDiscountValue()
+        );
     }
 
     private CouponType createDomain(
