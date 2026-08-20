@@ -19,23 +19,6 @@ node replay/replay-server.js --dir replay/fixtures/sample-match-bo3-001 --speed 
 `fixtures/smoke-test/`는 손으로 만든 가짜 경기(세트 1개, bestOf 1) 픽스처다. 실제 녹화 파일이 없어도
 스텁 서버 자체가 정상 동작하는지 바로 확인할 수 있다.
 
-## 같은 매치를 반복 테스트할 때 — auto-reset.js
-
-스텁 서버로 같은 매치를 계속 재생하며 테스트하면 DB에 이전 실행의 매치·세트·배팅 데이터가 계속
-쌓인다. `auto-reset.js`를 스텁 서버·백엔드와 같이 별도 터미널에서 띄워두면, 매치가 끝날 때마다
-(`esports_match.lifecycle_status`가 `completed`로 바뀔 때마다) 그 매치 데이터를 자동으로 지운다.
-
-```bash
-node replay/auto-reset.js --match sample-match-bo3-001
-```
-
-- 감지 후 기본 30초 뒤에 지운다(`--grace-seconds`로 조절 — 결과를 눈으로 확인할 시간을 준다).
-- 지우는 범위는 `--match`로 지정한 그 경기 하나뿐이다(매치·팀·세트·배팅·시청 기록). 유저 계정이나
-  쿠폰 이벤트 설정은 건드리지 않는다 — 그건 매치 주기와 무관하게 계속 재사용하는 것들이라서다.
-- 여러 매치를 동시에 재생 중이면 `auto-reset.js`도 매치 개수만큼 따로 띄우면 된다.
-- MySQL 접속은 `docker exec clutch-mysql-1 mysql ...`로 하므로, 로컬 docker compose 인프라가
-  떠 있어야 한다.
-
 ## 팀원에게 다른 형식의 파일을 받았다면 — convert-fixture.js
 
 녹화/합성 파일이 이 문서의 "엔드포인트별 JSONL" 계약과 다른 모양(예: 폴링 틱 하나에 여러 API 호출이
