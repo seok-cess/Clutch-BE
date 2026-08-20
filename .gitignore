@@ -44,9 +44,6 @@ out/
 ### k6 output ###
 k6/results/
 
-### replay fixtures (녹화 데이터 — 용량 커서 저장소에 안 어울림) ###
-replay/fixtures/*
-!replay/fixtures/smoke-test/
 
 ### 로컬 전용 Gradle 설정 ###
 # 한글 경로 + MS949 코드페이지 환경에서만 필요한 인코딩 지정.
