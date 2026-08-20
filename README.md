@@ -200,10 +200,49 @@ K6_BASE_URL=http://app:8080 docker compose --profile app run --rm k6
 기본 테스트는 가상 사용자 5명이 10초 동안 `/actuator/health`를 호출합니다. 사용자 수와 실행 시간은 다음처럼 변경할 수 있습니다.
 
 ```bash
-K6_VUS=20 K6_DURATION=30s docker compose run --rm k6
+SMOKE_VUS=20 SMOKE_DURATION=30s docker compose run --rm k6
 ```
 
 테스트 스크립트는 `k6/smoke.js`에 있습니다. HTTP 성공 여부, 애플리케이션의 `UP` 상태, 실패율, 95 백분위 응답 시간을 검사합니다.
+
+### 쿠폰 선착순 100명 테스트
+
+`k6/coupon-burst.js`는 사용자 100명이 샘플 페이지에 접속한 뒤 활성 쿠폰 이벤트를 1.5초마다 조회하는 흐름을 재현합니다. 사용자가 먼저 조회를 시작하고 15초 뒤 관리자 요청으로 이벤트를 수동 오픈합니다. 기본 쿠폰 수량은 사용자 수의 절반인 50개입니다.
+
+테스트 전에 다음 조건을 확인합니다.
+
+- 프런트엔드가 `http://100.101.76.93:5173`에서 실행 중이다.
+- 백엔드가 `http://100.101.76.93:8080`에서 실행 중이다.
+- 경기 ID `316`이 존재한다.
+- 이름이 `[K6] 10%`이고 할인 유형과 값이 `RATE`, `10`인 활성 쿠폰 종류가 존재한다.
+- MySQL, Redis와 Kafka가 정상 실행 중이다.
+
+PowerShell에서 기본 테스트를 실행합니다.
+
+```powershell
+docker compose run --rm `
+  -e FRONTEND_URL=http://100.101.76.93:5173 `
+  -e BASE_URL=http://100.101.76.93:8080 `
+  -e COUPON_VUS=100 `
+  -e COUPON_QUANTITY=50 `
+  -e USER_ID_START=900001 `
+  k6 run /scripts/coupon-burst.js
+```
+
+Prometheus Remote Write까지 사용하려면 설정한 Prometheus 주소를 전달하고 출력 옵션을 추가합니다.
+
+```powershell
+docker compose run --rm `
+  -e FRONTEND_URL=http://100.101.76.93:5173 `
+  -e BASE_URL=http://100.101.76.93:8080 `
+  -e COUPON_VUS=100 `
+  -e COUPON_QUANTITY=50 `
+  -e USER_ID_START=900001 `
+  -e K6_PROMETHEUS_RW_SERVER_URL=http://host.docker.internal:9090/api/v1/write `
+  k6 run -o experimental-prometheus-rw /scripts/coupon-burst.js
+```
+
+테스트는 쿠폰 요청 성공 50건, 재고 소진 50건, 예상하지 않은 오류 0건을 합격 기준으로 사용합니다. 성공한 사용자는 `내 쿠폰` API를 반복 조회하여 Kafka 처리 후 사용자 쿠폰이 실제 저장됐는지도 확인합니다. 같은 날 다시 실행해도 수동 테스트 트리거에는 새로운 순번이 자동으로 부여되지만, 이벤트와 발급 데이터는 데이터베이스에 계속 남습니다.
 
 ## 기본 접속 정보
 
