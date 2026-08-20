@@ -78,6 +78,21 @@ public class EsportsMatch {
     }
 
     /** 재적재 시 변할 수 있는 값만 갱신한다 (외부 식별자·리그는 불변) */
+    /**
+     * 소속 리그·대회를 소스 실제값으로 바로잡는다.
+     *
+     * getLive 는 전 리그를 주는데 예전 적재는 설정의 단일 리그 id 를 그대로 박아
+     * 타 리그 경기까지 LCK 로 저장됐다. getEventDetails 가 주는 값으로 교정한다.
+     */
+    public void reassignOrigin(String leagueExternalId, String tournamentExternalId) {
+        if (leagueExternalId != null && !leagueExternalId.isBlank()) {
+            this.leagueExternalId = leagueExternalId;
+        }
+        if (tournamentExternalId != null && !tournamentExternalId.isBlank()) {
+            this.tournamentExternalId = tournamentExternalId;
+        }
+    }
+
     public void updateProgress(String lifecycleStatus, LocalDateTime startedAt, Integer bestOf) {
         this.lifecycleStatus = lifecycleStatus;
         if (startedAt != null) {
