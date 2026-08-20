@@ -141,8 +141,19 @@ public final class ApiDtos {
     ) {
     }
 
+    /**
+     * 순위표 한 그룹.
+     *
+     * LCK 는 정규시즌을 레전드·라이즈 두 그룹으로 나눠 운영한다. 그룹 편성은
+     * 소스의 getStandingsV3 가 주므로 우리가 판단하지 않는다.
+     *
+     * @param groupName 그룹 없이 단일 순위면 null
+     */
+    public record TeamStandingsGroup(String groupName, List<TeamStandingRow> rows) {
+    }
+
     /** /api/standings/teams 응답 */
-    public record TeamStandingsBoard(String seasonKey, List<TeamStandingRow> rows) {
+    public record TeamStandingsBoard(String seasonKey, List<TeamStandingsGroup> groups) {
     }
 
     // ---- /api/live ----

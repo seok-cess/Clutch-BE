@@ -7,6 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 메인 화면의 시즌 요약 지표를 계산한다.
@@ -118,7 +119,8 @@ public class SeasonStatsService {
      */
     @Transactional(readOnly = true)
     public ApiDtos.TeamStandingsBoard teamStandings(String season, String leagueId,
-                                                    List<String> tournamentIds) {
+                                                    List<String> tournamentIds,
+                                                    Map<String, String> groupByTeamCode) {
         String seasonKey = resolveSeason(season);
         if (seasonKey == null || tournamentIds == null || tournamentIds.isEmpty()) {
             return new ApiDtos.TeamStandingsBoard(seasonKey, List.of());
@@ -148,7 +150,38 @@ public class SeasonStatsService {
                                 Comparator.reverseOrder()))
                 .toList();
 
-        return new ApiDtos.TeamStandingsBoard(seasonKey, withTeamRank(rows));
+        Map<String, String> groups = groupByTeamCode == null ? Map.of() : groupByTeamCode;
+        if (groups.isEmpty()) {
+            // 그룹 편성을 모르면 단일 순위표로 내려준다
+            return new ApiDtos.TeamStandingsBoard(seasonKey,
+                    List.of(new ApiDtos.TeamStandingsGroup(null, withTeamRank(rows))));
+        }
+
+        // 그룹별로 나눠 각 그룹 안에서 순위를 매긴다. 소스가 준 그룹 순서를 유지한다
+        Map<String, List<ApiDtos.TeamStandingRow>> byGroup = new java.util.LinkedHashMap<>();
+        for (String name : new java.util.LinkedHashSet<>(groups.values())) {
+            byGroup.put(name, new java.util.ArrayList<>());
+        }
+        List<ApiDtos.TeamStandingRow> ungrouped = new java.util.ArrayList<>();
+        for (ApiDtos.TeamStandingRow r : rows) {
+            String g = groups.get(r.teamCode());
+            if (g == null) {
+                ungrouped.add(r);
+            } else {
+                byGroup.get(g).add(r);
+            }
+        }
+
+        List<ApiDtos.TeamStandingsGroup> out = new java.util.ArrayList<>();
+        byGroup.forEach((name, list) -> {
+            if (!list.isEmpty()) {
+                out.add(new ApiDtos.TeamStandingsGroup(name, withTeamRank(list)));
+            }
+        });
+        if (!ungrouped.isEmpty()) {
+            out.add(new ApiDtos.TeamStandingsGroup(null, withTeamRank(ungrouped)));
+        }
+        return new ApiDtos.TeamStandingsBoard(seasonKey, out);
     }
 
     /** 정렬된 순위표에 순위를 매긴다. 승·세트득실이 모두 같으면 공동 순위 */
