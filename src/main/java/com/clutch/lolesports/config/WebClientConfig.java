@@ -1,5 +1,6 @@
 package com.clutch.lolesports.config;
 
+import com.clutch.lolesports.source.ExternalSourceProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.codec.ClientCodecConfigurer;
@@ -25,9 +26,9 @@ public class WebClientConfig {
                 .build();
     }
 
-    /** esports-api.lolesports.com/persisted/gw — x-api-key 필요 */
+    /** 실제 esports-api.lolesports.com/persisted/gw — x-api-key 필요 */
     @Bean
-    public WebClient esportsWebClient(LolesportsProperties props) {
+    public WebClient realEsportsWebClient(LolesportsProperties props) {
         return WebClient.builder()
                 .baseUrl(props.esportsApiBaseUrl())
                 .defaultHeader("x-api-key", props.apiKey())
@@ -35,11 +36,29 @@ public class WebClientConfig {
                 .build();
     }
 
-    /** feed.lolesports.com/livestats/v1 — api key 불필요 */
+    /** replay 스텁의 persisted API 호환 엔드포인트. */
     @Bean
-    public WebClient liveStatsWebClient(LolesportsProperties props) {
+    public WebClient stubEsportsWebClient(ExternalSourceProperties props) {
+        return WebClient.builder()
+                .baseUrl(props.stubEsportsApiBaseUrl())
+                .exchangeStrategies(strategies())
+                .build();
+    }
+
+    /** 실제 feed.lolesports.com/livestats/v1 — api key 불필요 */
+    @Bean
+    public WebClient realLiveStatsWebClient(LolesportsProperties props) {
         return WebClient.builder()
                 .baseUrl(props.liveStatsBaseUrl())
+                .exchangeStrategies(strategies())
+                .build();
+    }
+
+    /** replay 스텁의 livestats API 호환 엔드포인트. */
+    @Bean
+    public WebClient stubLiveStatsWebClient(ExternalSourceProperties props) {
+        return WebClient.builder()
+                .baseUrl(props.stubLiveStatsBaseUrl())
                 .exchangeStrategies(strategies())
                 .build();
     }

@@ -66,6 +66,13 @@ public class HistoricalGameService {
         this.cache = cache;
     }
 
+    /** 외부 소스 전환 시 이전 소스에서 만든 온디맨드 조회 상태를 비운다. */
+    public void resetForExternalSourceChange() {
+        timelineLoaded.clear();
+        completedMatchGames.clear();
+        failedUntil.clear();
+    }
+
     /**
      * 종료된 게임의 전체 타임라인을 훑어 버퍼에 채운다 (골드차 추이 그래프용).
      * livestats 는 한 번에 10초 창만 주므로, 게임 시작부터 10초 간격으로 요청해 이어 붙인다.
