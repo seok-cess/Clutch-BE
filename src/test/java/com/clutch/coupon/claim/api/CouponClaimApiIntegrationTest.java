@@ -1,6 +1,7 @@
 package com.clutch.coupon.claim.api;
 
 import com.clutch.coupon.claim.redis.CouponClaimRedisKeys;
+import com.clutch.coupon.claim.recovery.CouponStockRecoveryStateManager;
 import com.clutch.coupon.event.domain.CouponEventOccurrence;
 import com.clutch.coupon.event.domain.CouponEventOccurrenceStatus;
 import com.clutch.coupon.event.repository.CouponEventOccurrenceRepository;
@@ -60,6 +61,9 @@ class CouponClaimApiIntegrationTest {
     @Autowired
     private StringRedisTemplate stringRedisTemplate;
 
+    @Autowired
+    private CouponStockRecoveryStateManager recoveryStateManager;
+
     /**
      * 쿠폰 이벤트 회차 저장소
      */
@@ -83,6 +87,7 @@ class CouponClaimApiIntegrationTest {
      */
     @BeforeEach
     void setUp() {
+        recoveryStateManager.markReady();
         deleteRedisKeys();
 
         LocalDateTime currentTime =
@@ -182,6 +187,11 @@ class CouponClaimApiIntegrationTest {
                 COUPON_TYPE_ID,
                 10,
                 0
+        );
+
+        stringRedisTemplate.opsForValue().set(
+                CouponClaimRedisKeys.stock(COUPON_EVENT_ITEM_ID),
+                "10"
         );
 
         jdbcTemplate.update(
@@ -413,6 +423,10 @@ class CouponClaimApiIntegrationTest {
                         """,
                 COUPON_EVENT_ITEM_ID
         );
+        stringRedisTemplate.opsForValue().set(
+                CouponClaimRedisKeys.stock(COUPON_EVENT_ITEM_ID),
+                "0"
+        );
 
         // when, then
         mockMvc.perform(
@@ -452,6 +466,7 @@ class CouponClaimApiIntegrationTest {
      */
     @AfterEach
     void tearDown() {
+        recoveryStateManager.markReady();
         deleteRedisKeys();
     }
 

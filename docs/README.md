@@ -10,6 +10,7 @@
 | `domain/` | 도메인 용어, 불변식과 핵심 처리 규칙 |
 | `conventions/` | Git, 데이터베이스 등 반복 적용되는 개발 규칙 |
 | `adr/` | 중요한 기술 선택의 배경, 대안과 결과 |
+| `learning/` | 구현 내용을 학습하고 발표하기 위한 쉬운 설명 |
 
 ## 다른 협업 도구와의 관계
 
@@ -32,6 +33,8 @@ Notion에서 논의한 내용이 실제 구현을 제약하는 기술 결정으�
 - 패키지 구조: `architecture/package-structure.md`
 - 쿠폰 발급 규칙: `domain/coupon.md`
 - 쿠폰 실시간 잔여 재고 API: `api/coupon-stock.md`
+- Redis 쿠폰 재고 복구 결정: `adr/002-redis-coupon-stock-recovery.md`
+- Redis 쿠폰 재고 복구 학습: `learning/coupon-redis-recovery.md`
 - 시청 포인트 지급 규칙: `domain/viewing-point.md`
 - 승패 배팅 규칙: `domain/betting.md`
 - Git, 커밋과 Pull Request: `conventions/git-convention.md`

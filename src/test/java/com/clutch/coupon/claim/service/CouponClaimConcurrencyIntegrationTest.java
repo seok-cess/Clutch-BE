@@ -2,6 +2,7 @@ package com.clutch.coupon.claim.service;
 
 import com.clutch.coupon.claim.exception.CouponClaimException;
 import com.clutch.coupon.claim.redis.CouponClaimRedisKeys;
+import com.clutch.coupon.claim.recovery.CouponStockRecoveryStateManager;
 import com.clutch.lolesports.service.PollingScheduler;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -69,6 +70,9 @@ class CouponClaimConcurrencyIntegrationTest {
     @Autowired
     private StringRedisTemplate stringRedisTemplate;
 
+    @Autowired
+    private CouponStockRecoveryStateManager recoveryStateManager;
+
     /**
      * 경기 데이터 수집 스케줄러 모의 객체
      */
@@ -80,6 +84,7 @@ class CouponClaimConcurrencyIntegrationTest {
      */
     @BeforeEach
     void setUp() {
+        recoveryStateManager.markReady();
         cleanUpTestData();
 
 
@@ -182,6 +187,11 @@ class CouponClaimConcurrencyIntegrationTest {
                 0
         );
 
+        stringRedisTemplate.opsForValue().set(
+                CouponClaimRedisKeys.stock(COUPON_EVENT_ITEM_ID),
+                String.valueOf(STOCK_QUANTITY)
+        );
+
         jdbcTemplate.update(
                 """
                         INSERT INTO coupon_event_phase (
@@ -204,6 +214,7 @@ class CouponClaimConcurrencyIntegrationTest {
      */
     @AfterEach
     void tearDown() {
+        recoveryStateManager.markReady();
         cleanUpTestData();
     }
 

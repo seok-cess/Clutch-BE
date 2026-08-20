@@ -2,6 +2,7 @@ package com.clutch.wallet.service;
 
 import com.clutch.coupon.contract.issuance.CouponIssuanceCommand;
 import com.clutch.coupon.contract.issuance.CouponIssuanceResult;
+import com.clutch.coupon.contract.issuance.CouponIssuanceRecoveryReader;
 import com.clutch.coupon.contract.issuance.CouponIssuer;
 import com.clutch.coupon.contract.kafka.CouponClaimAcceptedEvent;
 import com.clutch.coupon.contract.kafka.CouponIssueResultEvent;
@@ -22,7 +23,9 @@ import java.util.UUID;
  * 쿠폰 생성 서비스
  */
 @Service
-public class CouponIssuanceService implements CouponIssuer {
+public class CouponIssuanceService implements
+        CouponIssuer,
+        CouponIssuanceRecoveryReader {
 
     private static final int EVENT_VERSION = 1;
 
@@ -75,6 +78,26 @@ public class CouponIssuanceService implements CouponIssuer {
 
         return new CouponIssuanceResult(
                 savedCoupon.getId()
+        );
+    }
+
+    /** 쿠폰 이벤트 항목별 실제 발급 수량 */
+    @Override
+    @Transactional(readOnly = true)
+    public long countIssuedCoupons(Long couponEventItemId) {
+        return userCouponRepository.countByCouponEventItemId(
+                couponEventItemId
+        );
+    }
+
+    /** 쿠폰 이벤트 회차별 실제 발급 사용자 목록 */
+    @Override
+    @Transactional(readOnly = true)
+    public java.util.List<Long> findIssuedUserIds(
+            Long couponEventOccurrenceId
+    ) {
+        return userCouponRepository.findUserIdsByOccurrenceId(
+                couponEventOccurrenceId
         );
     }
 
