@@ -2,6 +2,8 @@ package com.clutch.coupon.type.service;
 
 import com.clutch.coupon.event.repository.CouponEventItemRepository;
 import com.clutch.coupon.type.api.dto.CouponTypeCreateRequest;
+import com.clutch.coupon.type.api.dto.CouponTypeListResponse;
+import com.clutch.coupon.type.api.dto.CouponTypeOptionListResponse;
 import com.clutch.coupon.type.api.dto.CouponTypeResponse;
 import com.clutch.coupon.type.api.dto.CouponTypeUpdateRequest;
 import com.clutch.coupon.type.domain.CouponDiscountType;
@@ -15,6 +17,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.SliceImpl;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
@@ -72,19 +76,92 @@ class CouponTypeServiceTest {
     void 상태별_쿠폰_종류와_사용_여부를_조회한다() {
         CouponType first = couponType(1L, "10% 할인 쿠폰");
         CouponType second = couponType(2L, "20% 할인 쿠폰");
-        when(couponTypeRepository.findAllByStatusOrderByIdDesc(
-                CouponTypeStatus.ACTIVE
-        )).thenReturn(List.of(second, first));
+        PageRequest pageable = PageRequest.of(0, 20);
+        when(couponTypeRepository.findByStatusOrderByIdDesc(
+                CouponTypeStatus.ACTIVE,
+                pageable
+        )).thenReturn(new SliceImpl<>(
+                List.of(second, first),
+                pageable,
+                true
+        ));
         when(couponEventItemRepository.findUsedCouponTypeIds(List.of(2L, 1L)))
                 .thenReturn(Set.of(1L));
 
-        List<CouponTypeResponse> responses = couponTypeService.findAll(
-                CouponTypeStatus.ACTIVE
+        CouponTypeListResponse response = couponTypeService.findAll(
+                CouponTypeStatus.ACTIVE,
+                null,
+                20
         );
 
-        assertThat(responses).hasSize(2);
-        assertThat(responses.get(0).used()).isFalse();
-        assertThat(responses.get(1).used()).isTrue();
+        assertThat(response.couponTypes()).hasSize(2);
+        assertThat(response.couponTypes().get(0).used()).isFalse();
+        assertThat(response.couponTypes().get(1).used()).isTrue();
+        assertThat(response.nextCursor()).isEqualTo(1L);
+        assertThat(response.hasNext()).isTrue();
+    }
+
+    @Test
+    void 커서보다_작은_쿠폰_종류를_다음_페이지로_조회한다() {
+        CouponType couponType = couponType(7L, "10% 할인 쿠폰");
+        PageRequest pageable = PageRequest.of(0, 10);
+        when(couponTypeRepository.findByIdLessThanOrderByIdDesc(
+                10L,
+                pageable
+        )).thenReturn(new SliceImpl<>(List.of(couponType), pageable, false));
+        when(couponEventItemRepository.findUsedCouponTypeIds(List.of(7L)))
+                .thenReturn(Set.of());
+
+        CouponTypeListResponse response = couponTypeService.findAll(
+                null,
+                10L,
+                10
+        );
+
+        assertThat(response.couponTypes())
+                .extracting(CouponTypeResponse::couponTypeId)
+                .containsExactly(7L);
+        assertThat(response.nextCursor()).isNull();
+        assertThat(response.hasNext()).isFalse();
+    }
+
+    @Test
+    void 이벤트_생성용_쿠폰은_활성_상태와_이름으로_검색한다() {
+        CouponType couponType = couponType(3L, "20% 할인 쿠폰");
+        PageRequest pageable = PageRequest.of(0, 20);
+        when(couponTypeRepository
+                .findByStatusAndCouponNameContainingIgnoreCaseOrderByIdDesc(
+                        CouponTypeStatus.ACTIVE,
+                        "20%",
+                        pageable
+                )).thenReturn(new SliceImpl<>(
+                        List.of(couponType),
+                        pageable,
+                        false
+                ));
+
+        CouponTypeOptionListResponse response = couponTypeService.findOptions(
+                " 20% ",
+                null,
+                20
+        );
+
+        assertThat(response.options()).hasSize(1);
+        assertThat(response.options().getFirst().couponTypeId()).isEqualTo(3L);
+        assertThat(response.options().getFirst().couponName())
+                .isEqualTo("20% 할인 쿠폰");
+        assertThat(response.hasNext()).isFalse();
+    }
+
+    @Test
+    void 목록_크기가_허용_범위를_벗어나면_조회할_수_없다() {
+        assertThatThrownBy(() -> couponTypeService.findAll(null, null, 101))
+                .isInstanceOfSatisfying(
+                        CouponTypeException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(CouponTypeErrorCode
+                                        .INVALID_COUPON_TYPE_LIST_CONDITION)
+                );
     }
 
     @Test

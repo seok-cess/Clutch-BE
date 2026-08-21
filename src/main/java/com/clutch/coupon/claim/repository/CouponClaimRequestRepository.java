@@ -2,6 +2,11 @@ package com.clutch.coupon.claim.repository;
 
 import com.clutch.coupon.claim.domain.CouponClaimRequest;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import com.clutch.coupon.claim.domain.ClaimRequestStatus;
+
+import java.util.List;
 
 /**
  * 쿠폰 발급 요청 저장소
@@ -28,4 +33,22 @@ public interface CouponClaimRequestRepository
      * @return 발급 요청 이력이 있으면 {@code true}
      */
     boolean existsByCouponEventId(Long couponEventId);
+
+    /** 쿠폰 이벤트 항목별 상태 요청 수 */
+    long countByCouponEventItemIdAndRequestStatus(
+            Long couponEventItemId,
+            ClaimRequestStatus requestStatus
+    );
+
+    /** 쿠폰 이벤트 회차별 상태 사용자 목록 */
+    @Query("""
+            select request.userId
+              from CouponClaimRequest request
+             where request.couponEventOccurrenceId = :occurrenceId
+               and request.requestStatus = :status
+            """)
+    List<Long> findUserIdsByOccurrenceIdAndStatus(
+            @Param("occurrenceId") Long occurrenceId,
+            @Param("status") ClaimRequestStatus status
+    );
 }

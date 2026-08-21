@@ -3,6 +3,7 @@ package com.clutch.coupon.claim.service;
 import com.clutch.coupon.claim.api.dto.CouponStockResponse;
 import com.clutch.coupon.claim.exception.CouponClaimException;
 import com.clutch.coupon.claim.redis.CouponClaimRedisKeys;
+import com.clutch.coupon.claim.recovery.CouponStockRecoveryStateManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -17,15 +18,19 @@ import static com.clutch.coupon.claim.exception.CouponClaimErrorCode.COUPON_STOC
 public class CouponStockService {
 
     private final StringRedisTemplate stringRedisTemplate;
+    private final CouponStockRecoveryStateManager recoveryStateManager;
 
     /** 쿠폰 이벤트 항목 Redis 재고 조회 */
     public CouponStockResponse getStock(Long couponEventItemId) {
+        recoveryStateManager.requireReady();
+
         String value;
         try {
             value = stringRedisTemplate.opsForValue().get(
                     CouponClaimRedisKeys.stock(couponEventItemId)
             );
         } catch (DataAccessException exception) {
+            recoveryStateManager.markUnavailable();
             throw new CouponClaimException(
                     COUPON_STOCK_READ_FAILED,
                     exception
@@ -33,6 +38,7 @@ public class CouponStockService {
         }
 
         if (value == null) {
+            recoveryStateManager.markUnavailable();
             throw new CouponClaimException(
                     COUPON_STOCK_NOT_INITIALIZED
             );

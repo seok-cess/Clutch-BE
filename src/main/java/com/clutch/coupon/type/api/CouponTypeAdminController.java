@@ -1,6 +1,8 @@
 package com.clutch.coupon.type.api;
 
 import com.clutch.coupon.type.api.dto.CouponTypeCreateRequest;
+import com.clutch.coupon.type.api.dto.CouponTypeListResponse;
+import com.clutch.coupon.type.api.dto.CouponTypeOptionListResponse;
 import com.clutch.coupon.type.api.dto.CouponTypeResponse;
 import com.clutch.coupon.type.api.dto.CouponTypeStatusUpdateRequest;
 import com.clutch.coupon.type.api.dto.CouponTypeUpdateRequest;
@@ -19,8 +21,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.List;
 
 /**
  * 관리자 쿠폰 종류 CRUD API를 제공하는 컨트롤러.
@@ -51,13 +51,34 @@ public class CouponTypeAdminController {
      * 쿠폰 종류를 최신순으로 조회한다.
      *
      * @param status 조회할 상태, 전체 조회 시 {@code null}
-     * @return 조건에 맞는 쿠폰 종류 목록
+     * @param cursor 이전 페이지의 마지막 쿠폰 종류 ID, 첫 조회 시 {@code null}
+     * @param size 한 번에 조회할 쿠폰 종류 수
+     * @return 조건에 맞는 쿠폰 종류와 다음 커서 정보
      */
     @GetMapping
-    public List<CouponTypeResponse> findAll(
-            @RequestParam(required = false) CouponTypeStatus status
+    public CouponTypeListResponse findAll(
+            @RequestParam(required = false) CouponTypeStatus status,
+            @RequestParam(required = false) Long cursor,
+            @RequestParam(defaultValue = "20") int size
     ) {
-        return couponTypeService.findAll(status);
+        return couponTypeService.findAll(status, cursor, size);
+    }
+
+    /**
+     * 이벤트 생성 화면에서 선택할 활성 쿠폰 종류를 조회한다.
+     *
+     * @param keyword 쿠폰 이름 검색어, 전체 활성 목록 조회 시 {@code null}
+     * @param cursor 이전 페이지의 마지막 쿠폰 종류 ID, 첫 조회 시 {@code null}
+     * @param size 한 번에 조회할 선택 항목 수
+     * @return 활성 쿠폰 종류 선택 항목과 다음 커서 정보
+     */
+    @GetMapping("/options")
+    public CouponTypeOptionListResponse findOptions(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Long cursor,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        return couponTypeService.findOptions(keyword, cursor, size);
     }
 
     /**

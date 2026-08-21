@@ -10,7 +10,7 @@ import com.clutch.coupon.claim.domain.CouponClaimRequest;
 import com.clutch.coupon.claim.exception.CouponClaimException;
 import com.clutch.coupon.claim.redis.CouponClaimRedisExecutor;
 import com.clutch.coupon.claim.redis.CouponClaimRedisResult;
-import com.clutch.coupon.claim.redis.CouponStockInitializer;
+import com.clutch.coupon.claim.recovery.CouponStockRecoveryStateManager;
 import com.clutch.coupon.claim.repository.CouponClaimRequestRepository;
 import com.clutch.coupon.event.domain.CouponEventItem;
 import com.clutch.coupon.event.domain.CouponEventOccurrence;
@@ -24,6 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.dao.DataAccessException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -48,8 +49,8 @@ public class CouponClaimService {
     private final CouponEventOccurrenceRepository couponEventOccurrenceRepository;
     private final CouponClaimRequestRepository couponClaimRequestRepository;
     private final CouponClaimItemSelector couponClaimItemSelector;
-    private final CouponStockInitializer couponStockInitializer;
     private final CouponClaimRedisExecutor couponClaimRedisExecutor;
+    private final CouponStockRecoveryStateManager recoveryStateManager;
     private final CouponEventItemRepository couponEventItemRepository;
 
     private final CouponBenefitSnapshotRepository
@@ -72,6 +73,8 @@ public class CouponClaimService {
             Long couponEventId,
             Long couponEventOccurrenceId
     ){
+
+        recoveryStateManager.requireReady();
 
         couponEventRepository
                 .findById(couponEventId)
@@ -131,7 +134,6 @@ public class CouponClaimService {
 
         CouponClaimRedisResult redisResult =
                 executeRedisClaim(
-                        couponEventId,
                         couponEventItem.getId(),
                         couponEventOccurrenceId,
                         userId
@@ -260,12 +262,24 @@ public class CouponClaimService {
                             ) {
                                 if (status
                                         == STATUS_ROLLED_BACK) {
-                                    couponClaimRedisExecutor
-                                            .rollback(
+                                    try {
+                                        couponClaimRedisExecutor.rollback(
                                                     couponEventItemId,
                                                     couponEventOccurrenceId,
                                                     userId
-                                            );
+                                        );
+                                    } catch (DataAccessException exception) {
+                                        recoveryStateManager.markUnavailable();
+                                        log.warn(
+                                                "Redis 재고 보상 실패: "
+                                                        + "couponEventItemId={}, "
+                                                        + "occurrenceId={}, userId={}",
+                                                couponEventItemId,
+                                                couponEventOccurrenceId,
+                                                userId,
+                                                exception
+                                        );
+                                    }
                                 }
                             }
                         }
@@ -275,40 +289,35 @@ public class CouponClaimService {
     /**
      * 쿠폰 발급 Redis 실행
      *
-     * @param couponEventId           쿠폰 이벤트 식별자
      * @param couponEventItemId       쿠폰 이벤트 항목 식별자
      * @param couponEventOccurrenceId 쿠폰 이벤트 회차 식별자
      * @param userId                  사용자 식별자
      * @return 쿠폰 발급 Redis 실행 결과
      */
     private CouponClaimRedisResult executeRedisClaim(
-            Long couponEventId,
             Long couponEventItemId,
             Long couponEventOccurrenceId,
             Long userId
     ) {
-        CouponClaimRedisResult result =
-                couponClaimRedisExecutor.claim(
-                        couponEventItemId,
-                        couponEventOccurrenceId,
-                        userId
-                );
-
-        if (result
-                == CouponClaimRedisResult
-                .STOCK_NOT_INITIALIZED) {
-            couponStockInitializer.initialize(
-                    couponEventId
-            );
-
-            result = couponClaimRedisExecutor.claim(
+        try {
+            CouponClaimRedisResult result =
+                    couponClaimRedisExecutor.claim(
                     couponEventItemId,
                     couponEventOccurrenceId,
                     userId
             );
-        }
 
-        return result;
+            if (result == CouponClaimRedisResult.STOCK_NOT_INITIALIZED) {
+                recoveryStateManager.markUnavailable();
+            }
+            return result;
+        } catch (DataAccessException exception) {
+            recoveryStateManager.markUnavailable();
+            throw new CouponClaimException(
+                    COUPON_REDIS_UNAVAILABLE,
+                    exception
+            );
+        }
     }
 
     /**

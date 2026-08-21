@@ -29,6 +29,19 @@ public interface UserCouponRepository extends JpaRepository<UserCoupon, Long> {
      */
     boolean existsByCouponEventId(Long couponEventId);
 
+    /** 쿠폰 이벤트 항목별 실제 발급 수량 */
+    long countByCouponEventItemId(Long couponEventItemId);
+
+    /** 쿠폰 이벤트 회차별 실제 발급 사용자 목록 */
+    @Query("""
+            select coupon.userId
+              from UserCoupon coupon
+             where coupon.couponEventOccurrenceId = :occurrenceId
+            """)
+    List<Long> findUserIdsByOccurrenceId(
+            @Param("occurrenceId") Long occurrenceId
+    );
+
     Optional<UserCoupon> findByIdAndUserId(Long id, Long userId);
 
     @Query("""
