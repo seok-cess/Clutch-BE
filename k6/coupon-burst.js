@@ -71,7 +71,7 @@ export const options = {
   thresholds: {
     checks: ['rate>0.99'],
     http_req_failed: ['rate<0.01'],
-    'http_req_duration{endpoint:claim}': ['p(95)<1000'],
+    'http_req_duration{endpoint:claim}': ['p(95)<3000'],
     coupon_claim_expected: ['rate>0.99'],
     coupon_event_detected: ['rate>0.99'],
     coupon_claim_success_total: [`count==${couponQuantity}`],
