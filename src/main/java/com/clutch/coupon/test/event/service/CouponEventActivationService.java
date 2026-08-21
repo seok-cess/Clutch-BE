@@ -1,5 +1,7 @@
 package com.clutch.coupon.test.event.service;
 
+import com.clutch.coupon.claim.redis.CouponStockInitializer;
+import com.clutch.coupon.claim.recovery.CouponStockRecoveryStateManager;
 import com.clutch.coupon.event.domain.CouponEventItem;
 import com.clutch.coupon.event.domain.CouponEventOccurrenceStatus;
 import com.clutch.coupon.event.domain.CouponEventStatus;
@@ -12,8 +14,11 @@ import com.clutch.coupon.test.event.exception.CouponEventException;
 import com.clutch.coupon.test.event.repository.CouponEventOccurrenceRepository;
 import com.clutch.coupon.test.event.repository.CouponEventRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -29,6 +34,8 @@ public class CouponEventActivationService {
     private final CouponEventRepository couponEventRepository;
     private final CouponEventItemRepository couponEventItemRepository;
     private final CouponEventOccurrenceRepository occurrenceRepository;
+    private final CouponStockInitializer couponStockInitializer;
+    private final CouponStockRecoveryStateManager recoveryStateManager;
     private final Clock clock;
 
     /** 경기 트리거와 무관하게 대기 중인 쿠폰 이벤트를 즉시 연다. */
@@ -75,6 +82,8 @@ public class CouponEventActivationService {
                         event.getClaimWindowSeconds()
                 )
         );
+
+        initializeStockAfterCommit(event.getId());
 
         return toResponse(event, occurrence, remainingQuantity, true);
     }
@@ -149,6 +158,38 @@ public class CouponEventActivationService {
                 remainingQuantity,
                 claimable
         );
+    }
+
+    /**
+     * DB에 회차가 확정된 뒤에만 Redis 재고 키를 준비한다.
+     *
+     * <p>초기화 실패는 실제 Redis 장애로 취급해 이후 발급을 fail-closed로 막고,
+     * 기존 복구 스케줄러가 DB 기준 재구축을 수행하게 한다.</p>
+     */
+    private void initializeStockAfterCommit(Long couponEventId) {
+        if (!TransactionSynchronizationManager
+                .isSynchronizationActive()) {
+            initializeStock(couponEventId);
+            return;
+        }
+
+        TransactionSynchronizationManager.registerSynchronization(
+                new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        initializeStock(couponEventId);
+                    }
+                }
+        );
+    }
+
+    private void initializeStock(Long couponEventId) {
+        try {
+            couponStockInitializer.initialize(couponEventId);
+        } catch (DataAccessException exception) {
+            recoveryStateManager.markUnavailable();
+            throw exception;
+        }
     }
 
     private LocalDateTime now() {
