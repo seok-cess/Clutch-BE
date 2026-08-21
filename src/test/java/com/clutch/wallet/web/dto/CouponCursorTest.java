@@ -2,6 +2,9 @@ package com.clutch.wallet.web.dto;
 
 import com.clutch.wallet.web.exception.InvalidCouponQueryException;
 import org.junit.jupiter.api.Test;
+
+import java.time.Instant;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 public class CouponCursorTest {
@@ -17,7 +20,7 @@ public class CouponCursorTest {
     void 정상_커서를_파싱한다(){
         CouponCursor cursor = CouponCursor.parse("1734000000000_57");
         assertEquals(57L, cursor.id());
-        assertNotNull(cursor.expiresAt());
+        assertEquals(Instant.ofEpochMilli(1734000000000L), cursor.expiresAt());
     }
 
     @Test
