@@ -1,5 +1,7 @@
 package com.clutch.coupon.test.event.service;
 
+import com.clutch.coupon.claim.redis.CouponStockInitializer;
+import com.clutch.coupon.claim.recovery.CouponStockRecoveryStateManager;
 import com.clutch.coupon.event.domain.CouponEventItem;
 import com.clutch.coupon.event.domain.CouponEventOccurrenceStatus;
 import com.clutch.coupon.event.domain.CouponEventStatus;
@@ -16,6 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Clock;
@@ -29,6 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -52,6 +56,12 @@ class CouponEventActivationServiceTest {
     @Mock
     private CouponEventOccurrenceRepository occurrenceRepository;
 
+    @Mock
+    private CouponStockInitializer couponStockInitializer;
+
+    @Mock
+    private CouponStockRecoveryStateManager recoveryStateManager;
+
     private CouponEventActivationService activationService;
 
     @BeforeEach
@@ -60,6 +70,8 @@ class CouponEventActivationServiceTest {
                 couponEventRepository,
                 couponEventItemRepository,
                 occurrenceRepository,
+                couponStockInitializer,
+                recoveryStateManager,
                 Clock.fixed(NOW, ZoneOffset.UTC)
         );
     }
@@ -94,6 +106,37 @@ class CouponEventActivationServiceTest {
         assertThat(response.expiresAt()).isEqualTo(NOW_UTC.plusSeconds(60));
         assertThat(response.remainingQuantity()).isEqualTo(100L);
         assertThat(response.claimable()).isTrue();
+        verify(couponStockInitializer).initialize(1L);
+    }
+
+    @Test
+    void Redis_초기화에_실패하면_발급을_차단할_상태로_전환한다() {
+        CouponEvent event = event(1L, CouponEventStatus.READY);
+        CouponEventItem item = CouponEventItem.create(1L, 10L, 100);
+        when(couponEventRepository.findByIdForUpdate(1L))
+                .thenReturn(Optional.of(event));
+        when(occurrenceRepository
+                .findFirstByCouponEventIdAndOccurrenceStatusAndClosedAtIsNullAndOpenedAtLessThanEqualAndExpiresAtAfterOrderByOpenedAtDescIdDesc(
+                        1L,
+                        CouponEventOccurrenceStatus.OPEN,
+                        NOW_UTC,
+                        NOW_UTC
+                )).thenReturn(Optional.empty());
+        when(couponEventItemRepository.findAllByCouponEventId(1L))
+                .thenReturn(List.of(item));
+        when(occurrenceRepository.save(any(CouponEventOccurrence.class)))
+                .thenAnswer(invocation -> withId(
+                        invocation.getArgument(0),
+                        20L
+                ));
+        doThrow(new RedisConnectionFailureException("Redis 연결 실패"))
+                .when(couponStockInitializer)
+                .initialize(1L);
+
+        assertThatThrownBy(() -> activationService.manualOpen(1L))
+                .isInstanceOf(RedisConnectionFailureException.class);
+
+        verify(recoveryStateManager).markUnavailable();
     }
 
     @Test
