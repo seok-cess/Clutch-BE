@@ -24,26 +24,7 @@ public class CouponQueryService {
         this.userCouponRepository = userCouponRepository;
     }
 
-    public CouponPageResponse getMyCoupons(Long userId, UserCouponStatus status, String cursor, int size) {
-        if(size < 1 || size > 100){
-            throw new InvalidCouponQueryException("size는 1이상 100이하여야 합니다.");
-        }
-
-        Instant cursorExpiresAt = null;
-        Long cursorId = null;
-        if(cursor != null && !cursor.isBlank()) {
-            String[] parts = cursor.split("_", 2);
-            if (parts.length != 2) {
-                throw new InvalidCouponQueryException("cursor 형식이 올바르지 않습니다.");
-            }
-            try {
-                cursorExpiresAt = Instant.ofEpochMilli(Long.parseLong(parts[0]));
-                cursorId = Long.valueOf(parts[1]);
-            } catch (NumberFormatException e) {
-                throw new InvalidCouponQueryException("cursor 형식이 올바르지 않습니다.");
-            }
-        }
-
+    public CouponPageResponse getMyCoupons(Long userId, UserCouponStatus status, Instant cursorExpiresAt, Long cursorId, int size) {
         List<UserCoupon> fetched = userCouponRepository.findPage(
                 userId, status, cursorExpiresAt, cursorId, PageRequest.of(0, size + 1));
 

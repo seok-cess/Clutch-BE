@@ -8,4 +8,8 @@ public class InvalidCouponQueryException extends RuntimeException {
     public InvalidCouponQueryException(String message) {
         super(message);
     }
+
+    public InvalidCouponQueryException(String message, Throwable cause){
+        super(message, cause);
+    }
 }
