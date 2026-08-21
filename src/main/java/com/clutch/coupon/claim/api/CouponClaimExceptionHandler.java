@@ -17,7 +17,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
         assignableTypes = {
                 CouponClaimController.class,
                 CouponStockController.class,
-                CouponStockRecoveryAdminController.class
+                CouponStockRecoveryAdminController.class,
+                AdminCouponClaimController.class
         }
 )
 public class CouponClaimExceptionHandler {
