@@ -14,8 +14,10 @@ import java.util.List;
 /**
  * 관리자 발급 내역의 동적 필터 조합과 커서 조회를 담당한다.
  *
- * <p>발급 요청을 기준으로 이벤트, 쿠폰 항목, 쿠폰 종류, 사용자 및 실제
- * 발급 쿠폰을 한 번에 조인하여 관리자 목록에 필요한 정보를 조회한다.</p>
+ * <p>먼저 발급 요청 테이블을 기준으로 현재 페이지의 ID만 조회한 뒤,
+ * 해당 ID에 한해서 이벤트, 쿠폰 종류, 사용자 및 실제 발급 쿠폰을
+ * 조인한다. 상세 조인 대상을 페이지 크기로 제한해 대량 데이터에서도
+ * 첫 페이지 조회 시 전체 조인과 정렬이 발생하지 않도록 한다.</p>
  */
 @Repository
 @RequiredArgsConstructor
@@ -62,7 +64,7 @@ public class AdminCouponClaimQueryRepository {
     private final NamedParameterJdbcTemplate jdbcTemplate;
 
     /**
-     * 필터를 모두 AND로 조합해 최신 발급 요청부터 조회한다.
+     * 필터에 맞는 발급 요청 ID를 먼저 조회하고 해당 ID의 상세 내역만 조인한다.
      *
      * @param condition 조회 조건
      * @param limit 다음 페이지 확인용 값을 포함한 최대 조회 건수
@@ -72,7 +74,58 @@ public class AdminCouponClaimQueryRepository {
             AdminCouponClaimSearchCondition condition,
             int limit
     ) {
-        StringBuilder query = new StringBuilder(BASE_QUERY);
+        List<Long> claimRequestIds = findClaimRequestIds(condition, limit);
+        if (claimRequestIds.isEmpty()) {
+            return List.of();
+        }
+
+        String query = BASE_QUERY
+                + " AND claim.coupon_claim_request_id IN (:claimRequestIds)"
+                + " ORDER BY claim.coupon_claim_request_id DESC";
+        MapSqlParameterSource parameters = new MapSqlParameterSource()
+                .addValue("claimRequestIds", claimRequestIds);
+
+        return jdbcTemplate.query(query, parameters, this::mapRow);
+    }
+
+    /**
+     * 동적 필터를 적용해 현재 페이지에 포함할 발급 요청 ID만 조회한다.
+     *
+     * <p>필터 처리에 필요한 테이블만 선택적으로 조인한다. 필터가 없는
+     * 첫 페이지는 발급 요청 기본 키를 역순으로 읽다가 {@code limit}에서
+     * 중단할 수 있다.</p>
+     *
+     * @param condition 조회 조건
+     * @param limit 다음 페이지 확인용 값을 포함한 최대 조회 건수
+     * @return 최신순으로 정렬된 발급 요청 ID
+     */
+    private List<Long> findClaimRequestIds(
+            AdminCouponClaimSearchCondition condition,
+            int limit
+    ) {
+        StringBuilder query = new StringBuilder("""
+                SELECT claim.coupon_claim_request_id
+                  FROM coupon_claim_request claim
+                """);
+
+        if (condition.eventNameKeyword() != null
+                || condition.triggerKeyword() != null) {
+            query.append(" JOIN coupon_event event")
+                    .append(" ON event.coupon_event_id")
+                    .append(" = claim.coupon_event_id");
+        }
+        if (condition.couponStatus() != null) {
+            query.append(" JOIN user_coupon filtered_coupon")
+                    .append(" ON filtered_coupon.claim_id")
+                    .append(" = claim.coupon_claim_request_id");
+        }
+        if (condition.couponTypeId() != null) {
+            query.append(" JOIN coupon_event_item filtered_item")
+                    .append(" ON filtered_item.coupon_event_item_id")
+                    .append(" = claim.coupon_event_item_id");
+        }
+
+        query.append(" WHERE 1 = 1");
         MapSqlParameterSource parameters = new MapSqlParameterSource();
 
         if (condition.eventIdKeyword() != null) {
@@ -105,14 +158,14 @@ public class AdminCouponClaimQueryRepository {
             );
         }
         if (condition.couponStatus() != null) {
-            query.append(" AND issued_coupon.coupon_status = :couponStatus");
+            query.append(" AND filtered_coupon.coupon_status = :couponStatus");
             parameters.addValue(
                     "couponStatus",
                     condition.couponStatus().name()
             );
         }
         if (condition.couponTypeId() != null) {
-            query.append(" AND item.coupon_type_id = :couponTypeId");
+            query.append(" AND filtered_item.coupon_type_id = :couponTypeId");
             parameters.addValue("couponTypeId", condition.couponTypeId());
         }
         if (condition.from() != null) {
@@ -132,7 +185,11 @@ public class AdminCouponClaimQueryRepository {
         query.append(" LIMIT :limit");
         parameters.addValue("limit", limit);
 
-        return jdbcTemplate.query(query.toString(), parameters, this::mapRow);
+        return jdbcTemplate.queryForList(
+                query.toString(),
+                parameters,
+                Long.class
+        );
     }
 
     /**

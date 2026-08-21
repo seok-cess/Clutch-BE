@@ -62,7 +62,10 @@ public class PersonalDataMasker {
         if (digits.length() < 7) {
             return "***-****";
         }
-        return digits.substring(0, 3)
+        String prefix = digits.startsWith("02")
+                ? digits.substring(0, 2)
+                : digits.substring(0, 3);
+        return prefix
                 + "-****-"
                 + digits.substring(digits.length() - 4);
     }

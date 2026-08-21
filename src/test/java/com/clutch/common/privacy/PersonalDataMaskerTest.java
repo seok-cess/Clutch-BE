@@ -18,6 +18,12 @@ class PersonalDataMaskerTest {
     }
 
     @Test
+    void 서울_지역번호는_앞의_두_자리만_남긴다() {
+        assertThat(masker.maskPhoneNumber("02-1234-5678"))
+                .isEqualTo("02-****-5678");
+    }
+
+    @Test
     void 개인정보가_없으면_null을_반환한다() {
         assertThat(masker.maskName(null)).isNull();
         assertThat(masker.maskEmail(" ")).isNull();

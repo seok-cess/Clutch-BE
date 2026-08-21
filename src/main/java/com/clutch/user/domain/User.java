@@ -102,6 +102,16 @@ public class User {
         this.point = Math.addExact(this.point, pointDelta);
     }
 
+    /**
+     * 로그에 개인정보가 노출되지 않도록 식별자와 권한만 반환한다.
+     *
+     * @return 개인정보가 제외된 사용자 식별 문자열
+     */
+    @Override
+    public String toString() {
+        return "User(id=" + id + ", role=" + role + ")";
+    }
+
     private static String normalizeName(String name) {
         if (name == null || name.isBlank()) {
             return null;
