@@ -6,6 +6,7 @@ import com.clutch.wallet.repository.UserCouponRepository;
 import com.clutch.wallet.web.exception.CouponNotFoundException;
 import com.clutch.wallet.web.dto.CouponPageResponse;
 import com.clutch.wallet.web.dto.CouponResponse;
+import com.clutch.wallet.web.exception.InvalidCouponQueryException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,12 +25,23 @@ public class CouponQueryService {
     }
 
     public CouponPageResponse getMyCoupons(Long userId, UserCouponStatus status, String cursor, int size) {
+        if(size < 1 || size > 100){
+            throw new InvalidCouponQueryException("size는 1이상 100이하여야 합니다.");
+        }
+
         Instant cursorExpiresAt = null;
         Long cursorId = null;
-        if (cursor != null && !cursor.isBlank()) {
+        if(cursor != null && !cursor.isBlank()) {
             String[] parts = cursor.split("_", 2);
-            cursorExpiresAt = Instant.ofEpochMilli(Long.parseLong(parts[0]));
-            cursorId = Long.valueOf(parts[1]);
+            if (parts.length != 2) {
+                throw new InvalidCouponQueryException("cursor 형식이 올바르지 않습니다.");
+            }
+            try {
+                cursorExpiresAt = Instant.ofEpochMilli(Long.parseLong(parts[0]));
+                cursorId = Long.valueOf(parts[1]);
+            } catch (NumberFormatException e) {
+                throw new InvalidCouponQueryException("cursor 형식이 올바르지 않습니다.");
+            }
         }
 
         List<UserCoupon> fetched = userCouponRepository.findPage(
