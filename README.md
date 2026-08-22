@@ -232,37 +232,7 @@ docker compose run --rm `
 
 ### 부하 테스트 모니터링
 
-애플리케이션, MySQL, Redis 지표를 2초마다 자동 수집하고 Grafana 대시보드에서 확인하려면 `app`과 `monitoring` 프로필을 함께 시작합니다.
-
-```powershell
-docker compose --profile app --profile monitoring up -d --build --wait
-```
-
-기본 접속 정보는 다음과 같습니다.
-
-| 서비스 | 주소 | 기본 계정 |
-|---|---|---|
-| Grafana | `http://localhost:3000` | `admin` / `clutch_local_password` |
-| Prometheus | `http://localhost:9090` | 없음 |
-
-Grafana에 로그인하면 `Clutch / Clutch Load Test` 대시보드가 자동 등록됩니다. 대시보드에서 애플리케이션 요청량과 지연, CPU, JVM heap, Hikari 연결, Tomcat 스레드, MySQL 행 잠금과 연결 수를 확인할 수 있습니다. 운영하거나 외부에 포트를 노출하는 환경에서는 `GRAFANA_ADMIN_PASSWORD`를 반드시 별도로 지정합니다.
-
-k6 지표까지 같은 Prometheus에 자동 저장하려면 다음과 같이 Remote Write 출력을 사용합니다.
-
-백엔드와 k6를 같은 Docker Compose 네트워크에서 실행하는 경우:
-
-```powershell
-docker compose --profile monitoring run --rm `
-  -e BASE_URL=http://100.101.76.93:8080 `
-  -e COUPON_VUS=100 `
-  -e COUPON_QUANTITY=50 `
-  -e USER_ID_START=900001 `
-  -e CLAIM_WINDOW_SECONDS=600 `
-  -e K6_PROMETHEUS_RW_SERVER_URL=http://prometheus:9090/api/v1/write `
-  k6 run -o experimental-prometheus-rw /scripts/coupon-burst.js
-```
-
-k6를 별도 테스트 PC에서 실행하고 백엔드 서버가 `100.101.76.93`, 모니터링 서버가 `100.71.50.106`인 경우에는 다음 명령을 사용합니다.
+부하 테스트 지표는 별도 모니터링 컴퓨터에서 실행 중인 Prometheus와 Grafana를 사용합니다. 백엔드 서버가 `100.101.76.93`, 모니터링 서버가 `100.71.50.106`인 경우에는 다음 명령을 사용합니다.
 
 ```powershell
 $CouponVus = 10000
@@ -289,8 +259,6 @@ docker compose run --rm `
 ```
 
 이 경우 Grafana는 테스트 PC에서 `http://100.71.50.106:3000`으로 접속합니다. 모니터링 서버 방화벽에서는 테스트 PC가 사용하는 주소에만 3000번과 9090번 포트를 허용합니다.
-
-Prometheus 데이터는 7일 동안 보관합니다. Grafana와 Prometheus 데이터는 Docker 볼륨에 저장되므로 컨테이너를 다시 시작해도 유지됩니다.
 
 테스트는 쿠폰 요청 성공 50건, 재고 소진 50건, 예상하지 않은 오류 0건을 합격 기준으로 사용합니다. 성공한 사용자는 `내 쿠폰` API를 반복 조회하여 사용자 쿠폰이 실제 저장됐는지도 확인합니다. 같은 날 다시 실행해도 수동 테스트 트리거에는 새로운 순번이 자동으로 부여되지만, 이벤트와 발급 데이터는 데이터베이스에 계속 남습니다.
 
