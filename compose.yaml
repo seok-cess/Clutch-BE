@@ -127,12 +127,14 @@ services:
       DB_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-clutch}?serverTimezone=UTC&characterEncoding=UTF-8
       DB_USERNAME: ${MYSQL_USER:-clutch}
       DB_PASSWORD: ${MYSQL_PASSWORD:-clutch_local_password}
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-10}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-clutch_local_password}
       KAFKA_BOOTSTRAP_SERVERS: kafka:19092
       LOLESPORTS_API_KEY: ${LOLESPORTS_API_KEY:-0TvQnueqKa5mxJntVWt0w4LpLfEkrV1Ta8rQBb9Z}
       MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,prometheus
+      SERVER_TOMCAT_MBEANREGISTRY_ENABLED: "true"
     ports:
       - "${APP_PORT:-8080}:8080"
     depends_on:
