@@ -207,7 +207,9 @@ SMOKE_VUS=20 SMOKE_DURATION=30s docker compose run --rm k6
 
 ### 쿠폰 선착순 100명 테스트
 
-`k6/coupon-burst.js`는 사용자 100명이 샘플 페이지에 접속한 뒤 활성 쿠폰 이벤트를 1.5초마다 조회하는 흐름을 재현합니다. 사용자가 먼저 조회를 시작하고 15초 뒤 관리자 요청으로 이벤트를 수동 오픈합니다. 기본 쿠폰 수량은 사용자 수의 절반인 50개입니다.
+`k6/coupon-burst.js`는 `setup` 단계에서 테스트 이벤트를 생성하고 즉시 수동 오픈합니다. 오픈이 성공하면 반환된 이벤트 ID와 회차 ID를 사용자 VU에 전달하고, 모든 사용자가 쿠폰을 한 번씩 신청합니다. 관리자 페이지에서 이벤트를 미리 만들거나 열 필요가 없습니다. 기본 쿠폰 수량은 사용자 수의 절반인 50개입니다.
+
+준비 단계와 사용자 부하 단계는 별도 파일이 아니라 하나의 스크립트 안에서 분리합니다. 별도 k6 프로세스는 이벤트 ID와 회차 ID를 자동으로 공유할 수 없지만, 한 파일에서는 `setup` 반환값을 모든 VU에 안전하게 전달할 수 있습니다. 또한 이벤트 생성이나 오픈에 실패하면 사용자 부하가 시작되기 전에 전체 테스트를 중단할 수 있습니다.
 
 테스트 전에 다음 조건을 확인합니다.
 
@@ -224,22 +226,73 @@ docker compose run --rm `
   -e COUPON_VUS=100 `
   -e COUPON_QUANTITY=50 `
   -e USER_ID_START=900001 `
+  -e CLAIM_WINDOW_SECONDS=600 `
   k6 run /scripts/coupon-burst.js
 ```
 
-Prometheus Remote Write까지 사용하려면 설정한 Prometheus 주소를 전달하고 출력 옵션을 추가합니다.
+### 부하 테스트 모니터링
+
+애플리케이션, MySQL, Redis 지표를 2초마다 자동 수집하고 Grafana 대시보드에서 확인하려면 `app`과 `monitoring` 프로필을 함께 시작합니다.
 
 ```powershell
-docker compose run --rm `
+docker compose --profile app --profile monitoring up -d --build --wait
+```
+
+기본 접속 정보는 다음과 같습니다.
+
+| 서비스 | 주소 | 기본 계정 |
+|---|---|---|
+| Grafana | `http://localhost:3000` | `admin` / `clutch_local_password` |
+| Prometheus | `http://localhost:9090` | 없음 |
+
+Grafana에 로그인하면 `Clutch / Clutch Load Test` 대시보드가 자동 등록됩니다. 대시보드에서 애플리케이션 요청량과 지연, CPU, JVM heap, Hikari 연결, Tomcat 스레드, MySQL 행 잠금과 연결 수를 확인할 수 있습니다. 운영하거나 외부에 포트를 노출하는 환경에서는 `GRAFANA_ADMIN_PASSWORD`를 반드시 별도로 지정합니다.
+
+k6 지표까지 같은 Prometheus에 자동 저장하려면 다음과 같이 Remote Write 출력을 사용합니다.
+
+백엔드와 k6를 같은 Docker Compose 네트워크에서 실행하는 경우:
+
+```powershell
+docker compose --profile monitoring run --rm `
   -e BASE_URL=http://100.101.76.93:8080 `
   -e COUPON_VUS=100 `
   -e COUPON_QUANTITY=50 `
   -e USER_ID_START=900001 `
-  -e K6_PROMETHEUS_RW_SERVER_URL=http://host.docker.internal:9090/api/v1/write `
+  -e CLAIM_WINDOW_SECONDS=600 `
+  -e K6_PROMETHEUS_RW_SERVER_URL=http://prometheus:9090/api/v1/write `
   k6 run -o experimental-prometheus-rw /scripts/coupon-burst.js
 ```
 
-테스트는 쿠폰 요청 성공 50건, 재고 소진 50건, 예상하지 않은 오류 0건을 합격 기준으로 사용합니다. 성공한 사용자는 `내 쿠폰` API를 반복 조회하여 Kafka 처리 후 사용자 쿠폰이 실제 저장됐는지도 확인합니다. 같은 날 다시 실행해도 수동 테스트 트리거에는 새로운 순번이 자동으로 부여되지만, 이벤트와 발급 데이터는 데이터베이스에 계속 남습니다.
+k6를 별도 테스트 PC에서 실행하고 백엔드 서버가 `100.101.76.93`, 모니터링 서버가 `100.71.50.106`인 경우에는 다음 명령을 사용합니다.
+
+```powershell
+$CouponVus = 10000
+$CouponQuantity = [int]($CouponVus / 2)
+$TestId = "$(Get-Date -Format 'yyyyMMdd-HHmmss')-coupon-${CouponVus}vus"
+
+New-Item -ItemType Directory -Force ".\k6\logs" | Out-Null
+
+docker compose run --rm `
+  -e BASE_URL=http://100.101.76.93:8080 `
+  -e COUPON_VUS=$CouponVus `
+  -e COUPON_QUANTITY=$CouponQuantity `
+  -e USER_ID_START=90001 `
+  -e CLAIM_WINDOW_SECONDS=600 `
+  -e K6_PROMETHEUS_RW_SERVER_URL=http://100.71.50.106:9090/api/v1/write `
+  -e K6_PROMETHEUS_RW_PUSH_INTERVAL=10s `
+  -e K6_PROMETHEUS_RW_TREND_STATS="p(50),p(95),p(99),p(99.9),avg,min,max" `
+  k6 run `
+  --quiet `
+  -o experimental-prometheus-rw `
+  --tag testid=$TestId `
+  /scripts/coupon-burst.js 2>&1 |
+  Tee-Object -FilePath ".\k6\logs\$TestId.log"
+```
+
+이 경우 Grafana는 테스트 PC에서 `http://100.71.50.106:3000`으로 접속합니다. 모니터링 서버 방화벽에서는 테스트 PC가 사용하는 주소에만 3000번과 9090번 포트를 허용합니다.
+
+Prometheus 데이터는 7일 동안 보관합니다. Grafana와 Prometheus 데이터는 Docker 볼륨에 저장되므로 컨테이너를 다시 시작해도 유지됩니다.
+
+테스트는 쿠폰 요청 성공 50건, 재고 소진 50건, 예상하지 않은 오류 0건을 합격 기준으로 사용합니다. 성공한 사용자는 `내 쿠폰` API를 반복 조회하여 사용자 쿠폰이 실제 저장됐는지도 확인합니다. 같은 날 다시 실행해도 수동 테스트 트리거에는 새로운 순번이 자동으로 부여되지만, 이벤트와 발급 데이터는 데이터베이스에 계속 남습니다.
 
 ## 기본 접속 정보
 
