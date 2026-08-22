@@ -14,7 +14,7 @@ jobs:
 
     env:
       MYSQL_EXPORTER_PASSWORD: ${{ secrets.MYSQL_EXPORTER_PASSWORD }}
-      DB_POOL_SIZE: ${{ vars.DB_POOL_SIZE }}
+      DB_POOL_SIZE: ${{ secrets.DB_POOL_SIZE }}
 
     steps:
       - name: Checkout dev
@@ -32,5 +32,13 @@ jobs:
       - name: Deploy
         shell: powershell
         run: |
-          docker compose --profile app up -d --build --force-recreate --remove-orphans --wait
+          docker compose up -d --wait mysql redis kafka
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          docker compose up -d --force-recreate mysql-exporter redis-exporter
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          docker compose --profile app up -d --build --force-recreate --no-deps --wait app
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
           docker compose --profile app ps
