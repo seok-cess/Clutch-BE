@@ -127,12 +127,14 @@ services:
       DB_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-clutch}?serverTimezone=UTC&characterEncoding=UTF-8
       DB_USERNAME: ${MYSQL_USER:-clutch}
       DB_PASSWORD: ${MYSQL_PASSWORD:-clutch_local_password}
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-10}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-clutch_local_password}
       KAFKA_BOOTSTRAP_SERVERS: kafka:19092
       LOLESPORTS_API_KEY: ${LOLESPORTS_API_KEY:-0TvQnueqKa5mxJntVWt0w4LpLfEkrV1Ta8rQBb9Z}
       MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,prometheus
+      SERVER_TOMCAT_MBEANREGISTRY_ENABLED: "true"
     ports:
       - "${APP_PORT:-8080}:8080"
     depends_on:
@@ -162,7 +164,44 @@ services:
       - host.docker.internal:host-gateway
     command: [run, /scripts/smoke.js]
 
+  prometheus:
+    profiles: [monitoring]
+    image: prom/prometheus:v3.5.0
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=7d
+      - --web.enable-remote-write-receiver
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    depends_on:
+      - mysql-exporter
+      - redis-exporter
+
+  grafana:
+    profiles: [monitoring]
+    image: grafana/grafana:12.1.0
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-clutch_local_password}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+
 volumes:
   mysql-data:
   redis-data:
   kafka-data:
+  prometheus-data:
+  grafana-data:
