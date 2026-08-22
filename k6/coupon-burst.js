@@ -3,8 +3,6 @@ import { check, fail, sleep } from 'k6';
 import exec from 'k6/execution';
 import { Counter, Rate, Trend } from 'k6/metrics';
 
-const frontendUrl = (__ENV.FRONTEND_URL || 'http://100.101.76.93:5173')
-  .replace(/\/$/, '');
 const baseUrl = (__ENV.BASE_URL || 'http://100.101.76.93:8080')
   .replace(/\/$/, '');
 
@@ -45,6 +43,7 @@ const expectedClaimResults = new Rate('coupon_claim_expected');
 const eventDetected = new Rate('coupon_event_detected');
 const persistedCoupons = new Counter('coupon_persisted_total');
 const persistenceFailures = new Counter('coupon_persistence_failed_total');
+const claimFailures = new Counter('coupon_claim_failure');
 const claimDuration = new Trend('coupon_claim_duration', true);
 
 export const options = {
@@ -127,13 +126,6 @@ export function setup() {
 
 export function watchAndClaim(data) {
   const userId = userIdStart + exec.scenario.iterationInTest;
-  const pageResponse = http.get(`${frontendUrl}/sample`, {
-    tags: { endpoint: 'sample-page', name: 'GET /sample' },
-  });
-  check(pageResponse, {
-    'sample page is reachable': (res) => res.status === 200,
-  });
-
   const activeEvent = waitForActiveEvent(data.couponEventId);
   const detected = activeEvent !== null;
   eventDetected.add(detected);
@@ -159,6 +151,19 @@ export function watchAndClaim(data) {
 
   claimDuration.add(response.timings.duration);
   const code = jsonValue(response, 'code');
+    if (response.status >= 500) {
+        claimFailures.add(1, {
+            status: String(response.status),
+            error_code: code ?? 'NO_CODE',
+        });
+
+        console.error(
+            `쿠폰 신청 오류: userId=${userId}, `
+            + `status=${response.status}, `
+            + `code=${code ?? 'NO_CODE'}, `
+            + `body=${response.body}`,
+        );
+    }
   const success = response.status === 201;
   const soldOut = response.status === 409
     && (code === 'COUPON_STOCK_EXHAUSTED'

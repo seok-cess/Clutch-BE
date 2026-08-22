@@ -211,7 +211,6 @@ SMOKE_VUS=20 SMOKE_DURATION=30s docker compose run --rm k6
 
 테스트 전에 다음 조건을 확인합니다.
 
-- 프런트엔드가 `http://100.101.76.93:5173`에서 실행 중이다.
 - 백엔드가 `http://100.101.76.93:8080`에서 실행 중이다.
 - 경기 ID `316`이 존재한다.
 - 이름이 `[K6] 10%`이고 할인 유형과 값이 `RATE`, `10`인 활성 쿠폰 종류가 존재한다.
@@ -221,7 +220,6 @@ PowerShell에서 기본 테스트를 실행합니다.
 
 ```powershell
 docker compose run --rm `
-  -e FRONTEND_URL=http://100.101.76.93:5173 `
   -e BASE_URL=http://100.101.76.93:8080 `
   -e COUPON_VUS=100 `
   -e COUPON_QUANTITY=50 `
@@ -233,7 +231,6 @@ Prometheus Remote Write까지 사용하려면 설정한 Prometheus 주소를 전
 
 ```powershell
 docker compose run --rm `
-  -e FRONTEND_URL=http://100.101.76.93:5173 `
   -e BASE_URL=http://100.101.76.93:8080 `
   -e COUPON_VUS=100 `
   -e COUPON_QUANTITY=50 `
