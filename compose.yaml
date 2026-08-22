@@ -27,6 +27,20 @@ services:
       retries: 20
       start_period: 20s
 
+  mysql-exporter:
+    image: prom/mysqld-exporter:v0.20.0
+    restart: unless-stopped
+    environment:
+      MYSQLD_EXPORTER_PASSWORD: ${MYSQL_EXPORTER_PASSWORD}
+    command:
+      - --mysqld.address=mysql:3306
+      - --mysqld.username=exporter
+    ports:
+      - "9104:9104"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
   redis:
     image: redis:8.4.4-alpine
     restart: unless-stopped
@@ -54,6 +68,18 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.89.0
+    restart: unless-stopped
+    environment:
+      REDIS_ADDR: redis://redis:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-clutch_local_password}
+    ports:
+      - "9121:9121"
+    depends_on:
+      redis:
+        condition: service_healthy
 
   kafka:
     image: apache/kafka:4.2.0
@@ -105,9 +131,8 @@ services:
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-clutch_local_password}
       KAFKA_BOOTSTRAP_SERVERS: kafka:19092
-      # lolesports 비공식 피드 (공용 키 — 미지정 시 application.yaml 기본값 사용)
       LOLESPORTS_API_KEY: ${LOLESPORTS_API_KEY:-0TvQnueqKa5mxJntVWt0w4LpLfEkrV1Ta8rQBb9Z}
-      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,prometheus # 프로메테우스 환경설정
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,prometheus
     ports:
       - "${APP_PORT:-8080}:8080"
     depends_on:
