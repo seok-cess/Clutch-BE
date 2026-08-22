@@ -12,6 +12,10 @@ jobs:
       - windows
       - x64
 
+    env:
+      MYSQL_EXPORTER_PASSWORD: ${{ secrets.MYSQL_EXPORTER_PASSWORD }}
+      DB_POOL_SIZE: ${{ vars.DB_POOL_SIZE }}
+
     steps:
       - name: Checkout dev
         uses: actions/checkout@v6
@@ -21,10 +25,12 @@ jobs:
       - name: Prepare application config
         shell: powershell
         run: |
-          Copy-Item -LiteralPath src/main/resources/application.example.yaml -Destination src/main/resources/application.yaml -Force
+          Copy-Item -LiteralPath src/main/resources/application.example.yaml `
+            -Destination src/main/resources/application.yaml `
+            -Force
 
       - name: Deploy
         shell: powershell
         run: |
-          docker compose --profile app up -d --build --remove-orphans --wait
+          docker compose --profile app up -d --build --force-recreate --remove-orphans --wait
           docker compose --profile app ps
