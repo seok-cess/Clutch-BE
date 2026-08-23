@@ -92,6 +92,7 @@ public class ReplayControlService {
             if (response == null || response.runId() == null || response.matchId() == null) {
                 throw new ReplayControlException("replay 스텁 서버가 변경된 배속을 반환하지 않았다");
             }
+            refreshStubCachesAfterSpeedChange();
             return toStatusResult(response);
         } catch (WebClientException | IllegalStateException exception) {
             throw new ReplayControlException("replay 스텁 서버의 배속을 변경할 수 없다.", exception);
@@ -99,6 +100,21 @@ public class ReplayControlService {
     }
 
     private record ReplayServerStartResponse(String runId, String matchId, List<String> gameIds) {
+    }
+
+    /**
+     * 배속이 바뀌면 replay 서버가 돌려주는 일정·프레임 시각도 즉시 달라진다.
+     * 기존 캐시를 다음 정기 폴링까지 유지하면 첫 세트 마감과 다음 세트 오픈 시각이 이전 배속 기준으로
+     * 남으므로, STUB 모드에서만 즉시 다시 읽는다.
+     */
+    private void refreshStubCachesAfterSpeedChange() {
+        sourceState.withReadLock(() -> {
+            if (sourceState.mode() != ExternalSourceMode.STUB) {
+                return;
+            }
+            pollingScheduler.pollMeta();
+            pollingScheduler.pollLiveMatches();
+        });
     }
 
     private ReplayStatusResult toStatusResult(ReplayServerStatusResponse response) {

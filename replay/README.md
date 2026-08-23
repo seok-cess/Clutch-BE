@@ -9,15 +9,20 @@
 안 건드리고, 개인 설정 파일의 주소 두 줄만 이 서버로 돌리면, 폴링·DB 저장·배팅·시청 포인트까지
 전체 파이프라인이 실제 라이브 때와 동일하게 동작한다.
 
-## 빠르게 시작하기 (녹화 데이터 없이 동작 확인)
+## 빠르게 시작하기 (공유 실제 경기 fixture)
 
 ```bash
-node replay/replay-server.js --dir replay/fixtures/sample-match-bo3-001 --speed 3
+node replay/replay-server.js --dir replay/fixtures/sample-match-bo3-001 --speed 3 --compress-frame-time
 ./gradlew bootRun --args='--spring.profiles.active=replay'
 ```
 
-`fixtures/smoke-test/`는 손으로 만든 가짜 경기(세트 1개, bestOf 1) 픽스처다. 실제 녹화 파일이 없어도
-스텁 서버 자체가 정상 동작하는지 바로 확인할 수 있다.
+`fixtures/sample-match-bo3-001/`는 실제 GEN–KT best-of-3 녹화에서 만든 Git 추적 기본 fixture다.
+Docker Compose의 replay 컨테이너도 별도 환경 변수가 없으면 이 fixture를 사용하므로, 저장소를 받은
+모든 개발자가 같은 세트 진행·정산 흐름을 재생한다. 데이터 축약 방법과 마지막 세트 결과 보정은
+[fixture README](fixtures/sample-match-bo3-001/README.md)를 참고한다.
+
+`fixtures/smoke-test/`는 손으로 만든 가짜 경기(세트 1개, bestOf 1) 픽스처다. 스텁 서버의 최소 동작만
+빠르게 확인할 때 사용한다.
 
 ## 팀원에게 다른 형식의 파일을 받았다면 — convert-fixture.js
 
@@ -31,6 +36,62 @@ node replay/convert-fixture.js --in "받은파일.jsonl" [--out replay/fixtures/
 입력 파일 한 줄이 `{"elapsedSecond":60,"scheduler":"...","calls":[{"request":{"path":...},"response":{"status":200,"body":"<JSON 문자열>"}}]}`
 모양이면 그대로 처리된다. 첫 줄이 `{"type":"metadata","matchId":...}`면 `--out`을 안 줘도 그 matchId로
 출력 폴더를 자동으로 만든다. 다른 모양의 파일을 받으면 이 스크립트를 그 형식에 맞춰 고쳐야 한다.
+
+## 실제 API 호출 로그 변환 — convert-recorded-fixture.js
+
+애플리케이션이 실제 LoL Esports API를 호출하며 남긴 JSONL은 한 줄에 호출 하나씩
+`calledAt`, `api`, `request`, `status`, `response`를 담는다. 이 형식은 다음 스크립트로 변환한다.
+
+```bash
+node replay/convert-recorded-fixture.js \
+  --in "/path/to/recorded.jsonl" \
+  --match-id "115548147900619045" \
+  --out ~/Desktop/clutch-replay-recordings/115548147900619045
+```
+
+변환 결과는 원본 보관·압축 입력으로만 사용한다. replay 컨테이너에 원본을 마운트하거나 직접
+재생하지 않는다. 아래의 Git 공유용 압축 과정을 거쳐 `sample-match-bo3-001`을 갱신하면 된다.
+
+Docker Compose는 `REPLAY_FIXTURE_DIR`을 별도로 지정하지 않으면 Git 추적 압축 fixture
+(`sample-match-bo3-001`)를 사용한다.
+
+- 대상 매치의 `getLive`, `getEventDetails`, `getSchedule` 응답과 그 매치에 속한
+  `window`·`details` 세트 응답만 추출한다. `204`, `400`, `404` 같은 실패 응답은 재생 fixture에 넣지 않는다.
+- `getLive`가 대상을 처음 반환하기 전에는 빈 라이브 응답 하나를 넣어, 재생 시작부터 경기가
+  이미 진행 중으로 보이지 않게 한다.
+- 실제 로그를 두 번 스트리밍 순회하므로 입력 전체를 메모리에 올리지 않는다. 출력은 원본과 비슷한
+  크기가 될 수 있으므로 기본 출력 위치는 저장소 밖 `~/Desktop/clutch-replay-recordings/`다.
+- replay 서버는 64MB를 넘는 JSONL에 대해 줄 위치·시각·세트 ID만 먼저 인덱싱하고, 요청된 응답
+  본문만 디스크에서 읽는다. 기동 시 파일을 한 번 순회하지만 이후에는 fixture 전체 크기만큼의
+  힙 메모리를 사용하지 않는다.
+- 원본에 마지막 세트 또는 `gameWins` 확정 구간이 없다면 변환 결과도 해당 시점에서 멈춘다.
+  세트별 정산은 확정된 구간까지만 검증할 수 있다.
+
+### Git 공유용 실제 fixture 압축
+
+실제 변환 fixture의 `window`·`details` 응답에는 최근 수십 초의 프레임이 매번 중복되어 들어간다.
+`compact-recorded-fixture.js`는 같은 세트·시각 프레임을 한 번만 남기고, 남은 프레임을 기본 초당
+하나로 샘플링해 JSONL 한 줄로 기록한다. replay 서버는 재생 시 전달하지 않은 JSONL 프레임을 다시
+합치므로 백엔드는 기존과 같은 순서로 프레임을 받는다.
+
+```bash
+node replay/compact-recorded-fixture.js \
+  --in ~/Desktop/clutch-replay-recordings/115548147900619045 \
+  --out replay/fixtures/sample-match-bo3-001 \
+  --replace \
+  --frame-interval-seconds 1 \
+  --final-winner-team-id 100205573495116443 \
+  --final-result-delay-seconds 120
+```
+
+- `--replace`는 대상 fixture 디렉터리만 교체한다. 대상의 `README.md`가 있으면 유지하며, 원본 fixture는
+  수정하지 않는다.
+- `--frame-interval-seconds`는 `window`·`details`의 프레임 간격이다. 기본값은 1초이며, 더 큰
+  fixture가 필요하면 값을 줄이고 GitHub 단일 파일 100MB 제한을 넘지 않는지 확인한다.
+- `--final-winner-team-id`는 원본 녹화가 마지막 세트 공식 응답 전에 끝난 경우에만 사용한다. 마지막
+  `eventDetails` 응답을 복제해 미완료 세트를 `completed`로 바꾸고 해당 팀의 `gameWins`를 하나 올린
+  **테스트용 보정 응답**을 추가한다.
+- 이 작업은 대용량 원본을 스트리밍 처리하므로, 원본 전체를 메모리에 올리지 않는다.
 
 ## 백엔드와 연결하기
 
@@ -106,11 +167,14 @@ replay profile은 `getLive`도 실제 1초마다 확인한다. 따라서 20배�
 사전 대기 구간이 있는 픽스처에서는 그 대기시간만큼 화면이 첫 프레임에 고정돼 있었다(배속 무관). 지금은
 게임별로 따로 맞춰서 이 문제가 없다.
 
-**남는 절충**: 2세트 이후 배팅 재오픈은 "직전 세트가 끝난 시각"을 기준으로 여는데, 이것도 같은
-프레임 시각을 읽는다 — 배속으로 나눌 수 없으므로 **"그 세트가 시작된 뒤 실제로 경과한 시간"만큼
-실제로 기다려야 열린다(배속과 무관하게).** 예를 들어 세트가 원본 기준 30분짜리면, 배속과 상관없이
-그 세트 진입 후 실제 30분은 지나야 다음 세트 배팅이 열린다. 영원히 안 열리는 건 아니고, 게임 시계를
-지키기 위한 구조적 절충이다. 이 타이밍을 정확히 확인하고 싶으면 `--speed 1`로 돌려서 보는 게 낫다.
+`--compress-frame-time`을 지정하면 화면용 프레임 시각도 재생 배속에 맞춰 압축한다. Compose의
+replay는 이 옵션을 기본으로 사용한다. 대신 화면의 게임 경과 시간도 압축된다. 실제 게임 시간 표시를
+우선하는 수동 실행에서는 이 옵션을 생략하고 `--speed 1`을 사용한다.
+
+배팅의 다음 세트 마감은 화면용 프레임 시각을 쓰지 않는다. `LiveStatsClient`가 게임 시작 시각을
+찾는 전용 요청에는 스텁이 픽스처 전체의 압축된 재생 시간축을 돌려준다. 따라서 다음 세트는 이전
+세트 종료 뒤 열리고, 실제 게임 시작을 감지하면 1분 뒤에 닫히며, 게임별 화면 프레임을 재생 시작에
+맞춰 평행이동해도 이 마감 근거가 섞이지 않는다.
 
 ### 배팅 첫 세트 창(경기 시작 전 오픈)도 재생된다
 

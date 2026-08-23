@@ -24,12 +24,13 @@ const path = require('path');
 const { randomUUID } = require('crypto');
 
 function parseArgs(argv) {
-  const args = { dir: null, port: 4000, speed: 1 };
+  const args = { dir: null, port: 4000, speed: 1, compressFrameTime: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--dir') args.dir = argv[++i];
     else if (a === '--port') args.port = Number(argv[++i]);
     else if (a === '--speed') args.speed = Number(argv[++i]);
+    else if (a === '--compress-frame-time') args.compressFrameTime = true;
     else if (a === '--help' || a === '-h') { printUsage(); process.exit(0); }
   }
   if (!args.dir || !Number.isFinite(args.port) || !Number.isFinite(args.speed) || args.speed <= 0) {
@@ -40,12 +41,158 @@ function parseArgs(argv) {
 }
 
 function printUsage() {
-  console.error('사용법: node replay-server.js --dir <fixture-dir> [--port 4000] [--speed 1]');
+  console.error('사용법: node replay-server.js --dir <fixture-dir> [--port 4000] [--speed 1] [--compress-frame-time]');
 }
 
-/** JSONL 한 줄 = 응답 하나. capturedAt 오름차순으로 정렬해서 반환한다. */
+/** 이 크기 이상은 본문을 메모리에 적재하지 않고 JSONL 줄 위치만 인덱싱한다. */
+const LAZY_LOAD_THRESHOLD_BYTES = 64 * 1024 * 1024;
+const JSONL_INDEX_PREFIX_BYTES = 1024;
+const JSONL_INDEX_BUFFER_BYTES = 1024 * 1024;
+
+/** eager/lazy fixture를 같은 방식으로 순회·조회하는 시계열 래퍼. */
+class FixtureSeries {
+  constructor(entries, filePath = null) {
+    this.entries = entries;
+    this.filePath = filePath;
+  }
+
+  get length() {
+    return this.entries.length;
+  }
+
+  capturedAtMsAt(index) {
+    return this.entries[index]?.capturedAtMs;
+  }
+
+  /** lazy 인덱스 항목이면 필요한 한 줄만 읽어 JSON으로 복원한다. */
+  entryAt(index) {
+    const entry = this.entries[index];
+    if (!entry || Object.hasOwn(entry, 'body')) return entry || null;
+
+    const buffer = Buffer.allocUnsafe(entry.length);
+    const descriptor = fs.openSync(this.filePath, 'r');
+    try {
+      const bytesRead = fs.readSync(descriptor, buffer, 0, entry.length, entry.offset);
+      if (bytesRead !== entry.length) {
+        throw new Error(`fixture 줄을 끝까지 읽지 못했습니다: ${this.filePath} @ ${entry.offset}`);
+      }
+      const parsed = JSON.parse(buffer.toString('utf8', 0, bytesRead));
+      return { ...parsed, capturedAtMs: entry.capturedAtMs };
+    } finally {
+      fs.closeSync(descriptor);
+    }
+  }
+}
+
+/**
+ * 큰 JSONL의 줄 시작 위치·길이·시간·gameId만 읽는다. 본문은 요청이 올 때까지 파싱하지 않는다.
+ * 표준 fixture는 gameId를 줄 앞부분에 기록한다. 이전 변환 결과도 읽을 수 있도록 줄 끝 1KB도 함께 확인한다.
+ */
+function buildJsonlIndex(filePath) {
+  const descriptor = fs.openSync(filePath, 'r');
+  const size = fs.fstatSync(descriptor).size;
+  const buffer = Buffer.allocUnsafe(JSONL_INDEX_BUFFER_BYTES);
+  const prefix = Buffer.allocUnsafe(JSONL_INDEX_PREFIX_BYTES);
+  const suffix = Buffer.allocUnsafe(JSONL_INDEX_PREFIX_BYTES);
+  const entries = [];
+  let fileOffset = 0;
+  let lineStart = 0;
+  let prefixLength = 0;
+  let suffixLength = 0;
+
+  const appendPrefix = (source, start, end) => {
+    if (prefixLength >= JSONL_INDEX_PREFIX_BYTES || start >= end) return;
+    const available = JSONL_INDEX_PREFIX_BYTES - prefixLength;
+    const copied = Math.min(available, end - start);
+    source.copy(prefix, prefixLength, start, start + copied);
+    prefixLength += copied;
+  };
+
+  const appendSuffix = (source, start, end) => {
+    const length = end - start;
+    if (length <= 0) return;
+    if (length >= JSONL_INDEX_PREFIX_BYTES) {
+      source.copy(suffix, 0, end - JSONL_INDEX_PREFIX_BYTES, end);
+      suffixLength = JSONL_INDEX_PREFIX_BYTES;
+      return;
+    }
+
+    const overflow = Math.max(0, suffixLength + length - JSONL_INDEX_PREFIX_BYTES);
+    if (overflow > 0) {
+      suffix.copy(suffix, 0, overflow, suffixLength);
+      suffixLength -= overflow;
+    }
+    source.copy(suffix, suffixLength, start, end);
+    suffixLength += length;
+  };
+
+  const registerLine = (lineEnd) => {
+    if (prefixLength === 0) return;
+    const header = prefix.toString('utf8', 0, prefixLength);
+    if (header.trim().length === 0) return;
+    const capturedAt = header.match(/"capturedAt"\s*:\s*"([^"]+)"/)?.[1];
+    if (!capturedAt) {
+      throw new Error(`fixture capturedAt을 찾지 못했습니다: ${filePath} @ ${lineStart}`);
+    }
+    const capturedAtMs = Date.parse(capturedAt);
+    if (Number.isNaN(capturedAtMs)) {
+      throw new Error(`fixture capturedAt 형식이 올바르지 않습니다: ${capturedAt}`);
+    }
+    const trailing = suffix.toString('utf8', 0, suffixLength);
+    const gameId = header.match(/"gameId"\s*:\s*"([^"]+)"/)?.[1]
+      || trailing.match(/"gameId"\s*:\s*"([^"]+)"\s*}\s*$/)?.[1];
+    entries.push({
+      capturedAt,
+      capturedAtMs,
+      gameId,
+      offset: lineStart,
+      length: lineEnd - lineStart,
+    });
+  };
+
+  try {
+    while (fileOffset < size) {
+      const bytesRead = fs.readSync(descriptor, buffer, 0, buffer.length, fileOffset);
+      if (bytesRead === 0) break;
+
+      let cursor = 0;
+      while (cursor < bytesRead) {
+        const newline = buffer.indexOf(0x0A, cursor);
+        if (newline < 0 || newline >= bytesRead) {
+          appendPrefix(buffer, cursor, bytesRead);
+          appendSuffix(buffer, cursor, bytesRead);
+          break;
+        }
+        appendPrefix(buffer, cursor, newline);
+        appendSuffix(buffer, cursor, newline);
+        registerLine(fileOffset + newline);
+        lineStart = fileOffset + newline + 1;
+        prefixLength = 0;
+        suffixLength = 0;
+        cursor = newline + 1;
+      }
+      fileOffset += bytesRead;
+    }
+
+    if (lineStart < size) {
+      registerLine(size);
+    }
+  } finally {
+    fs.closeSync(descriptor);
+  }
+
+  entries.sort((left, right) => left.capturedAtMs - right.capturedAtMs);
+  return entries;
+}
+
+/** JSONL 한 줄 = 응답 하나. 작은 파일은 즉시 파싱하고, 큰 파일은 줄 위치만 인덱싱한다. */
 function loadJsonl(filePath) {
   if (!fs.existsSync(filePath)) return null;
+  const size = fs.statSync(filePath).size;
+  if (size > LAZY_LOAD_THRESHOLD_BYTES) {
+    return new FixtureSeries(buildJsonlIndex(filePath), filePath);
+  }
+
   const text = fs.readFileSync(filePath, 'utf8');
   const entries = text
     .split('\n')
@@ -53,46 +200,45 @@ function loadJsonl(filePath) {
     .filter((line) => line.length > 0)
     .map((line) => JSON.parse(line))
     .map((entry) => ({ ...entry, capturedAtMs: Date.parse(entry.capturedAt) }));
-  entries.sort((a, b) => a.capturedAtMs - b.capturedAtMs);
-  return entries;
+  entries.sort((left, right) => left.capturedAtMs - right.capturedAtMs);
+  return new FixtureSeries(entries);
 }
 
-/** window.jsonl/details.jsonl 은 gameId 별로 각각 시간순 배열을 갖는다 (매치 하나에 세트 여러 개). */
+/** window.jsonl/details.jsonl 은 gameId 별로 각각 시간순 시계열을 갖는다 (매치 하나에 세트 여러 개). */
 function loadJsonlByGameId(filePath) {
   const flat = loadJsonl(filePath);
   if (!flat) return new Map();
   const byGame = new Map();
-  for (const entry of flat) {
+  for (const entry of flat.entries) {
+    if (!entry.gameId) continue;
     const list = byGame.get(entry.gameId) || [];
     list.push(entry);
     byGame.set(entry.gameId, list);
   }
-  for (const list of byGame.values()) {
-    list.sort((a, b) => a.capturedAtMs - b.capturedAtMs);
-  }
-  return byGame;
+  return new Map([...byGame].map(([gameId, entries]) => [
+    gameId,
+    new FixtureSeries(entries, flat.filePath),
+  ]));
 }
 
 /** mappedMs 이하 중 가장 늦은 항목. mappedMs 가 범위를 벗어나면 양 끝 항목으로 고정된다. */
-function pickAtOrBefore(entries, mappedMs) {
-  if (!entries || entries.length === 0) return null;
-  let picked = entries[0];
-  for (const entry of entries) {
-    if (entry.capturedAtMs <= mappedMs) picked = entry;
-    else break;
-  }
-  return picked;
+function pickAtOrBefore(series, mappedMs) {
+  const index = indexAtOrBefore(series, mappedMs);
+  return index < 0 ? null : series.entryAt(index);
 }
 
 /** mappedMs 시점에 해당하는 JSONL 항목의 배열 인덱스. */
-function indexAtOrBefore(entries, mappedMs) {
-  if (!entries || entries.length === 0) return -1;
-  let index = 0;
-  for (let i = 1; i < entries.length; i++) {
-    if (entries[i].capturedAtMs <= mappedMs) index = i;
-    else break;
+function indexAtOrBefore(series, mappedMs) {
+  if (!series || series.length === 0) return -1;
+
+  let left = 0;
+  let right = series.length - 1;
+  while (left < right) {
+    const middle = Math.ceil((left + right) / 2);
+    if (series.capturedAtMsAt(middle) <= mappedMs) left = middle;
+    else right = middle - 1;
   }
-  return index;
+  return left;
 }
 
 function cloneJson(value) {
@@ -106,11 +252,11 @@ function cloneJson(value) {
  * 반면 녹화 JSONL은 초마다 한 줄이므로, 배속 재생에서 한 폴링 사이에 건너뛴 줄을
  * 그대로 한 번에 돌려줘야 백엔드 캐시와 DB 타임라인이 빠지지 않는다.
  */
-function mergeUnservedFrameEntries(entries, mappedMs, lastServedIndex) {
-  const latestIndex = indexAtOrBefore(entries, mappedMs);
+function mergeUnservedFrameEntries(series, mappedMs, lastServedIndex) {
+  const latestIndex = indexAtOrBefore(series, mappedMs);
   if (latestIndex < 0) return null;
 
-  const latest = entries[latestIndex];
+  const latest = series.entryAt(latestIndex);
   if (latestIndex <= lastServedIndex) {
     // 새 프레임이 없을 때도 실제 API처럼 최신 스냅샷은 반환한다.
     return { entry: latest, body: latest.body, lastServedIndex };
@@ -120,7 +266,7 @@ function mergeUnservedFrameEntries(entries, mappedMs, lastServedIndex) {
   const frames = [];
   const seenTimestamps = new Set();
   for (let i = Math.max(0, lastServedIndex + 1); i <= latestIndex; i++) {
-    for (const frame of entries[i].body?.frames || []) {
+    for (const frame of series.entryAt(i).body?.frames || []) {
       const timestamp = frame?.rfc460Timestamp;
       // 백엔드도 이 값으로 중복을 제거하므로, 서버 쪽에서도 같은 기준을 쓴다.
       const key = typeof timestamp === 'string' ? timestamp : `index:${i}:${frames.length}`;
@@ -188,27 +334,56 @@ function shiftScheduleBody(body, timelineMs, wallMs, speed) {
  * 재생 시작 시각에 맞춰 따로 평행이동한다 — 게임이 몇 번째 세트든 캐시에 들어오는
  * 순간부터 곧바로 "45초 전" 조회가 성립한다.
  */
-function shiftFramesBody(body, frameOffsetMs) {
+function shiftFramesBody(body, frameClock, speed, compressFrameTime) {
   if (!Array.isArray(body?.frames)) return body;
   const shifted = JSON.parse(JSON.stringify(body));
   for (const frame of shifted.frames) {
     if (typeof frame.rfc460Timestamp === 'string') {
       const ms = Date.parse(frame.rfc460Timestamp);
-      if (!Number.isNaN(ms)) frame.rfc460Timestamp = new Date(ms + frameOffsetMs).toISOString();
+      if (!Number.isNaN(ms)) {
+        const shiftedMs = compressFrameTime
+          ? frameClock.startWallMs + (ms - frameClock.firstFrameMs) / speed
+          : ms + frameClock.offsetMs;
+        frame.rfc460Timestamp = new Date(shiftedMs).toISOString();
+      }
     }
   }
   return shifted;
 }
 
-/** gameId 별 평행이동량 — 그 게임의 (시간순) 첫 프레임이 재생 시작 시각에 오도록 맞춘다. */
+/**
+ * 게임 시작 시각 탐색 전용 프레임 변환.
+ *
+ * 화면용 window/details는 세트별 첫 프레임을 재생 시작 시각에 맞춰 즉시 표시되게 한다.
+ * 반면 배팅 마감은 세트 간 공백까지 보존한 실제 재생 시간축이 필요하므로, 이 응답만은
+ * fixture 전체 원본 시각을 현재 run의 시간축으로 옮긴다.
+ */
+function shiftGameStartFramesBody(body, run) {
+  if (!Array.isArray(body?.frames)) return body;
+  const shifted = JSON.parse(JSON.stringify(body));
+  for (const frame of shifted.frames) {
+    if (typeof frame.rfc460Timestamp !== 'string') continue;
+    const frameMs = Date.parse(frame.rfc460Timestamp);
+    if (Number.isNaN(frameMs)) continue;
+    const shiftedMs = run.timelineAnchorWallMs + (frameMs - run.timelineAnchorMs) / run.speed;
+    frame.rfc460Timestamp = new Date(shiftedMs).toISOString();
+  }
+  return shifted;
+}
+
+/** gameId 별 프레임 시계 — 각 게임의 첫 프레임이 재생 시작 시각에 오도록 맞춘다. */
 function computeFrameOffsets(fixtures, startWallMs) {
   const offsets = new Map();
   for (const gameId of new Set([...fixtures.window.keys(), ...fixtures.details.keys()])) {
     const windowSeries = fixtures.window.get(gameId);
-    const first = windowSeries && windowSeries[0];
+    const first = windowSeries?.entryAt(0);
     const frameTs = first?.body?.frames?.[0]?.rfc460Timestamp;
     const frameMs = typeof frameTs === 'string' ? Date.parse(frameTs) : NaN;
-    offsets.set(gameId, Number.isNaN(frameMs) ? 0 : startWallMs - frameMs);
+    offsets.set(gameId, {
+      firstFrameMs: Number.isNaN(frameMs) ? startWallMs : frameMs,
+      startWallMs,
+      offsetMs: Number.isNaN(frameMs) ? 0 : startWallMs - frameMs,
+    });
   }
   return offsets;
 }
@@ -243,14 +418,17 @@ function collectFixtureIds(fixtures) {
     if (typeof body?.esportsGameId === 'string') gameIds.add(body.esportsGameId);
   };
 
-  for (const entry of fixtures.getLive) collectBody(entry.body);
-  for (const entry of fixtures.eventDetails) collectBody(entry.body);
-  for (const entries of fixtures.window.values()) {
-    for (const entry of entries) collectBody(entry.body);
-  }
-  for (const entries of fixtures.details.values()) {
-    for (const entry of entries) collectBody(entry.body);
-  }
+  const collectSeries = (series) => {
+    if (!series) return;
+    for (let index = 0; index < series.length; index++) {
+      collectBody(series.entryAt(index).body);
+    }
+  };
+  // getLive/eventDetails/getSchedule은 작아서 여기서 본문을 읽어도 된다. 대용량
+  // window/details는 gameId를 파일 인덱스에서 이미 수집했으므로 본문을 전수 파싱하지 않는다.
+  collectSeries(fixtures.getLive);
+  collectSeries(fixtures.eventDetails);
+  collectSeries(fixtures.getSchedule);
 
   return { matchIds: [...matchIds], gameIds: [...gameIds] };
 }
@@ -342,8 +520,8 @@ function loadFixtures(dir) {
   const schedule = loadJsonl(path.join(dir, 'getSchedule.jsonl'));
   const standings = loadJsonl(path.join(dir, 'getStandings.jsonl'));
   return {
-    getLive: loadJsonl(path.join(dir, 'getLive.jsonl')) || [],
-    eventDetails: loadJsonl(path.join(dir, 'eventDetails.jsonl')) || [],
+    getLive: loadJsonl(path.join(dir, 'getLive.jsonl')) || new FixtureSeries([]),
+    eventDetails: loadJsonl(path.join(dir, 'eventDetails.jsonl')) || new FixtureSeries([]),
     // 없으면 pollMeta() 가 에러/백오프를 반복하지 않도록 빈 응답으로 대체한다.
     getSchedule: schedule,
     getStandings: standings,
@@ -354,31 +532,28 @@ function loadFixtures(dir) {
 
 /** 로드된 모든 픽스처를 통틀어 가장 이른 시각 — 재생 시계의 기준점(t=0)이다. */
 function earliestCapturedAtMs(fixtures) {
-  const all = [
-    ...fixtures.getLive,
-    ...fixtures.eventDetails,
-    ...(fixtures.getSchedule || []),
-    ...(fixtures.getStandings || []),
-    ...[...fixtures.window.values()].flat(),
-    ...[...fixtures.details.values()].flat(),
-  ];
-  if (all.length === 0) {
+  const series = allFixtureSeries(fixtures).filter((item) => item.length > 0);
+  if (series.length === 0) {
     throw new Error('픽스처가 비어 있다 — getLive.jsonl / eventDetails.jsonl / window.jsonl / details.jsonl 중 최소 하나는 있어야 한다');
   }
-  return Math.min(...all.map((e) => e.capturedAtMs));
+  return Math.min(...series.map((item) => item.capturedAtMsAt(0)));
 }
 
 /** JSONL 전체에서 가장 늦은 응답 시각 — 재생 타임라인의 끝이다. */
 function latestCapturedAtMs(fixtures) {
-  const all = [
-    ...fixtures.getLive,
-    ...fixtures.eventDetails,
-    ...(fixtures.getSchedule || []),
-    ...(fixtures.getStandings || []),
-    ...[...fixtures.window.values()].flat(),
-    ...[...fixtures.details.values()].flat(),
-  ];
-  return Math.max(...all.map((e) => e.capturedAtMs));
+  const series = allFixtureSeries(fixtures).filter((item) => item.length > 0);
+  return Math.max(...series.map((item) => item.capturedAtMsAt(item.length - 1)));
+}
+
+function allFixtureSeries(fixtures) {
+  return [
+    fixtures.getLive,
+    fixtures.eventDetails,
+    fixtures.getSchedule,
+    fixtures.getStandings,
+    ...fixtures.window.values(),
+    ...fixtures.details.values(),
+  ].filter(Boolean);
 }
 
 function sendJson(res, status, body) {
@@ -400,7 +575,11 @@ function main() {
     `(각 게임 첫 프레임을 재생 시작 시각에 맞춤 — 세트 진입 즉시 화면에 반영됨)`);
   console.log(`[replay] 배속 ${run.speed}x 로 재생 시작 (기준 시각 ${new Date(run.originMs).toISOString()})`);
   console.log(`[replay] 실행 ID: ${run.runId} · matchId: ${runSummary(run).matchId}`);
-  console.log('[replay]   배속 1이 아니면 세트 종료~다음 세트 배팅 오픈 텀이 실제 배속만큼 줄지 않음 — README 참고');
+  if (args.compressFrameTime) {
+    console.log('[replay] 배팅 검증용 압축 프레임 시계 사용 (화면의 게임 경과 시간은 실제와 다를 수 있음)');
+  } else {
+    console.log('[replay]   배속 1이 아니면 세트 종료~다음 세트 배팅 오픈 텀이 실제 배속만큼 줄지 않음 — README 참고');
+  }
 
   /** 지금(wall clock)이 녹화 타임라인상 몇 시일지 계산한다. */
   function currentMappedNowMs() {
@@ -414,7 +593,8 @@ function main() {
 
     if (pathname === '/__replay/start') {
       if (req.method !== 'POST') return sendJson(res, 405, { error: 'POST 요청만 허용한다' });
-      run = createReplayRun(fixtures, args.speed);
+      // 사용자가 고른 배속을 유지해야, 새 테스트 경기의 첫 schedule 폴링도 같은 시간축으로 시작한다.
+      run = createReplayRun(fixtures, run.speed);
       const summary = runSummary(run);
       console.log(`[replay] 새 재생 시작: runId=${summary.runId} · matchId=${summary.matchId}`);
       return sendJson(res, 200, summary);
@@ -437,7 +617,17 @@ function main() {
     // getLive/getSchedule 의 startTime 은 실제 지금과 비교되므로 재생 시작 시각 기준으로 옮겨서 돌려준다.
     const transform = (body) => replaceReplayIds(body, run);
     const shiftSchedule = (body) => transform(shiftScheduleBody(body, mappedMs, Date.now(), run.speed));
-    const shiftFrames = (body, originalGameId) => transform(shiftFramesBody(body, run.frameOffsets.get(originalGameId) ?? 0));
+    const shiftFrames = (body, originalGameId) => transform(shiftFramesBody(
+      body,
+      run.frameOffsets.get(originalGameId) ?? {
+        firstFrameMs: run.startWallMs,
+        startWallMs: run.startWallMs,
+        offsetMs: 0,
+      },
+      run.speed,
+      args.compressFrameTime,
+    ));
+    const shiftGameStartFrames = (body) => transform(shiftGameStartFramesBody(body, run));
 
     let match;
     if (pathname === '/getLive') {
@@ -459,13 +649,19 @@ function main() {
       const originalGameId = run.originalGameIdByReplayId.get(replayGameId);
       const series = fixtures.window.get(originalGameId);
       if (!series) return sendJson(res, 404, { error: `녹화된 window 데이터 없음: ${replayGameId}` });
+      const isGameStartProbe = url.searchParams.has('clutchGameStartProbe');
       // startingTime 파라미터가 없는 호출은 LiveStatsClient.getGameStartTimestamp() 전용 —
       // "게임 시작 첫 프레임"을 기대하므로 재생 시각과 무관하게 최초 항목을 돌려줘야 한다.
       if (!url.searchParams.has('startingTime')) {
-        return respondPicked(res, pathname, series[0], (body) => shiftFrames(body, originalGameId));
+        return respondPicked(
+          res,
+          pathname,
+          series.entryAt(0),
+          (body) => isGameStartProbe ? shiftGameStartFrames(body) : shiftFrames(body, originalGameId),
+        );
       }
       return respondMergedFrames(res, pathname, 'window', originalGameId, series, mappedMs,
-        (body) => shiftFrames(body, originalGameId));
+        (body) => isGameStartProbe ? shiftGameStartFrames(body) : shiftFrames(body, originalGameId));
     }
     if ((match = pathname.match(/^\/details\/(.+)$/))) {
       const replayGameId = decodeURIComponent(match[1]);
