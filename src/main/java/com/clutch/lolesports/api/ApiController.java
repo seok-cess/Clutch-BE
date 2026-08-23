@@ -17,10 +17,12 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 
 /**
  * 프론트 소비용 REST API. 전부 인메모리 캐시에서 응답한다 (외부 소스 직접 호출 없음).
@@ -73,15 +75,25 @@ public class ApiController {
      * 최신만 보면 그 안의 초 단위 변화가 전부 버려진다 (2026-08-08 라이브 실측).
      */
     private WindowResponse.Frame pickWindowFrame(String gameId, Long lag) {
-        if (sourceState.mode() == ExternalSourceMode.STUB || (lag != null && lag <= 0)) {
+        if (lag != null && lag <= 0) {
             return cache.getNewestWindowFrame(gameId);
+        }
+        if (sourceState.mode() == ExternalSourceMode.STUB) {
+            return cache.getReplayWindowFrame(gameId, Instant.now());
         }
         return cache.getWindowFrameAt(gameId, displayTarget(lag));
     }
 
     private DetailsResponse.Frame pickDetailsFrame(String gameId, Long lag) {
-        if (sourceState.mode() == ExternalSourceMode.STUB || (lag != null && lag <= 0)) {
+        if (lag != null && lag <= 0) {
             return cache.getNewestDetailsFrame(gameId);
+        }
+        if (sourceState.mode() == ExternalSourceMode.STUB) {
+            WindowResponse.Frame windowFrame = cache.getReplayWindowFrame(gameId, Instant.now());
+            Instant target = windowFrame != null ? parseInstant(windowFrame.rfc460Timestamp()) : null;
+            return target != null
+                    ? cache.getDetailsFrameAt(gameId, target)
+                    : cache.getNewestDetailsFrame(gameId);
         }
         return cache.getDetailsFrameAt(gameId, displayTarget(lag));
     }
@@ -94,7 +106,11 @@ public class ApiController {
      * 표시 중인 프레임의 게임 경과 시간(초).
      * 피드에 게임 시계 필드가 없어 "프레임 시각 - 게임 시작 시각"으로 계산한다.
      */
-    private Long elapsedSeconds(String gameId, String frameTs) {
+    private Long elapsedSeconds(String gameId, WindowResponse.Frame frame) {
+        if (frame != null && frame.gameTimeSeconds() != null) {
+            return frame.gameTimeSeconds();
+        }
+        String frameTs = frame != null ? frame.rfc460Timestamp() : null;
         java.time.Instant start = cache.getGameStart(gameId);
         if (start == null || frameTs == null) {
             return null;
@@ -361,7 +377,7 @@ public class ApiController {
                 frame.rfc460Timestamp(),
                 frame.gameState(),
                 meta != null ? meta.patchVersion() : null,
-                elapsedSeconds(gameId, frame.rfc460Timestamp()),
+                elapsedSeconds(gameId, frame),
                 goldDiff,
                 blue,
                 red
@@ -374,33 +390,30 @@ public class ApiController {
     public ResponseEntity<ApiDtos.GameHistory> history(
             @PathVariable String gameId,
             @org.springframework.web.bind.annotation.RequestParam(value = "lag", required = false) Long lag,
-            @org.springframework.web.bind.annotation.RequestParam(value = "step", defaultValue = "10") int step) {
+            @org.springframework.web.bind.annotation.RequestParam(value = "step", required = false) Integer step) {
+        int samplingStep = Math.max(1, step != null ? step
+                : (sourceState.mode() == ExternalSourceMode.STUB ? 1 : 10));
         if (!cache.hasWindow(gameId)) {
-            var stored = gameQuery.history(gameId, Math.max(1, step));
+            var stored = gameQuery.history(gameId, samplingStep);
             if (stored.isPresent()) {
                 return ResponseEntity.ok(stored.get());
             }
             historical.ensureGameLoaded(gameId);
         }
-        java.time.Instant until = (sourceState.mode() == ExternalSourceMode.STUB || (lag != null && lag <= 0))
-                ? java.time.Instant.MAX
-                : displayTarget(lag);
+        Instant until;
+        if (lag != null && lag <= 0) {
+            until = Instant.MAX;
+        } else if (sourceState.mode() == ExternalSourceMode.STUB) {
+            WindowResponse.Frame replayFrame = cache.getReplayWindowFrame(gameId, Instant.now());
+            Instant replayTime = replayFrame != null ? parseInstant(replayFrame.rfc460Timestamp()) : null;
+            until = replayTime != null ? replayTime : Instant.MAX;
+        } else {
+            until = displayTarget(lag);
+        }
 
-        java.time.Instant start = cache.getGameStart(gameId);
-        List<ApiDtos.HistoryPoint> points = cache.getWindowSeries(gameId, until, Math.max(1, step)).stream()
-                .map(f -> {
-                    Long t = elapsed(start, f.rfc460Timestamp());
-                    Long blue = f.blueTeam() != null ? f.blueTeam().totalGold() : null;
-                    Long red = f.redTeam() != null ? f.redTeam().totalGold() : null;
-                    return new ApiDtos.HistoryPoint(
-                            t,
-                            (blue != null && red != null) ? blue - red : null,
-                            blue, red,
-                            f.blueTeam() != null ? f.blueTeam().totalKills() : null,
-                            f.redTeam() != null ? f.redTeam().totalKills() : null);
-                })
-                .filter(p -> p.goldDiff() != null)
-                .toList();
+        Instant start = cache.getGameStart(gameId);
+        List<ApiDtos.HistoryPoint> points = chronologicalHistoryPoints(
+                cache.getWindowSeries(gameId, until, samplingStep), start);
 
         // 오브젝트는 원본 해상도(1초)로 훑어야 시점이 정확하다 — step 으로 솎으면 놓친다
         List<ApiDtos.ObjectiveEvent> objectives =
@@ -409,14 +422,63 @@ public class ApiController {
         return ResponseEntity.ok(new ApiDtos.GameHistory(gameId, points, objectives));
     }
 
+    /**
+     * 프레임 수신 순서와 무관하게 게임 시간순으로 그래프 점을 만든다.
+     * 같은 게임 초에 여러 스냅샷이 있으면 마지막 스냅샷만 남겨 선이 되감기지 않게 한다.
+     */
+    private static List<ApiDtos.HistoryPoint> chronologicalHistoryPoints(
+            List<WindowResponse.Frame> frames, Instant start) {
+        Map<Long, ApiDtos.HistoryPoint> pointsBySecond = new TreeMap<>();
+        for (WindowResponse.Frame f : frames) {
+            Long t = elapsed(start, f);
+            Long blue = f.blueTeam() != null ? f.blueTeam().totalGold() : null;
+            Long red = f.redTeam() != null ? f.redTeam().totalGold() : null;
+            if (t == null || t < 0 || blue == null || red == null) {
+                continue;
+            }
+            pointsBySecond.put(t, new ApiDtos.HistoryPoint(
+                    t,
+                    blue - red,
+                    blue, red,
+                    f.blueTeam().totalKills(),
+                    f.redTeam().totalKills()));
+        }
+        return List.copyOf(pointsBySecond.values());
+    }
+
+    /** 게임 시간순으로 정렬하고, 같은 초의 중복 프레임은 마지막 값만 남긴다. */
+    private static List<WindowResponse.Frame> chronologicalFrames(
+            List<WindowResponse.Frame> frames, Instant start) {
+        Map<Long, WindowResponse.Frame> framesBySecond = new TreeMap<>();
+        for (WindowResponse.Frame frame : frames) {
+            Long t = elapsed(start, frame);
+            if (t != null && t >= 0) {
+                framesBySecond.put(t, frame);
+            }
+        }
+        return List.copyOf(framesBySecond.values());
+    }
+
     /** 게임 시작 기준 경과 초 */
-    private static Long elapsed(java.time.Instant start, String frameTs) {
+    private static Long elapsed(java.time.Instant start, WindowResponse.Frame frame) {
+        if (frame != null && frame.gameTimeSeconds() != null) {
+            return frame.gameTimeSeconds();
+        }
+        String frameTs = frame != null ? frame.rfc460Timestamp() : null;
         if (start == null || frameTs == null) {
             return null;
         }
         try {
             return java.time.Duration.between(start, java.time.Instant.parse(frameTs)).getSeconds();
         } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static Instant parseInstant(String value) {
+        try {
+            return value != null ? Instant.parse(value) : null;
+        } catch (Exception ignored) {
             return null;
         }
     }
@@ -429,46 +491,54 @@ public class ApiController {
             List<WindowResponse.Frame> frames, java.time.Instant start) {
 
         List<ApiDtos.ObjectiveEvent> out = new ArrayList<>();
-        WindowResponse.Frame prev = null;
-
-        for (WindowResponse.Frame f : frames) {
-            if (prev != null) {
-                Long t = elapsed(start, f.rfc460Timestamp());
-                collectSide(out, t, "blue", prev.blueTeam(), f.blueTeam());
-                collectSide(out, t, "red", prev.redTeam(), f.redTeam());
-            }
-            prev = f;
+        ObjectiveProgress blue = new ObjectiveProgress();
+        ObjectiveProgress red = new ObjectiveProgress();
+        for (WindowResponse.Frame f : chronologicalFrames(frames, start)) {
+            Long t = elapsed(start, f);
+            collectSide(out, t, "blue", blue, f.blueTeam());
+            collectSide(out, t, "red", red, f.redTeam());
         }
         return out;
     }
 
-    /** 한 팀의 이전/현재 프레임을 비교해 늘어난 오브젝트를 기록 */
+    /** 각 오브젝트의 최대 관측치를 보존해, 늦게 도착한 이전 프레임을 새 획득으로 오인하지 않는다. */
+    private static final class ObjectiveProgress {
+        private List<String> dragons = List.of();
+        private int barons;
+        private int towers;
+        private int inhibitors;
+    }
+
+    /** 한 팀 프레임에서 이전 최대 관측치보다 새로 늘어난 오브젝트만 기록한다. */
     private static void collectSide(List<ApiDtos.ObjectiveEvent> out, Long t, String side,
-                                    WindowResponse.TeamFrame before, WindowResponse.TeamFrame after) {
-        if (before == null || after == null || t == null) {
+                                    ObjectiveProgress progress, WindowResponse.TeamFrame after) {
+        if (after == null || t == null) {
             return;
         }
 
         // 용은 종류가 순서대로 쌓이므로 새로 추가된 항목만 꺼낸다
-        List<String> pd = before.dragons() != null ? before.dragons() : List.of();
-        List<String> cd = after.dragons() != null ? after.dragons() : List.of();
-        for (int i = pd.size(); i < cd.size(); i++) {
-            out.add(new ApiDtos.ObjectiveEvent(t, side, "dragon", cd.get(i)));
+        List<String> currentDragons = after.dragons() != null ? after.dragons() : List.of();
+        if (currentDragons.size() >= progress.dragons.size()) {
+            for (int i = progress.dragons.size(); i < currentDragons.size(); i++) {
+                out.add(new ApiDtos.ObjectiveEvent(t, side, "dragon", currentDragons.get(i)));
+            }
+            progress.dragons = List.copyOf(currentDragons);
         }
 
-        addCount(out, t, side, "baron", before.barons(), after.barons());
-        addCount(out, t, side, "tower", before.towers(), after.towers());
-        addCount(out, t, side, "inhibitor", before.inhibitors(), after.inhibitors());
+        progress.barons = addCount(out, t, side, "baron", progress.barons, after.barons());
+        progress.towers = addCount(out, t, side, "tower", progress.towers, after.towers());
+        progress.inhibitors = addCount(out, t, side, "inhibitor", progress.inhibitors, after.inhibitors());
     }
 
-    private static void addCount(List<ApiDtos.ObjectiveEvent> out, Long t, String side,
-                                 String type, Integer before, Integer after) {
-        if (before == null || after == null) {
-            return;
+    private static int addCount(List<ApiDtos.ObjectiveEvent> out, Long t, String side,
+                                String type, int previousMaximum, Integer current) {
+        if (current == null || current <= previousMaximum) {
+            return previousMaximum;
         }
-        for (int i = 0; i < after - before; i++) {
+        for (int i = previousMaximum; i < current; i++) {
             out.add(new ApiDtos.ObjectiveEvent(t, side, type, null));
         }
+        return current;
     }
 
     // ---- 선수 상세 (라이브는 폴링 캐시, 과거 경기는 온디맨드 로드) ----

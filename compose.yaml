@@ -166,8 +166,6 @@ services:
       - "${REPLAY_FIXTURE_DIR:-fixtures/sample-match-bo3-001}"
       - --speed
       - "${REPLAY_SPEED:-1}"
-      # 고배속 replay에서도 세트 종료·다음 세트 베팅 시점을 함께 압축한다.
-      - --compress-frame-time
     ports:
       - "4000:4000"
     volumes:

@@ -24,13 +24,14 @@ const path = require('path');
 const { randomUUID } = require('crypto');
 
 function parseArgs(argv) {
-  const args = { dir: null, port: 4000, speed: 1, compressFrameTime: false };
+  const args = { dir: null, port: 4000, speed: 1 };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--dir') args.dir = argv[++i];
     else if (a === '--port') args.port = Number(argv[++i]);
     else if (a === '--speed') args.speed = Number(argv[++i]);
-    else if (a === '--compress-frame-time') args.compressFrameTime = true;
+    // 이전 Compose 명령과의 호환성. 프레임 시계는 이제 항상 재생 배속을 따른다.
+    else if (a === '--compress-frame-time') continue;
     else if (a === '--help' || a === '-h') { printUsage(); process.exit(0); }
   }
   if (!args.dir || !Number.isFinite(args.port) || !Number.isFinite(args.speed) || args.speed <= 0) {
@@ -41,7 +42,7 @@ function parseArgs(argv) {
 }
 
 function printUsage() {
-  console.error('사용법: node replay-server.js --dir <fixture-dir> [--port 4000] [--speed 1] [--compress-frame-time]');
+  console.error('사용법: node replay-server.js --dir <fixture-dir> [--port 4000] [--speed 1]');
 }
 
 /** 이 크기 이상은 본문을 메모리에 적재하지 않고 JSONL 줄 위치만 인덱싱한다. */
@@ -221,7 +222,10 @@ function loadJsonlByGameId(filePath) {
   ]));
 }
 
-/** mappedMs 이하 중 가장 늦은 항목. mappedMs 가 범위를 벗어나면 양 끝 항목으로 고정된다. */
+/**
+ * mappedMs 이하 중 가장 늦은 항목. 마지막 항목 뒤에서는 마지막 스냅샷을 유지한다.
+ * 첫 항목 전에는 아직 녹화된 응답이 없으므로 null을 반환한다.
+ */
 function pickAtOrBefore(series, mappedMs) {
   const index = indexAtOrBefore(series, mappedMs);
   return index < 0 ? null : series.entryAt(index);
@@ -229,7 +233,7 @@ function pickAtOrBefore(series, mappedMs) {
 
 /** mappedMs 시점에 해당하는 JSONL 항목의 배열 인덱스. */
 function indexAtOrBefore(series, mappedMs) {
-  if (!series || series.length === 0) return -1;
+  if (!series || series.length === 0 || series.capturedAtMsAt(0) > mappedMs) return -1;
 
   let left = 0;
   let right = series.length - 1;
@@ -253,6 +257,9 @@ function cloneJson(value) {
  * 그대로 한 번에 돌려줘야 백엔드 캐시와 DB 타임라인이 빠지지 않는다.
  */
 function mergeUnservedFrameEntries(series, mappedMs, lastServedIndex) {
+  // window/details가 아직 첫 성공 응답을 받지 못한 구간이다. 여기서 첫 프레임을
+  // 미리 반환하면 같은 미래 프레임이 캐시에 고정되어 화면이 멈춘 것처럼 보인다.
+  if (!series || series.length === 0 || series.capturedAtMsAt(0) > mappedMs) return null;
   const latestIndex = indexAtOrBefore(series, mappedMs);
   if (latestIndex < 0) return null;
 
@@ -290,8 +297,8 @@ function mergeUnservedFrameEntries(series, mappedMs, lastServedIndex) {
  * 직접 비교된다. 녹화 당시의 고정된 과거 시각을 그대로 돌려주면 이 비교가 항상
  * 어긋나므로, 배속을 반영해 재생 시작 시각 기준으로 다시 계산해야 한다.
  *
- * window/details 의 프레임 시각(rfc460Timestamp)은 여기 대상이 아니다 — 그건
- * 서로 상대적으로만 쓰이고 실제 시각과 비교되지 않는다(DataCacheService 참고).
+ * window/details의 프레임 전달 시각도 같은 시간축으로 옮긴다. 이 시각은 캐시에서 현재
+ * 재생 위치의 프레임을 고르고, 다음 세트 배팅 마감을 판단하는 데 쓴다.
  */
 function shiftIsoTimestamp(iso, timelineMs, wallMs, speed) {
   const originalMs = Date.parse(iso);
@@ -314,37 +321,24 @@ function shiftScheduleBody(body, timelineMs, wallMs, speed) {
 }
 
 /**
- * window/details 프레임의 rfc460Timestamp 를 상수만큼 평행이동한다.
+ * window/details 프레임의 rfc460Timestamp를 재생 시간축의 실제 벽시계로 바꾼다.
  *
- * 이 값은 게임 내 경과 시간 계산(frameTs - gameStartTs)에도 쓰이므로 프레임끼리의
- * 간격은 절대 바꾸면 안 된다 — 배속으로 나누면 게임 시계가 깨진다. 그래서 startTime 과
- * 달리 배속을 반영한 축소가 아니라 "통째로 밀기"만 한다.
- *
- * 부작용 1 — 다음 세트 배팅 오픈: DataCacheService.getFeedFinishedAt() 처럼 이 값을
- * "지금"과 직접 비교하는 곳은 배속이 1이 아니면 정확히 배속만큼 당겨지지 않는다 —
- * 재생 시작 후 경과 초만큼 실제로 기다려야 열린다. 게임 시계를 지키는 한 구조적으로
- * 피할 수 없는 절충이다. 배속 1이면 이 오차가 0이 된다.
- *
- * 부작용 2(중요, 실제로 걸렸던 버그) — 화면 표시 지연: ApiController 는 "지금보다
- * 45초 전" 프레임을 찾아서 보여준다. 평행이동 기준점을 세트별 첫 프레임이 아니라
- * 픽스처 전체의 시작(사전 대기 포함)으로 잡으면, 그 사전 대기 시간만큼(예: 20분)
- * "45초 전" 이 버퍼의 가장 오래된 프레임보다도 더 과거를 가리키게 되어 floorEntry 가
- * 매번 실패하고 항상 최초 프레임에 고정된다 — 배속과 무관하게, 그 대기시간이 실제로
- * 지날 때까지 화면이 멈춘 것처럼 보인다. 그래서 게임별로 "그 게임의 첫 프레임"을
- * 재생 시작 시각에 맞춰 따로 평행이동한다 — 게임이 몇 번째 세트든 캐시에 들어오는
- * 순간부터 곧바로 "45초 전" 조회가 성립한다.
+ * `rfc460Timestamp`는 재생 프레임을 현재 시각에서 선택할 수 있도록 배속만큼 압축한다.
+ * 이 값으로 게임 시간을 계산하면 20배속이어도 1초씩만 늘어나므로, 원래 게임 경과 시간은
+ * 별도 `gameTimeSeconds` 필드에 보존한다. 실제 livestats 응답에는 없는 replay 전용 필드다.
  */
-function shiftFramesBody(body, frameClock, speed, compressFrameTime) {
+function shiftFramesBody(body, run, originalGameId) {
   if (!Array.isArray(body?.frames)) return body;
   const shifted = JSON.parse(JSON.stringify(body));
+  const gameStartMs = run.gameStartMsByOriginalId.get(originalGameId);
   for (const frame of shifted.frames) {
     if (typeof frame.rfc460Timestamp === 'string') {
       const ms = Date.parse(frame.rfc460Timestamp);
       if (!Number.isNaN(ms)) {
-        const shiftedMs = compressFrameTime
-          ? frameClock.startWallMs + (ms - frameClock.firstFrameMs) / speed
-          : ms + frameClock.offsetMs;
-        frame.rfc460Timestamp = new Date(shiftedMs).toISOString();
+        if (Number.isFinite(gameStartMs)) {
+          frame.gameTimeSeconds = Math.max(0, Math.floor((ms - gameStartMs) / 1000));
+        }
+        frame.rfc460Timestamp = new Date(wallMsForTimeline(run, ms)).toISOString();
       }
     }
   }
@@ -352,40 +346,32 @@ function shiftFramesBody(body, frameClock, speed, compressFrameTime) {
 }
 
 /**
- * 게임 시작 시각 탐색 전용 프레임 변환.
+ * 녹화본에 다음 스냅샷이 없는 구간에도 마지막 프레임의 시계를 현재 재생 위치까지 전진시킨다.
  *
- * 화면용 window/details는 세트별 첫 프레임을 재생 시작 시각에 맞춰 즉시 표시되게 한다.
- * 반면 배팅 마감은 세트 간 공백까지 보존한 실제 재생 시간축이 필요하므로, 이 응답만은
- * fixture 전체 원본 시각을 현재 run의 시간축으로 옮긴다.
+ * 실제 기록은 세트 시작 직후 다음 프레임이 몇 분 뒤에만 있는 경우가 있다. 그 프레임을
+ * 그대로 재사용하면 백엔드 캐시가 같은 RFC 시각을 중복으로 버려 화면 타이머가 0초에
+ * 고정된다. 선수·골드 값은 마지막 관측값을 유지하되, 프레임 시각과 gameTimeSeconds는
+ * 재생 시계로 갱신해 1배속은 1초, 20배속은 20초씩 계속 흐르게 한다.
  */
-function shiftGameStartFramesBody(body, run) {
-  if (!Array.isArray(body?.frames)) return body;
-  const shifted = JSON.parse(JSON.stringify(body));
-  for (const frame of shifted.frames) {
-    if (typeof frame.rfc460Timestamp !== 'string') continue;
-    const frameMs = Date.parse(frame.rfc460Timestamp);
-    if (Number.isNaN(frameMs)) continue;
-    const shiftedMs = run.timelineAnchorWallMs + (frameMs - run.timelineAnchorMs) / run.speed;
-    frame.rfc460Timestamp = new Date(shiftedMs).toISOString();
-  }
-  return shifted;
-}
+function advanceLatestFrameToReplayClock(body, run, originalGameId, mappedMs, includeGameTime) {
+  if (!Array.isArray(body?.frames) || body.frames.length === 0) return body;
+  const gameStartMs = run.gameStartMsByOriginalId.get(originalGameId);
+  if (!Number.isFinite(gameStartMs) || mappedMs < gameStartMs) return body;
 
-/** gameId 별 프레임 시계 — 각 게임의 첫 프레임이 재생 시작 시각에 오도록 맞춘다. */
-function computeFrameOffsets(fixtures, startWallMs) {
-  const offsets = new Map();
-  for (const gameId of new Set([...fixtures.window.keys(), ...fixtures.details.keys()])) {
-    const windowSeries = fixtures.window.get(gameId);
-    const first = windowSeries?.entryAt(0);
-    const frameTs = first?.body?.frames?.[0]?.rfc460Timestamp;
-    const frameMs = typeof frameTs === 'string' ? Date.parse(frameTs) : NaN;
-    offsets.set(gameId, {
-      firstFrameMs: Number.isNaN(frameMs) ? startWallMs : frameMs,
-      startWallMs,
-      offsetMs: Number.isNaN(frameMs) ? 0 : startWallMs - frameMs,
-    });
+  const latest = body.frames.at(-1);
+  if (!latest || String(latest.gameState).toLowerCase() === 'finished') return body;
+  const replayGameTimeSeconds = Math.max(0, Math.floor((mappedMs - gameStartMs) / 1000));
+  // 수집 순서가 뒤섞인 fixture는 현재 재생 위치보다 앞선 캡처에 더 늦은 원본 프레임을
+  // 담을 수 있다. 그 경우에는 검증 가능한 원본 프레임의 시간 정보를 덮어쓰지 않는다.
+  if (includeGameTime && Number.isFinite(latest.gameTimeSeconds)
+    && latest.gameTimeSeconds > replayGameTimeSeconds) {
+    return body;
   }
-  return offsets;
+  latest.rfc460Timestamp = new Date().toISOString();
+  if (includeGameTime) {
+    latest.gameTimeSeconds = replayGameTimeSeconds;
+  }
+  return body;
 }
 
 /** fixture 안에 등장하는 매치·세트 ID를 모은다. 원본 fixture 파일은 절대 수정하지 않는다. */
@@ -454,10 +440,10 @@ function createReplayRun(fixtures, speed) {
     timelineAnchorMs: originMs,
     timelineAnchorWallMs: startWallMs,
     speed,
-    frameOffsets: computeFrameOffsets(fixtures, startWallMs),
     matchIdMap,
     gameIdMap,
     originalGameIdByReplayId,
+    gameStartMsByOriginalId: fixtures.gameStartMsByOriginalId,
     // endpoint/game 별 마지막으로 백엔드에 전달한 JSONL 인덱스.
     // 새 테스트 시작 시 run 자체가 새로 만들어지므로 커서도 항상 초기화된다.
     lastServedFrameIndex: new Map(),
@@ -467,6 +453,11 @@ function createReplayRun(fixtures, speed) {
 /** 현재 실제 시각을 JSONL 타임라인 시각으로 바꾼다. 배속 변경 뒤에도 연속성을 유지한다. */
 function timelineNowMs(run, wallMs = Date.now()) {
   return run.timelineAnchorMs + (wallMs - run.timelineAnchorWallMs) * run.speed;
+}
+
+/** 재생 시간축의 시각을 현재 배속을 반영한 실제 벽시계 시각으로 바꾼다. */
+function wallMsForTimeline(run, timelineMs) {
+  return run.timelineAnchorWallMs + (timelineMs - run.timelineAnchorMs) / run.speed;
 }
 
 function changeSpeed(run, speed) {
@@ -519,15 +510,54 @@ const EMPTY_STANDINGS_BODY = { data: { standings: [] } };
 function loadFixtures(dir) {
   const schedule = loadJsonl(path.join(dir, 'getSchedule.jsonl'));
   const standings = loadJsonl(path.join(dir, 'getStandings.jsonl'));
+  const eventDetails = loadJsonl(path.join(dir, 'eventDetails.jsonl')) || new FixtureSeries([]);
+  const window = loadJsonlByGameId(path.join(dir, 'window.jsonl'));
   return {
     getLive: loadJsonl(path.join(dir, 'getLive.jsonl')) || new FixtureSeries([]),
-    eventDetails: loadJsonl(path.join(dir, 'eventDetails.jsonl')) || new FixtureSeries([]),
+    eventDetails,
+    // schedule에는 팀 ID가 빠진 경우가 많다. 시작 전 배팅 이벤트를 만들려면 팀 ID를
+    // 담은 안전한(unstarted) 상세 스냅샷을 첫 폴링부터 읽을 수 있어야 한다.
+    preMatchEventDetails: findPreMatchEventDetails(eventDetails),
     // 없으면 pollMeta() 가 에러/백오프를 반복하지 않도록 빈 응답으로 대체한다.
     getSchedule: schedule,
     getStandings: standings,
-    window: loadJsonlByGameId(path.join(dir, 'window.jsonl')),
+    window,
     details: loadJsonlByGameId(path.join(dir, 'details.jsonl')),
+    gameStartMsByOriginalId: findGameStartMsByOriginalId(window),
   };
+}
+
+/** replay 화면 타이머의 0초 기준인 게임별 첫 비정지 프레임 시각을 찾는다. */
+function findGameStartMsByOriginalId(windowByGameId) {
+  const starts = new Map();
+  for (const [gameId, series] of windowByGameId) {
+    let earliestStartedFrameMs = Number.POSITIVE_INFINITY;
+    for (let index = 0; index < series.length; index++) {
+      for (const frame of series.entryAt(index).body?.frames || []) {
+        const timestamp = Date.parse(frame?.rfc460Timestamp);
+        if (!Number.isNaN(timestamp) && !String(frame?.gameState).toLowerCase().includes('paused')) {
+          earliestStartedFrameMs = Math.min(earliestStartedFrameMs, timestamp);
+        }
+      }
+    }
+    if (Number.isFinite(earliestStartedFrameMs)) {
+      starts.set(gameId, earliestStartedFrameMs);
+    }
+  }
+  return starts;
+}
+
+/** 아직 어느 세트도 시작하지 않은 eventDetails만 시작 전 메타데이터로 재사용한다. */
+function findPreMatchEventDetails(series) {
+  for (let index = 0; index < series.length; index++) {
+    const entry = series.entryAt(index);
+    const games = entry?.body?.data?.event?.match?.games;
+    if (Array.isArray(games) && games.length > 0
+      && games.every((game) => String(game?.state).toLowerCase() === 'unstarted')) {
+      return entry;
+    }
+  }
+  return null;
 }
 
 /** 로드된 모든 픽스처를 통틀어 가장 이른 시각 — 재생 시계의 기준점(t=0)이다. */
@@ -562,6 +592,12 @@ function sendJson(res, status, body) {
   res.end(payload);
 }
 
+/** livestats가 아직 프레임을 제공하지 않는 구간. 폴러가 재시도할 수 있도록 본문 없이 응답한다. */
+function sendNoContent(res) {
+  res.writeHead(204);
+  res.end();
+}
+
 function main() {
   const args = parseArgs(process.argv.slice(2));
   const fixtures = loadFixtures(args.dir);
@@ -572,14 +608,10 @@ function main() {
     `schedule ${fixtures.getSchedule ? fixtures.getSchedule.length : '없음(빈 응답으로 대체)'} · ` +
     `standings ${fixtures.getStandings ? fixtures.getStandings.length : '없음(빈 응답으로 대체)'}`);
   console.log(`[replay]   window/details gameId: ${[...fixtures.window.keys()].join(', ') || '없음'} ` +
-    `(각 게임 첫 프레임을 재생 시작 시각에 맞춤 — 세트 진입 즉시 화면에 반영됨)`);
+    `(프레임 시계도 재생 시간축으로 변환)`);
   console.log(`[replay] 배속 ${run.speed}x 로 재생 시작 (기준 시각 ${new Date(run.originMs).toISOString()})`);
   console.log(`[replay] 실행 ID: ${run.runId} · matchId: ${runSummary(run).matchId}`);
-  if (args.compressFrameTime) {
-    console.log('[replay] 배팅 검증용 압축 프레임 시계 사용 (화면의 게임 경과 시간은 실제와 다를 수 있음)');
-  } else {
-    console.log('[replay]   배속 1이 아니면 세트 종료~다음 세트 배팅 오픈 텀이 실제 배속만큼 줄지 않음 — README 참고');
-  }
+  console.log('[replay] 프레임 시계도 재생 배속을 따름 — 20배속이면 게임 시간도 실제 초당 20초 진행');
 
   /** 지금(wall clock)이 녹화 타임라인상 몇 시일지 계산한다. */
   function currentMappedNowMs() {
@@ -617,32 +649,49 @@ function main() {
     // getLive/getSchedule 의 startTime 은 실제 지금과 비교되므로 재생 시작 시각 기준으로 옮겨서 돌려준다.
     const transform = (body) => replaceReplayIds(body, run);
     const shiftSchedule = (body) => transform(shiftScheduleBody(body, mappedMs, Date.now(), run.speed));
-    const shiftFrames = (body, originalGameId) => transform(shiftFramesBody(
-      body,
-      run.frameOffsets.get(originalGameId) ?? {
-        firstFrameMs: run.startWallMs,
-        startWallMs: run.startWallMs,
-        offsetMs: 0,
-      },
-      run.speed,
-      args.compressFrameTime,
-    ));
-    const shiftGameStartFrames = (body) => transform(shiftGameStartFramesBody(body, run));
+    const shiftFrames = (body, originalGameId, advanceClock = false) => {
+      const shifted = shiftFramesBody(body, run, originalGameId);
+      if (advanceClock) {
+        advanceLatestFrameToReplayClock(shifted, run, originalGameId, mappedMs, true);
+      }
+      return transform(shifted);
+    };
+    const shiftDetailsFrames = (body, originalGameId) => {
+      const shifted = shiftFramesBody(body, run, originalGameId);
+      advanceLatestFrameToReplayClock(shifted, run, originalGameId, mappedMs, false);
+      return transform(shifted);
+    };
+    // 게임 시작 시각 탐색도 화면용 window 프레임과 같은 시간축을 써야
+    // gameTimeSeconds(frameTs - gameStartTs)가 음수가 되지 않는다.
+    const shiftGameStartFrames = (body, originalGameId) => shiftFrames(body, originalGameId);
 
     let match;
     if (pathname === '/getLive') {
-      return respondPicked(res, pathname, pickAtOrBefore(fixtures.getLive, mappedMs), shiftSchedule);
+      const entry = pickAtOrBefore(fixtures.getLive, mappedMs);
+      // replay 시작 전의 getLive는 아직 경기 전 상태다. 미래의 inProgress 응답을
+      // 미리 반환하면 첫 세트 배팅이 이미 진행 중인 경기로 동기화돼 곧바로 마감된다.
+      return entry
+        ? respondPicked(res, pathname, entry, shiftSchedule)
+        : sendJson(res, 200, EMPTY_SCHEDULE_BODY);
     }
     if (pathname === '/getEventDetails') {
-      return respondPicked(res, pathname, pickAtOrBefore(fixtures.eventDetails, mappedMs), transform);
+      const entry = pickAtOrBefore(fixtures.eventDetails, mappedMs)
+        || fixtures.preMatchEventDetails;
+      return respondPicked(res, pathname, entry, transform);
     }
     if (pathname === '/getSchedule') {
       if (!fixtures.getSchedule) return sendJson(res, 200, EMPTY_SCHEDULE_BODY);
-      return respondPicked(res, pathname, pickAtOrBefore(fixtures.getSchedule, mappedMs), shiftSchedule);
+      const entry = pickAtOrBefore(fixtures.getSchedule, mappedMs);
+      return entry
+        ? respondPicked(res, pathname, entry, shiftSchedule)
+        : sendJson(res, 200, EMPTY_SCHEDULE_BODY);
     }
     if (pathname === '/getStandings') {
       if (!fixtures.getStandings) return sendJson(res, 200, EMPTY_STANDINGS_BODY);
-      return respondPicked(res, pathname, pickAtOrBefore(fixtures.getStandings, mappedMs));
+      const entry = pickAtOrBefore(fixtures.getStandings, mappedMs);
+      return entry
+        ? respondPicked(res, pathname, entry)
+        : sendJson(res, 200, EMPTY_STANDINGS_BODY);
     }
     if ((match = pathname.match(/^\/window\/(.+)$/))) {
       const replayGameId = decodeURIComponent(match[1]);
@@ -657,11 +706,11 @@ function main() {
           res,
           pathname,
           series.entryAt(0),
-          (body) => isGameStartProbe ? shiftGameStartFrames(body) : shiftFrames(body, originalGameId),
+          (body) => isGameStartProbe ? shiftGameStartFrames(body, originalGameId) : shiftFrames(body, originalGameId),
         );
       }
       return respondMergedFrames(res, pathname, 'window', originalGameId, series, mappedMs,
-        (body) => isGameStartProbe ? shiftGameStartFrames(body) : shiftFrames(body, originalGameId));
+        (body) => isGameStartProbe ? shiftGameStartFrames(body, originalGameId) : shiftFrames(body, originalGameId, true));
     }
     if ((match = pathname.match(/^\/details\/(.+)$/))) {
       const replayGameId = decodeURIComponent(match[1]);
@@ -669,7 +718,7 @@ function main() {
       const series = fixtures.details.get(originalGameId);
       if (!series) return sendJson(res, 404, { error: `녹화된 details 데이터 없음: ${replayGameId}` });
       return respondMergedFrames(res, pathname, 'details', originalGameId, series, mappedMs,
-        (body) => shiftFrames(body, originalGameId));
+        (body) => shiftDetailsFrames(body, originalGameId));
     }
 
     sendJson(res, 404, { error: `알 수 없는 경로: ${pathname}` });
@@ -686,7 +735,9 @@ function main() {
     const cursorKey = `${endpoint}:${originalGameId}`;
     const lastServedIndex = run.lastServedFrameIndex.get(cursorKey) ?? -1;
     const merged = mergeUnservedFrameEntries(series, mappedMs, lastServedIndex);
-    if (!merged) return sendJson(res, 404, { error: `${pathname} 재생 데이터 없음` });
+    // 실제 livestats도 게임 시작 전에는 204를 줄 수 있다. 404를 쓰면 백엔드는
+    // "통계 미제공"으로 누적 판단할 수 있으므로, 아직 녹화 프레임이 없는 경우는 204다.
+    if (!merged) return sendNoContent(res);
 
     run.lastServedFrameIndex.set(cursorKey, merged.lastServedIndex);
     const body = transformBody ? transformBody(merged.body) : merged.body;

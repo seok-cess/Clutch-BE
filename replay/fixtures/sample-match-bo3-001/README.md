@@ -1,7 +1,13 @@
 # 기본 실제 경기 replay fixture
 
 이 fixture는 GEN–KT best-of-3 실제 API 호출 녹화에서 생성한 공유 기본 fixture다. `compose.yaml`의
-replay 컨테이너는 `REPLAY_FIXTURE_DIR`을 지정하지 않으면 이 디렉터리를 사용한다.
+replay 컨테이너는 `REPLAY_FIXTURE_DIR`을 지정하지 않으면 이 디렉터리를 사용한다. 승패·킬·오브젝트
+흐름은 원본을 유지하되, 로컬 test 경기 시간축과 시작 골드는 아래처럼 재구성했다.
+
+- 첫 세트 전 대기: 10분
+- 세트당 진행 시간: 25분
+- 세트 사이 공백: 1분
+- 각 세트의 첫 프레임: 모든 선수 골드 500 (팀 골드 2,500)
 
 ## 포함된 흐름
 
@@ -33,4 +39,15 @@ node replay/compact-recorded-fixture.js \
   --frame-interval-seconds 1 \
   --final-winner-team-id 100205573495116443 \
   --final-result-delay-seconds 120
+```
+
+압축을 다시 만들었다면 이어서 시간축·골드 규칙을 적용한다.
+
+```bash
+node replay/reshape-fixture.js \
+  --dir replay/fixtures/sample-match-bo3-001 \
+  --replace \
+  --initial-wait-minutes 10 \
+  --set-duration-minutes 25 \
+  --between-set-minutes 1
 ```

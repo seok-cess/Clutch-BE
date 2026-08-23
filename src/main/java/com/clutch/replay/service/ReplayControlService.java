@@ -38,7 +38,9 @@ public class ReplayControlService {
     }
 
     public ReplayStartResult start() {
-        return sourceState.withReadLock(this::startInStubMode);
+        // 새 replay run은 외부 데이터 소스 전환과 같은 캐시 경계다.
+        // 이전 run의 경기·백오프 상태가 새 run을 덮어쓰지 않도록 쓰기 잠금으로 직렬화한다.
+        return sourceState.withWriteLock(this::startInStubMode);
     }
 
     private ReplayStartResult startInStubMode() {
@@ -54,6 +56,9 @@ public class ReplayControlService {
             if (response == null || response.runId() == null || response.matchId() == null) {
                 throw new ReplayControlException("replay 스텁 서버가 새 경기 정보를 반환하지 않았다");
             }
+            // 새 run의 외부 ID는 이전 run과 다르다. 이전 경기의 캐시·백오프·세트 상태를
+            // 비운 뒤 즉시 다시 읽어야 이전 세트의 배팅 마감이 남지 않는다.
+            pollingScheduler.resetForExternalSourceChange();
             // 기본 폴링을 기다리지 않고, 프론트가 곧바로 새 경기를 조회할 수 있게 한다.
             pollingScheduler.pollMeta();
             pollingScheduler.pollLiveMatches();
@@ -108,12 +113,17 @@ public class ReplayControlService {
      * 남으므로, STUB 모드에서만 즉시 다시 읽는다.
      */
     private void refreshStubCachesAfterSpeedChange() {
-        sourceState.withReadLock(() -> {
+        sourceState.withWriteLock(() -> {
             if (sourceState.mode() != ExternalSourceMode.STUB) {
-                return;
+                return null;
             }
+            // replay 프레임 rfc460Timestamp는 선택한 배속에 맞춘 벽시계 좌표다.
+            // 이전 배속으로 키가 잡힌 프레임을 남기면 새 좌표의 프레임과 섞여 타이머가
+            // 되감기거나 최초 프레임에 고정될 수 있으므로, 새 run과 같은 캐시 경계를 만든다.
+            pollingScheduler.resetForExternalSourceChange();
             pollingScheduler.pollMeta();
             pollingScheduler.pollLiveMatches();
+            return null;
         });
     }
 

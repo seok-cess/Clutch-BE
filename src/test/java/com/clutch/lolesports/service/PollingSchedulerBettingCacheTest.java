@@ -5,6 +5,9 @@ import com.clutch.lolesports.client.LolesportsApiClient;
 import com.clutch.lolesports.config.LolesportsProperties;
 import com.clutch.lolesports.dto.external.EventDetailsResponse;
 import com.clutch.lolesports.dto.external.ScheduleResponse;
+import com.clutch.lolesports.source.ExternalSourceMode;
+import com.clutch.lolesports.source.ExternalSourceProperties;
+import com.clutch.lolesports.source.ExternalSourceState;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -14,11 +17,38 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /** 라이브 목록과 분리된 배팅 후보 캐시의 예정 경기 선적재 정책을 검증한다. */
 class PollingSchedulerBettingCacheTest {
+
+    /** STUB은 고배속 시간축을 놓치지 않도록 일반 60초 폴링 대신 1초 경로를 사용한다. */
+    @Test
+    void stubLivePollingReadsLiveStateEveryScheduledTick() {
+        LolesportsApiClient api = mock(LolesportsApiClient.class);
+        when(api.getLive()).thenReturn(schedule(List.of()));
+        ExternalSourceState sourceState = new ExternalSourceState(new ExternalSourceProperties(
+                true, ExternalSourceMode.STUB, null, null));
+        PollingScheduler scheduler = new PollingScheduler(
+                api,
+                mock(LiveStatsClient.class),
+                new DataCacheService(),
+                mock(PentakillDetector.class),
+                mock(GamePersistService.class),
+                mock(SetWinnerTracker.class),
+                mock(HistoricalGameService.class),
+                properties(),
+                sourceState
+        );
+
+        scheduler.pollStubLiveMatches();
+        scheduler.pollRealLiveMatches();
+
+        verify(api).getLive();
+        verify(api, never()).getEventDetails(org.mockito.ArgumentMatchers.anyString());
+    }
 
     /**
      * 공식 시작 30분 이내 예정 경기는 배팅 캐시에만 넣고 먼 경기는 제외하는지 검증한다.

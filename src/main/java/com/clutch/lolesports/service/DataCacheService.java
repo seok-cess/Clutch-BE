@@ -33,7 +33,6 @@ public class DataCacheService {
      * 골드차 추이 그래프가 게임 전체 구간을 필요로 하므로 한 게임 길이(최대 ~90분)보다 넉넉히 잡는다.
      */
     private static final long BUFFER_RETENTION_SECONDS = 7200;
-
     /**
      * 진행 중인 매치 하나에 대한 getLive와 getEventDetails 조합 상태다.
      *
@@ -261,6 +260,17 @@ public class DataCacheService {
     public WindowResponse.Frame getNewestWindowFrame(String gameId) {
         WindowBuffer buf = windows.get(gameId);
         return (buf == null || buf.frames.isEmpty()) ? null : buf.frames.lastEntry().getValue();
+    }
+
+    /**
+     * replay 서버가 재생 시간축으로 변환한 실제 벽시계 기준 프레임을 고른다.
+     *
+     * <p>프레임 시각 자체가 현재 재생 배속을 반영한다. 따라서 1배속에서는 매초 한 프레임,
+     * 20배속에서는 매 실제 초에 게임 시간 20초만큼 전진한다. 수신 배치를 다시 1배속으로
+     * 풀어내면 고배속 재생이 느려지고, 다음 배치에서 시계가 되감기는 문제가 생긴다.</p>
+     */
+    public WindowResponse.Frame getReplayWindowFrame(String gameId, Instant now) {
+        return getWindowFrameAt(gameId, now != null ? now : Instant.now());
     }
 
     public boolean hasWindow(String gameId) {
