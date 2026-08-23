@@ -47,7 +47,7 @@ class BettingEventSynchronizationServiceTest {
 
         BettingEvent saved = captureSavedEvent();
         assertThat(saved.getOpenedAt()).isEqualTo(LocalDateTime.of(2026, 8, 14, 9, 40));
-        assertThat(saved.getClosesAt()).isEqualTo(LocalDateTime.of(2026, 8, 14, 10, 1));
+        assertThat(saved.getClosesAt()).isEqualTo(LocalDateTime.of(2026, 8, 14, 10, 20));
         assertThat(saved.getStatus()).isEqualTo(BettingEventStatus.OPEN);
     }
 
@@ -105,9 +105,9 @@ class BettingEventSynchronizationServiceTest {
         assertThat(existing.getExternalGameId()).isEqualTo("game-2");
     }
 
-    /** 스케줄러가 늦게 복구돼도 첫 세트 마감이 공식 시작 1분 후로 유지되는지 검증한다. */
+    /** 실제 첫 프레임 후 1분이 지나면 첫 세트 배팅을 마감하는지 검증한다. */
     @Test
-    void closesRecoveredFirstSetAtOneMinuteAfterOfficialStart() {
+    void closesFirstSetOneMinuteAfterActualStatsStart() {
         BettingEventSynchronizationService service = serviceAt("2026-08-14T10:03:00Z");
         given(repository.findByExternalMatchIdAndSetNumberForUpdate("match-1", 1))
                 .willReturn(Optional.empty());
@@ -120,6 +120,57 @@ class BettingEventSynchronizationServiceTest {
         assertThat(saved.getExternalGameId()).isEqualTo("game-1");
         assertThat(saved.getStatus()).isEqualTo(BettingEventStatus.CLOSED);
         assertThat(saved.getClosesAt()).isEqualTo(LocalDateTime.of(2026, 8, 14, 10, 1));
+    }
+
+    /** 실제 첫 프레임 뒤 1분 전에는 첫 세트 배팅이 열려 있어야 한다. */
+    @Test
+    void keepsFirstSetOpenDuringOneMinuteAfterActualStatsStart() {
+        BettingEventSynchronizationService service = serviceAt("2026-08-14T10:00:30Z");
+        given(repository.findByExternalMatchIdAndSetNumberForUpdate("match-1", 1))
+                .willReturn(Optional.empty());
+        given(repository.save(any(BettingEvent.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
+
+        service.synchronizeMatch(snapshot(List.of(activeSet(1))));
+
+        BettingEvent saved = captureSavedEvent();
+        assertThat(saved.getStatus()).isEqualTo(BettingEventStatus.OPEN);
+        assertThat(saved.getClosesAt()).isEqualTo(LocalDateTime.of(2026, 8, 14, 10, 1));
+    }
+
+    /** replay는 배속과 무관하게 게임 시계 1분을 넘는 즉시 첫 세트 배팅을 마감한다. */
+    @Test
+    void closesFirstSetWhenReplayGameClockReachesOneMinute() {
+        BettingEventSynchronizationService service = serviceAt("2026-08-14T10:00:03Z");
+        given(repository.findByExternalMatchIdAndSetNumberForUpdate("match-1", 1))
+                .willReturn(Optional.empty());
+        given(repository.save(any(BettingEvent.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
+
+        service.synchronizeMatch(snapshot(List.of(new SetSnapshot(
+                "game-1", 1, LocalDateTime.of(2026, 8, 14, 10, 0), 60L,
+                true, false, null, null
+        ))));
+
+        assertThat(captureSavedEvent().getStatus()).isEqualTo(BettingEventStatus.CLOSED);
+    }
+
+    /** 일정이 먼저 inProgress가 되어도 첫 livestats 프레임 전에는 배팅을 유지한다. */
+    @Test
+    void keepsFirstSetOpenUntilActualStatsStart() {
+        BettingEventSynchronizationService service = serviceAt("2026-08-14T10:03:00Z");
+        given(repository.findByExternalMatchIdAndSetNumberForUpdate("match-1", 1))
+                .willReturn(Optional.empty());
+        given(repository.save(any(BettingEvent.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
+
+        service.synchronizeMatch(snapshot(List.of(new SetSnapshot(
+                "game-1", 1, null, true, false, null, null
+        ))));
+
+        BettingEvent saved = captureSavedEvent();
+        assertThat(saved.getStatus()).isEqualTo(BettingEventStatus.OPEN);
+        assertThat(saved.getClosesAt()).isEqualTo(LocalDateTime.of(2026, 8, 14, 10, 20));
     }
 
     /** 실제 다음 세트 시작 시각을 아직 모르면 안전 마감 시각까지 다음 세트를 열어 둔다. */

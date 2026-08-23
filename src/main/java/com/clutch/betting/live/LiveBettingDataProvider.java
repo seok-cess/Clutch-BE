@@ -60,6 +60,7 @@ public interface LiveBettingDataProvider {
      * @param externalGameId 외부 게임 ID
      * @param setNumber 세트 번호
      * @param startedAt 세트 시작 시각
+     * @param gameTimeSeconds 피드가 제공한 게임 경과 초. 없으면 실제 벽시계 시각으로 처리한다.
      * @param active 현재 진행 세트 여부
      * @param finished 세트 종료 여부
      * @param finishedAt livestats 피드가 세트 종료를 알린 시각
@@ -69,10 +70,24 @@ public interface LiveBettingDataProvider {
             String externalGameId,
             int setNumber,
             LocalDateTime startedAt,
+            Long gameTimeSeconds,
             boolean active,
             boolean finished,
             LocalDateTime finishedAt,
             String winnerExternalTeamId
     ) {
+
+        /** replay 전용 게임 시계가 없던 기존 호출부와 호환되는 생성자다. */
+        public SetSnapshot(
+                String externalGameId,
+                int setNumber,
+                LocalDateTime startedAt,
+                boolean active,
+                boolean finished,
+                LocalDateTime finishedAt,
+                String winnerExternalTeamId
+        ) {
+            this(externalGameId, setNumber, startedAt, null, active, finished, finishedAt, winnerExternalTeamId);
+        }
     }
 }

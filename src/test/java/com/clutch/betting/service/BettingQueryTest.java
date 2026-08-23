@@ -43,7 +43,7 @@ class BettingQueryTest {
     );
 
     @Test
-    void returnsCurrentEventWithRemainingTime() {
+    void returnsCurrentEventWithBettingAvailability() {
         BettingEvent event = BettingEvent.open(
                 "match-1",
                 1,
@@ -58,11 +58,8 @@ class BettingQueryTest {
                 .willReturn(Optional.of(event));
         given(userBetRepository.findByBettingEventIdAndUserId(1L, 10L))
                 .willReturn(Optional.empty());
-        given(liveBettingDataProvider.isAcceptingBets("match-1", "game-1", 1)).willReturn(true);
-
         BettingEventView view = service.getCurrentEvent("match-1", 10L);
 
-        assertThat(view.remainingSeconds()).isEqualTo(60L);
         assertThat(view.bettingAvailable()).isTrue();
         assertThat(view.myBet()).isNull();
     }

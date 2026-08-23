@@ -199,9 +199,9 @@ class LolesportsLiveBettingDataProviderTest {
         assertThat(provider.isAcceptingBets("match-1", "game-2", 2)).isFalse();
     }
 
-    /** 첫 세트는 피드 시작 시각이 아니라 공식 일정의 마감 시각을 사용한다. */
+    /** 첫 세트도 실제 시작 후 1분이 지나면 공식 일정과 무관하게 마감한다. */
     @Test
-    void keepsFirstSetAcceptingBetsWhenFeedStartIsEarlierThanOfficialDeadline() {
+    void closesFirstSetOneMinuteAfterFeedStart() {
         dataCacheService.putBettingMatches(List.of(liveMatch(
                 3,
                 0,
@@ -209,7 +209,7 @@ class LolesportsLiveBettingDataProviderTest {
         )));
         dataCacheService.setGameStart("game-1", Instant.parse("2026-08-14T10:00:00Z"));
 
-        assertThat(provider.isAcceptingBets("match-1", "game-1", 1)).isTrue();
+        assertThat(provider.isAcceptingBets("match-1", "game-1", 1)).isFalse();
     }
 
     @Test

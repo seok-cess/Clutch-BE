@@ -2,6 +2,7 @@ package com.clutch.betting.live;
 
 import com.clutch.betting.config.BettingProperties;
 import com.clutch.lolesports.dto.external.EventDetailsResponse;
+import com.clutch.lolesports.dto.external.WindowResponse;
 import com.clutch.lolesports.repository.EsportsGameRepository;
 import com.clutch.lolesports.repository.EsportsMatchRepository;
 import com.clutch.lolesports.service.DataCacheService;
@@ -147,12 +148,14 @@ public class LolesportsLiveBettingDataProvider implements LiveBettingDataProvide
             EventDetailsResponse.Game game
     ) {
         LocalDateTime startedAt = toUtc(dataCacheService.getGameStart(game.id()));
+        WindowResponse.Frame frame = dataCacheService.getNewestWindowFrame(game.id());
         LocalDateTime finishedAt = toUtc(dataCacheService.getFeedFinishedAt(game.id()));
         boolean finished = finishedAt != null || "completed".equalsIgnoreCase(game.state());
         return new SetSnapshot(
                 game.id(),
                 game.number(),
                 startedAt,
+                frame != null ? frame.gameTimeSeconds() : null,
                 game.id().equals(liveMatch.activeGameId()),
                 finished,
                 finishedAt,
@@ -266,9 +269,8 @@ public class LolesportsLiveBettingDataProvider implements LiveBettingDataProvide
         if (set.finished()) {
             return false;
         }
-        // 첫 세트는 실제 피드 시작보다 공식 일정이 마감 기준이다.
-        if (set.setNumber() == 1) {
-            return true;
+        if (set.gameTimeSeconds() != null) {
+            return set.gameTimeSeconds() < bettingProperties.firstSetCloseAfterStart().toSeconds();
         }
         if (set.startedAt() == null) {
             return true;

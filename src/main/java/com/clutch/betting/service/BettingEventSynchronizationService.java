@@ -224,11 +224,11 @@ public class BettingEventSynchronizationService {
     }
 
     /**
-     * 두 번째 세트부터는 실제 게임이 시작된 시각을 기준으로 마감 시각을 다시 잡는다.
+     * 실제 게임이 시작된 시각을 기준으로 이벤트를 마감한다.
      *
-     * <p>세트 사이에는 종료 프레임 시각부터 열어 두되, 실제 게임의 첫 프레임이 들어오면
-     * 1분의 공통 유예 시간 뒤에는 반드시 마감한다. 라이브 캐시가 늦게 복구돼도 이미
-     * 유예 시간이 지났다면 즉시 닫는다.</p>
+     * <p>모든 세트는 실제 첫 프레임이 들어온 시각부터 1분 동안만 배팅을 허용한다.
+     * 첫 세트도 공식 일정 상태가 먼저 inProgress가 되더라도 실제 프레임 전까지는 열어 두고,
+     * 실제 시작을 확인한 뒤에만 1분 마감 시각을 확정한다.</p>
      */
     private void closeNextSetAfterStartGracePeriod(
             BettingEvent event,
@@ -238,8 +238,11 @@ public class BettingEventSynchronizationService {
         if (event == null || event.getStatus() != BettingEventStatus.OPEN) {
             return;
         }
-        if (set.setNumber() == 1) {
-            event.closeIfExpired(now);
+        Long gameTimeSeconds = set.gameTimeSeconds();
+        if (gameTimeSeconds != null) {
+            if (gameTimeSeconds >= bettingProperties.firstSetCloseAfterStart().toSeconds()) {
+                event.close();
+            }
             return;
         }
         if (set.startedAt() == null) {
@@ -458,7 +461,12 @@ public class BettingEventSynchronizationService {
                 .orElse(null);
     }
 
-    /** 공식 일정으로 첫 세트의 오픈·마감 기간을 계산한다. */
+    /**
+     * 공식 일정으로 첫 세트의 오픈·안전 마감 기간을 계산한다.
+     *
+     * <p>정상 마감은 실제 첫 livestats 프레임이 들어온 순간 처리한다. 이 안전 마감은
+     * livestats가 영구적으로 오지 않는 장애에서 OPEN 이벤트가 무한히 남는 것만 막는다.</p>
+     */
     private BettingPeriod firstSetPeriodOf(LiveMatchSnapshot liveMatch) {
         if (liveMatch.scheduledStartAt() == null) {
             return null;
@@ -467,7 +475,7 @@ public class BettingEventSynchronizationService {
                 liveMatch.scheduledStartAt()
                         .minus(bettingProperties.firstSetOpenBeforeStart()),
                 liveMatch.scheduledStartAt()
-                        .plus(bettingProperties.firstSetCloseAfterStart())
+                        .plus(bettingProperties.nextSetBettingDuration())
         );
     }
 
