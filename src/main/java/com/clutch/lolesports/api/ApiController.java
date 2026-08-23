@@ -1,5 +1,6 @@
 package com.clutch.lolesports.api;
 
+import com.clutch.betting.service.BettingCandidateQueryService;
 import com.clutch.lolesports.dto.external.DetailsResponse;
 import com.clutch.lolesports.dto.external.EventDetailsResponse;
 import com.clutch.lolesports.dto.external.ScheduleResponse;
@@ -38,6 +39,7 @@ public class ApiController {
     private final com.clutch.lolesports.service.SeasonStatsService seasonStats;
     private final com.clutch.lolesports.service.PollingScheduler polling;
     private final ExternalSourceState sourceState;
+    private final BettingCandidateQueryService bettingCandidateQueryService;
 
     public ApiController(DataCacheService cache, HistoricalGameService historical,
                          LolesportsProperties props, com.clutch.lolesports.client.LiveStatsClient liveStats,
@@ -46,7 +48,8 @@ public class ApiController {
                          com.clutch.lolesports.service.SetWinnerTracker setWinners,
                          com.clutch.lolesports.service.SeasonStatsService seasonStats,
                          com.clutch.lolesports.service.PollingScheduler polling,
-                         ExternalSourceState sourceState) {
+                         ExternalSourceState sourceState,
+                         BettingCandidateQueryService bettingCandidateQueryService) {
         this.cache = cache;
         this.historical = historical;
         this.props = props;
@@ -57,6 +60,7 @@ public class ApiController {
         this.seasonStats = seasonStats;
         this.polling = polling;
         this.sourceState = sourceState;
+        this.bettingCandidateQueryService = bettingCandidateQueryService;
     }
 
     /**
@@ -224,30 +228,42 @@ public class ApiController {
 
     @GetMapping("/live")
     public ResponseEntity<ApiDtos.LiveSummary> live() {
-        List<DataCacheService.LiveMatch> matches = cache.getLiveMatches();
-        List<ApiDtos.LiveMatchItem> items = matches.stream()
-                .map(m -> new ApiDtos.LiveMatchItem(
-                        m.matchId(),
-                        m.leagueName(),
-                        m.blockName(),
-                        m.startTime(),
-                        m.bestOf(),
-                        m.isFinished(),
-                        m.winnerTeamId(),
-                        mapTeams(m.teams()),
-                        m.games() == null ? List.of() : m.games().stream()
-                                .map(g -> new ApiDtos.GameItem(
-                                        g.id(),
-                                        g.number(),
-                                        g.state(),
-                                        cache.isFeedFinished(g.id()),
-                                        setWinners.winnerOf(m.matchId(), g.id()),
-                                        polling.isStatsUnavailable(g.id())))
-                                .toList(),
-                        m.activeGameId()
-                ))
+        List<ApiDtos.LiveMatchItem> items = cache.getLiveMatches().stream()
+                .map(this::toLiveMatchItem)
                 .toList();
         return ResponseEntity.ok(new ApiDtos.LiveSummary(!items.isEmpty(), items));
+    }
+
+    /** 시작 전에도 실제로 배팅이 열린 매치를 라이브 화면의 배팅 카드용으로 반환한다. */
+    @GetMapping("/betting-candidates")
+    public ResponseEntity<List<ApiDtos.LiveMatchItem>> bettingCandidates() {
+        return ResponseEntity.ok(bettingCandidateQueryService.findOpenMatchCandidates().stream()
+                .map(this::toLiveMatchItem)
+                .toList());
+    }
+
+    /** 캐시된 매치를 라이브와 시작 전 배팅 카드가 함께 쓰는 응답 모델로 변환한다. */
+    private ApiDtos.LiveMatchItem toLiveMatchItem(DataCacheService.LiveMatch match) {
+        return new ApiDtos.LiveMatchItem(
+                match.matchId(),
+                match.leagueName(),
+                match.blockName(),
+                match.startTime(),
+                match.bestOf(),
+                match.isFinished(),
+                match.winnerTeamId(),
+                mapTeams(match.teams()),
+                match.games() == null ? List.of() : match.games().stream()
+                        .map(game -> new ApiDtos.GameItem(
+                                game.id(),
+                                game.number(),
+                                game.state(),
+                                cache.isFeedFinished(game.id()),
+                                setWinners.winnerOf(match.matchId(), game.id()),
+                                polling.isStatsUnavailable(game.id())))
+                        .toList(),
+                match.activeGameId()
+        );
     }
 
     // ---- 전적 (최근 폼 / 상대 전적) ----
