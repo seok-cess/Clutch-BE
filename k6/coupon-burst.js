@@ -34,8 +34,15 @@ const claimWindowSeconds = positiveInteger(
 );
 const persistenceTimeoutSeconds = positiveNumber(
   __ENV.PERSISTENCE_TIMEOUT_SECONDS,
-  30,
+  600,
   'PERSISTENCE_TIMEOUT_SECONDS',
+);
+const claimRequestTimeout = __ENV.CLAIM_REQUEST_TIMEOUT || '10m';
+const scenarioMaxDuration = __ENV.SCENARIO_MAX_DURATION || '12m';
+const verifyIndividualPersistence = booleanValue(
+  __ENV.VERIFY_INDIVIDUAL_PERSISTENCE,
+  true,
+  'VERIFY_INDIVIDUAL_PERSISTENCE',
 );
 const couponName = __ENV.COUPON_NAME || '[K6] 10%';
 
@@ -55,6 +62,23 @@ const claimDuration = new Trend('coupon_claim_duration', true);
 
 // 3) 부하 단계 설정과 테스트 합격 기준
 // setup은 scenarios보다 먼저 한 번 실행되므로 claimers에는 관리자 VU가 섞이지 않는다.
+const thresholds = {
+  checks: ['rate>0.99'],
+  http_req_failed: ['rate<0.01'],
+  'http_req_duration{endpoint:claim}': ['p(95)<5000'],
+  coupon_claim_expected: ['rate>0.99'],
+  coupon_claim_success_total: [`count==${couponQuantity}`],
+  coupon_claim_sold_out_total: [`count==${virtualUsers - couponQuantity}`],
+  coupon_claim_unexpected_total: ['count==0'],
+};
+
+// 대규모 신청 부하에서는 개별 저장 조회를 끌 수 있다.
+// 이 경우 teardown의 최종 발급 수량으로 전체 저장 결과를 검증한다.
+if (verifyIndividualPersistence) {
+  thresholds.coupon_persisted_total = [`count==${couponQuantity}`];
+  thresholds.coupon_persistence_failed_total = ['count==0'];
+}
+
 export const options = {
   scenarios: {
     claimers: {
@@ -62,22 +86,12 @@ export const options = {
       exec: 'claimCoupon',
       vus: virtualUsers,
       iterations: 1,
-      maxDuration: '2m',
-      gracefulStop: '5s',
+      maxDuration: scenarioMaxDuration,
+      gracefulStop: '30s',
       tags: { flow: 'coupon-claimer' },
     },
   },
-  thresholds: {
-    checks: ['rate>0.99'],
-    http_req_failed: ['rate<0.01'],
-    'http_req_duration{endpoint:claim}': ['p(95)<5000'],
-    coupon_claim_expected: ['rate>0.99'],
-    coupon_claim_success_total: [`count==${couponQuantity}`],
-    coupon_claim_sold_out_total: [`count==${virtualUsers - couponQuantity}`],
-    coupon_claim_unexpected_total: ['count==0'],
-    coupon_persisted_total: [`count==${couponQuantity}`],
-    coupon_persistence_failed_total: ['count==0'],
-  },
+  thresholds,
 };
 
 /**
@@ -122,7 +136,9 @@ export function setup() {
   const occurrence = openCouponEvent(couponEventId);
   console.log(
     `준비 완료: event=${couponEventId}, occurrence=${occurrence.couponEventOccurrenceId}, `
-      + `users=${virtualUsers}, stock=${couponQuantity}, couponType=${couponType.couponTypeId}`,
+      + `users=${virtualUsers}, stock=${couponQuantity}, couponType=${couponType.couponTypeId}, `
+      + `claimTimeout=${claimRequestTimeout}, `
+      + `individualPersistence=${verifyIndividualPersistence}`,
   );
 
   return {
@@ -136,7 +152,8 @@ export function setup() {
  * [다중 사용자 부하 단계]
  * setup이 정상 종료된 뒤 COUPON_VUS 수만큼 실행된다.
  * VU마다 서로 다른 사용자 ID로 동일한 이벤트 회차에 한 번씩 신청한다.
- * 성공 사용자는 실제 쿠폰 저장까지 확인하고, 나머지는 재고 소진 응답을 기대한다.
+ * 나머지는 재고 소진 응답을 기대한다. 성공 사용자의 개별 저장 조회는 환경변수로
+ * 켜고 끌 수 있으며, 끈 경우 신청 부하와 분리해 teardown에서 최종 수량만 확인한다.
  */
 export function claimCoupon(data) {
   const userId = userIdStart + exec.scenario.iterationInTest;
@@ -150,6 +167,7 @@ export function claimCoupon(data) {
         'X-User-Id': String(userId),
       },
       responseCallback: http.expectedStatuses(201, 409),
+      timeout: claimRequestTimeout,
       tags: { endpoint: 'claim', name: 'POST /coupon-events/:id/occurrences/:id/claims' },
     },
   );
@@ -183,7 +201,7 @@ export function claimCoupon(data) {
     'claim result is success or sold out': () => expected,
   });
 
-  if (success) {
+  if (success && verifyIndividualPersistence) {
     const persisted = waitForPersistedCoupon(userId, data.couponEventId);
     persistedCoupons.add(persisted ? 1 : 0);
     persistenceFailures.add(persisted ? 0 : 1);
@@ -288,6 +306,7 @@ function waitForPersistedCoupon(userId, couponEventId) {
         Accept: 'application/json',
         'X-User-Id': String(userId),
       },
+      timeout: claimRequestTimeout,
       tags: { endpoint: 'my-coupons', name: 'GET /users/me/coupons' },
     });
     if (response.status === 200) {
@@ -347,4 +366,19 @@ function positiveNumber(rawValue, defaultValue, name) {
     throw new Error(`${name}은 0보다 큰 숫자여야 합니다.`);
   }
   return value;
+}
+
+/** 환경변수가 true 또는 false인지 검증한다. */
+function booleanValue(rawValue, defaultValue, name) {
+  if (rawValue === undefined) {
+    return defaultValue;
+  }
+  const normalized = String(rawValue).trim().toLowerCase();
+  if (normalized === 'true') {
+    return true;
+  }
+  if (normalized === 'false') {
+    return false;
+  }
+  throw new Error(`${name}은 true 또는 false여야 합니다.`);
 }

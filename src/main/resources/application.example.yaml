@@ -38,6 +38,9 @@ spring:
       enable-auto-commit: false
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+server:
+  tomcat:
+    max-connections: ${SERVER_TOMCAT_MAX_CONNECTIONS:25000}
 management:
   endpoints:
     web:
