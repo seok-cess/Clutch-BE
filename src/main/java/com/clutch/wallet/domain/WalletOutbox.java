@@ -4,6 +4,12 @@ import jakarta.persistence.*;
 
 import java.time.Instant;
 
+/**
+ * Kafka로 전송할 지갑 도메인 이벤트를 임시 저장하는 아웃박스.
+ *
+ * <p>도메인 상태 변경과 같은 트랜잭션에서 저장되어 발행 실패에도
+ * 이벤트가 유실되지 않도록 한다.</p>
+ */
 @Entity
 @Table(name = "wallet_outbox")
 public class WalletOutbox {
@@ -36,6 +42,14 @@ public class WalletOutbox {
 
     protected WalletOutbox(){}
 
+    /**
+     * 미발행({@code PENDING}) 상태의 아웃박스 레코드를 생성한다.
+     *
+     * @param aggregateId 이벤트가 속한 ID
+     * @param topic 발행할 Kafka 토픽
+     * @param payload 직렬화된 이벤트 페이로드
+     * @return 생성된 아웃박스 레코드
+     */
     public static WalletOutbox create(Long aggregateId, String topic, String payload){
         WalletOutbox outbox = new WalletOutbox();
         outbox.aggregateId = aggregateId;
@@ -45,11 +59,17 @@ public class WalletOutbox {
         return outbox;
     }
 
+    /**
+     * 아웃박스를 발행 완료 상태로 변경한다.
+     *
+     * @param sentAt 발행이 완료된 시각
+     */
     public void markSent(Instant sentAt){
         this.status = WalletOutboxStatus.SENT;
         this.sentAt = sentAt;
     }
 
+    /** 발행 재시도 횟수를 1 증가시킨다. */
     public void increaseRetryCount(){
         this.retryCount++;
     }

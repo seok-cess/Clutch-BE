@@ -5,6 +5,12 @@ import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.Instant;
 
+/**
+ * 사용자에게 발급된 쿠폰.
+ *
+ * <p>발급 시 {@link UserCouponStatus#ISSUED} 상태로 생성되며,
+ * 이후 사용 또는 취소를 통해 상태가 전이된다.</p>
+ */
 @Entity
 @Table(name = "user_coupon")
 public class UserCoupon {
@@ -62,6 +68,19 @@ public class UserCoupon {
 
     protected UserCoupon() {}
 
+    /**
+     * 발급 요청을 기준으로 {@code ISSUED} 상태의 사용자 쿠폰을 생성한다.
+     *
+     * @param claimId 쿠폰 발급 요청(claim) 식별자
+     * @param userId 발급 대상 사용자 ID
+     * @param couponEventId 쿠폰 이벤트 ID
+     * @param couponEventOccurrenceId 쿠폰 이벤트 회차 ID
+     * @param couponEventItemId 발급된 쿠폰 종류(이벤트 항목) ID
+     * @param couponCode 발급된 쿠폰 코드
+     * @param discountType 할인 유형
+     * @param discountValue 할인 값
+     * @param expiresAt 만료 시각
+     */
     public UserCoupon(Long claimId, Long userId, Long couponEventId, Long couponEventOccurrenceId, Long couponEventItemId,
                       String couponCode, String discountType, BigDecimal discountValue, Instant expiresAt){
         this.claimId = claimId;
