@@ -17,8 +17,10 @@ import java.util.Optional;
  */
 public interface UserCouponRepository extends JpaRepository<UserCoupon, Long> {
 
+    /** 쿠폰 발급 요청(claimId) 기준으로 이미 발급된 쿠폰이 있는지 확인한다. */
     boolean existsByClaimId(Long claimId);
 
+    /** 쿠폰 발급 요청(claimId)으로 발급된 사용자 쿠폰을 조회한다. */
     Optional<UserCoupon> findByClaimId(Long claimId);
 
     /**
@@ -42,8 +44,19 @@ public interface UserCouponRepository extends JpaRepository<UserCoupon, Long> {
             @Param("occurrenceId") Long occurrenceId
     );
 
+    /** 소유자를 함께 검증해 사용자 쿠폰을 단건 조회한다. */
     Optional<UserCoupon> findByIdAndUserId(Long id, Long userId);
 
+    /**
+     * 상태와 커서 조건으로 사용자 쿠폰 목록을 만료일 오름차순으로 조회한다.
+     *
+     * @param userId 조회할 사용자 ID
+     * @param status 조회할 쿠폰 상태, 전체 조회 시 {@code null}
+     * @param cursorExpiresAt 이전 페이지 마지막 항목의 만료 시각, 첫 조회 시 {@code null}
+     * @param cursorId 이전 페이지 마지막 항목의 ID, 첫 조회 시 {@code null}
+     * @param pageable 조회 개수 제한
+     * @return 조건에 맞는 사용자 쿠폰 목록
+     */
     @Query("""
         SELECT c FROM UserCoupon c
         WHERE c.userId = :userId
@@ -61,6 +74,14 @@ public interface UserCouponRepository extends JpaRepository<UserCoupon, Long> {
                               Pageable pageable
                               );
 
+    /**
+     * 만료되지 않은 발급 상태의 쿠폰을 사용 완료 상태로 변경한다.
+     *
+     * @param id 사용 처리할 사용자 쿠폰 ID
+     * @param userId 소유자 검증에 사용할 사용자 ID
+     * @param usedAt 사용 처리 시각
+     * @return 변경된 행 수, 조건이 맞지 않으면 0
+     */
     @Modifying(clearAutomatically = true)
     @Query("""
         UPDATE UserCoupon c
@@ -74,6 +95,14 @@ public interface UserCouponRepository extends JpaRepository<UserCoupon, Long> {
                    @Param("userId") Long userId,
                    @Param("usedAt") Instant usedAt);
 
+    /**
+     * 발급 상태의 쿠폰을 취소 상태로 변경한다.
+     *
+     * @param id 취소할 사용자 쿠폰 ID
+     * @param cancelledAt 취소 처리 시각
+     * @param reason 취소 사유
+     * @return 변경된 행 수, 조건이 맞지 않으면 0
+     */
     @Modifying(clearAutomatically = true)
     @Query("""
         UPDATE UserCoupon c
