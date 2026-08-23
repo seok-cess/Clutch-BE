@@ -8,8 +8,8 @@ import java.time.Duration;
  * 배팅 마감 시간과 라이브 동기화 주기를 관리한다.
  *
  * @param firstSetOpenBeforeStart 첫 세트 공식 시작 전 배팅 오픈 간격
- * @param firstSetCloseAfterStart 첫 세트 공식 시작 후 배팅 마감 간격
- * @param nextSetBettingDuration 직전 세트 종료 후 다음 세트 배팅 가능 기간
+ * @param firstSetCloseAfterStart 모든 세트의 실제 시작 후 배팅 마감 유예 간격
+ * @param nextSetBettingDuration 다음 세트 시작 시각을 아직 받지 못했을 때의 안전 마감 간격
  * @param synchronizationInterval 라이브 동기화 실행 간격
  */
 @ConfigurationProperties(prefix = "betting")
@@ -29,8 +29,8 @@ public record BettingProperties(
      * 누락되거나 양수가 아닌 설정을 운영 기본값으로 정규화한다.
      *
      * @param firstSetOpenBeforeStart 첫 세트 공식 시작 전 배팅 오픈 간격
-     * @param firstSetCloseAfterStart 첫 세트 공식 시작 후 배팅 마감 간격
-     * @param nextSetBettingDuration 직전 세트 종료 후 다음 세트 배팅 가능 기간
+     * @param firstSetCloseAfterStart 모든 세트의 실제 시작 후 배팅 마감 유예 간격
+     * @param nextSetBettingDuration 다음 세트 시작 시각을 아직 받지 못했을 때의 안전 마감 간격
      * @param synchronizationInterval 라이브 동기화 실행 간격
      */
     public BettingProperties {

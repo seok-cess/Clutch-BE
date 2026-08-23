@@ -151,6 +151,31 @@ public class GamePersistService {
     }
 
     /**
+     * 라이브 목록에서 사라진 뒤 결과 재조회로 확정된 세트 승자를 DB에 반영한다.
+     *
+     * <p>승자 판정 자체는 {@link SetWinnerTracker}가 공식 {@code gameWins} 증가분으로
+     * 수행한다. 이 메서드는 이미 적재된 게임 행에 그 확정 결과를 영속화하는 역할만 한다.</p>
+     *
+     * @param externalMatchId 결과를 재조회한 매치의 외부 ID
+     */
+    @Transactional
+    public void persistTrackedWinners(String externalMatchId) {
+        matchRepo.findByExternalMatchId(externalMatchId).ifPresent(match -> {
+            Map<String, MatchTeam> teamsByExternalId = matchTeamRepo
+                    .findByMatchIdOrderByDisplayOrderAsc(match.getId())
+                    .stream()
+                    .filter(team -> team.getExternalTeamId() != null)
+                    .collect(java.util.stream.Collectors.toMap(
+                            MatchTeam::getExternalTeamId,
+                            team -> team
+                    ));
+            for (EsportsGame game : gameRepo.findByMatchIdOrderByGameNumberAsc(match.getId())) {
+                applyWinner(game, externalMatchId, teamsByExternalId);
+            }
+        });
+    }
+
+    /**
      * 세트 통계 적재 후 늦게 확정된 승자를 기존 esports_game 행에 반영한다.
      *
      * <p>livestats 종료 직후에는 gameWins가 아직 오르지 않아 승자 없이 적재될 수 있다.

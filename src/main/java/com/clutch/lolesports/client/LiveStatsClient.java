@@ -128,7 +128,11 @@ public class LiveStatsClient {
     public String getGameStartTimestamp(String gameId) {
         try {
             WindowResponse res = sourceRouter.liveStatsClient().get()
-                    .uri(uri -> uri.path("/window/{gameId}").build(gameId))
+                    .uri(uri -> uri.path("/window/{gameId}")
+                            // replay는 화면 프레임과 게임 시작 시각에 서로 다른 시간축을 쓴다.
+                            // 실제 lolesports 서버는 알 수 없는 query parameter를 무시한다.
+                            .queryParam("clutchGameStartProbe", "true")
+                            .build(gameId))
                     .retrieve()
                     .bodyToMono(WindowResponse.class)
                     .block(TIMEOUT);
@@ -145,7 +149,7 @@ public class LiveStatsClient {
                     res.frames().get(res.frames().size() - 1).rfc460Timestamp());
             for (int i = 0; i < GAME_START_MAX_WINDOWS; i++) {
                 cursor = cursor.plusSeconds(10);
-                WindowResponse next = getWindowAt(gameId, cursor);
+                WindowResponse next = getGameStartWindowAt(gameId, cursor);
                 if (next == null || next.frames() == null || next.frames().isEmpty()) {
                     break;
                 }
@@ -173,6 +177,21 @@ public class LiveStatsClient {
             }
         }
         return null;
+    }
+
+    /** 게임 시작 프레임 탐색용 window — replay가 전체 재생 시간축을 적용하도록 표시한다. */
+    private WindowResponse getGameStartWindowAt(String gameId, Instant at) {
+        long epoch = at.getEpochSecond();
+        epoch -= epoch % 10;
+        String ts = DateTimeFormatter.ISO_INSTANT.format(Instant.ofEpochSecond(epoch));
+        return sourceRouter.liveStatsClient().get()
+                .uri(uri -> uri.path("/window/{gameId}")
+                        .queryParam("startingTime", ts)
+                        .queryParam("clutchGameStartProbe", "true")
+                        .build(gameId))
+                .retrieve()
+                .bodyToMono(WindowResponse.class)
+                .block(TIMEOUT);
     }
 
     /**

@@ -1,13 +1,16 @@
 package com.clutch.betting.live;
 
+import com.clutch.betting.config.BettingProperties;
 import com.clutch.lolesports.dto.external.EventDetailsResponse;
 import com.clutch.lolesports.repository.EsportsGameRepository;
+import com.clutch.lolesports.repository.EsportsMatchRepository;
 import com.clutch.lolesports.service.DataCacheService;
 import com.clutch.lolesports.service.SetWinnerTracker;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
@@ -22,6 +25,9 @@ public class LolesportsLiveBettingDataProvider implements LiveBettingDataProvide
     private final DataCacheService dataCacheService;
     private final SetWinnerTracker setWinnerTracker;
     private final EsportsGameRepository esportsGameRepository;
+    private final EsportsMatchRepository esportsMatchRepository;
+    private final BettingProperties bettingProperties;
+    private final Clock clock;
 
     /**
      * 캐시된 모든 배팅 후보 매치를 배팅용 스냅샷으로 변환한다.
@@ -76,8 +82,33 @@ public class LolesportsLiveBettingDataProvider implements LiveBettingDataProvide
                 parseUtc(liveMatch.startTime()),
                 teamIds,
                 toSetSnapshots(liveMatch),
-                isMatchFinished(liveMatch)
+                isMatchFinished(liveMatch),
+                resolveBestOf(liveMatch)
         );
+    }
+
+    /** 라이브 캐시의 다전제 수가 비어 있으면 이미 적재된 매치 정보로 즉시 보완한다. */
+    private Integer resolveBestOf(DataCacheService.LiveMatch liveMatch) {
+        Integer bestOf = liveMatch.bestOf();
+        if (bestOf == null || bestOf < 1) {
+            bestOf = esportsMatchRepository.findByExternalMatchId(liveMatch.matchId())
+                    .map(match -> match.getBestOf())
+                    .filter(value -> value != null && value > 0)
+                    .orElse(null);
+        }
+        int maximumKnownSetNumber = liveMatch.games() == null
+                ? 0
+                : liveMatch.games().stream()
+                        .map(EventDetailsResponse.Game::number)
+                        .filter(number -> number != null && number > 0)
+                        .mapToInt(Integer::intValue)
+                        .max()
+                        .orElse(0);
+        if (maximumKnownSetNumber > 0
+                && (bestOf == null || maximumKnownSetNumber > bestOf)) {
+            return maximumKnownSetNumber;
+        }
+        return bestOf;
     }
 
     /**
@@ -205,12 +236,15 @@ public class LolesportsLiveBettingDataProvider implements LiveBettingDataProvide
             String externalGameId,
             int setNumber
     ) {
+        if (match.bestOf() != null && match.bestOf() > 0 && setNumber > match.bestOf()) {
+            return false;
+        }
         if (match.sets().isEmpty()) {
             return setNumber == 1 && externalGameId == null;
         }
         boolean previousSetFinished = setNumber == 1 || match.sets().stream()
                 .filter(set -> set.setNumber() == setNumber - 1)
-                .anyMatch(set -> set.finished() && set.finishedAt() != null);
+                .anyMatch(SetSnapshot::finished);
         if (!previousSetFinished) {
             return false;
         }
@@ -218,12 +252,28 @@ public class LolesportsLiveBettingDataProvider implements LiveBettingDataProvide
             return match.sets().stream()
                     .filter(set -> set.setNumber() == setNumber)
                     .filter(set -> set.externalGameId().equals(externalGameId))
-                    .anyMatch(set -> !set.finished());
+                    .anyMatch(this::isWithinStartGracePeriod);
         }
         return match.sets().stream()
                 .filter(set -> set.setNumber() == setNumber)
                 .findFirst()
-                .map(set -> !set.finished())
+                .map(this::isWithinStartGracePeriod)
                 .orElse(setNumber > 1);
+    }
+
+    /** 실제 세트가 시작되면 공통 1분 유예 시간까지만 배팅을 허용한다. */
+    private boolean isWithinStartGracePeriod(SetSnapshot set) {
+        if (set.finished()) {
+            return false;
+        }
+        // 첫 세트는 실제 피드 시작보다 공식 일정이 마감 기준이다.
+        if (set.setNumber() == 1) {
+            return true;
+        }
+        if (set.startedAt() == null) {
+            return true;
+        }
+        LocalDateTime now = LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC);
+        return now.isBefore(set.startedAt().plus(bettingProperties.firstSetCloseAfterStart()));
     }
 }
