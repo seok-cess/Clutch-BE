@@ -13,6 +13,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.List;
 
+/**
+ * 사용자 쿠폰 목록 및 단건 조회를 담당하는 서비스.
+ */
 @Service
 @Transactional(readOnly = true)
 public class CouponQueryService {
@@ -23,6 +26,15 @@ public class CouponQueryService {
         this.userCouponRepository = userCouponRepository;
     }
 
+    /**
+     * 커서 기반 페이징으로 사용자의 쿠폰 목록을 조회한다.
+     *
+     * @param userId 조회할 사용자 ID
+     * @param status 조회할 쿠폰 상태, 전체 조회 시 {@code null}
+     * @param cursor 이전 페이지의 마지막 커서, 첫 조회 시 {@code null}
+     * @param size 한 번에 조회할 쿠폰 수
+     * @return 쿠폰 목록과 다음 커서 정보
+     */
     public CouponPageResponse getMyCoupons(Long userId, UserCouponStatus status, String cursor, int size) {
         Instant cursorExpiresAt = null;
         Long cursorId = null;
@@ -48,6 +60,13 @@ public class CouponQueryService {
         return new CouponPageResponse(items, nextCursor, hasNext);
     }
 
+    /**
+     * 사용자 소유의 쿠폰을 단건 조회한다.
+     *
+     * @param userId 조회할 사용자 ID
+     * @param couponId 조회할 쿠폰 ID
+     * @return 조회된 쿠폰 정보
+     */
     public CouponResponse getMyCoupon(Long userId, Long couponId){
         UserCoupon coupon = userCouponRepository.findByIdAndUserId(couponId, userId)
                 .orElseThrow(CouponNotFoundException::new);
