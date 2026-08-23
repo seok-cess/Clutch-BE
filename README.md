@@ -235,7 +235,7 @@ docker compose run --rm `
 부하 테스트 지표는 별도 모니터링 컴퓨터에서 실행 중인 Prometheus와 Grafana를 사용합니다. 백엔드 서버가 `100.101.76.93`, 모니터링 서버가 `100.71.50.106`인 경우에는 다음 명령을 사용합니다.
 
 ```powershell
-$CouponVus = 10000
+$CouponVus = 20000
 $CouponQuantity = [int]($CouponVus / 2)
 $TestId = "$(Get-Date -Format 'yyyyMMdd-HHmmss')-coupon-${CouponVus}vus"
 
@@ -246,7 +246,10 @@ docker compose run --rm `
   -e COUPON_VUS=$CouponVus `
   -e COUPON_QUANTITY=$CouponQuantity `
   -e USER_ID_START=90001 `
-  -e CLAIM_WINDOW_SECONDS=600 `
+  -e CLAIM_WINDOW_SECONDS=900 `
+  -e CLAIM_REQUEST_TIMEOUT=10m `
+  -e SCENARIO_MAX_DURATION=12m `
+  -e VERIFY_INDIVIDUAL_PERSISTENCE=false `
   -e K6_PROMETHEUS_RW_SERVER_URL=http://100.71.50.106:9090/api/v1/write `
   -e K6_PROMETHEUS_RW_PUSH_INTERVAL=10s `
   -e K6_PROMETHEUS_RW_TREND_STATS="p(50),p(95),p(99),p(99.9),avg,min,max" `
@@ -260,7 +263,7 @@ docker compose run --rm `
 
 이 경우 Grafana는 테스트 PC에서 `http://100.71.50.106:3000`으로 접속합니다. 모니터링 서버 방화벽에서는 테스트 PC가 사용하는 주소에만 3000번과 9090번 포트를 허용합니다.
 
-테스트는 쿠폰 요청 성공 50건, 재고 소진 50건, 예상하지 않은 오류 0건을 합격 기준으로 사용합니다. 성공한 사용자는 `내 쿠폰` API를 반복 조회하여 사용자 쿠폰이 실제 저장됐는지도 확인합니다. 같은 날 다시 실행해도 수동 테스트 트리거에는 새로운 순번이 자동으로 부여되지만, 이벤트와 발급 데이터는 데이터베이스에 계속 남습니다.
+테스트는 쿠폰 요청 성공 50건, 재고 소진 50건, 예상하지 않은 오류 0건을 합격 기준으로 사용합니다. `VERIFY_INDIVIDUAL_PERSISTENCE=true`가 기본값이며 성공한 사용자는 `내 쿠폰` API를 반복 조회하여 사용자 쿠폰이 실제 저장됐는지도 확인합니다. 대규모 신청 부하에서는 위 명령처럼 값을 `false`로 지정하여 개별 조회를 끄고, 신청이 끝난 뒤 `teardown`에서 최종 발급 수량을 한 번 확인합니다. 신청 요청 제한 시간은 기본 10분이고 전체 시나리오 제한 시간은 기본 12분입니다. 같은 날 다시 실행해도 수동 테스트 트리거에는 새로운 순번이 자동으로 부여되지만, 이벤트와 발급 데이터는 데이터베이스에 계속 남습니다.
 
 ## 기본 접속 정보
 
@@ -341,6 +344,7 @@ docker compose down
 | `DB_USERNAME` | `clutch` |
 | `DB_PASSWORD` | `clutch_local_password` |
 | `DB_POOL_SIZE` | `10` |
+| `SERVER_TOMCAT_MAX_CONNECTIONS` | `25000` |
 | `REDIS_HOST` | `localhost` |
 | `REDIS_PORT` | `6379` |
 | `REDIS_PASSWORD` | `clutch_local_password` |
