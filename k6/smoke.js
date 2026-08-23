@@ -4,8 +4,8 @@ import { check, sleep } from 'k6';
 const baseUrl = (__ENV.BASE_URL || 'http://host.docker.internal:8080').replace(/\/$/, '');
 
 export const options = {
-  vus: Number(__ENV.K6_VUS || 5),
-  duration: __ENV.K6_DURATION || '10s',
+  vus: Number(__ENV.SMOKE_VUS || 5),
+  duration: __ENV.SMOKE_DURATION || '10s',
   thresholds: {
     checks: ['rate>0.99'],
     http_req_failed: ['rate<0.01'],

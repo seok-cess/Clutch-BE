@@ -2,9 +2,11 @@ package com.clutch.wallet.web;
 
 import com.clutch.wallet.domain.UserCouponStatus;
 import com.clutch.wallet.service.CouponQueryService;
+import com.clutch.wallet.web.dto.CouponCursor;
 import com.clutch.wallet.web.dto.CouponPageResponse;
 import com.clutch.wallet.web.dto.CouponResponse;
 import com.clutch.wallet.service.CouponUseService;
+import com.clutch.wallet.web.exception.InvalidCouponQueryException;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -38,7 +40,11 @@ public class MyCouponController {
             @RequestParam(required = false)String cursor,
             @RequestParam(defaultValue = "20")int size
     ){
-        return couponQueryService.getMyCoupons(userId, status, cursor, size);
+        if(size < 1 || size > 100){
+            throw new InvalidCouponQueryException("size는 1이상 100이하여야 합니다.");
+        }
+        CouponCursor parsedCursor = CouponCursor.parse(cursor);
+        return couponQueryService.getMyCoupons(userId, status, parsedCursor.expiresAt(), parsedCursor.id(), size);
     }
 
     /**
