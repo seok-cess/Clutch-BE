@@ -9,11 +9,13 @@ import com.clutch.coupon.event.repository.CouponEventItemRepository;
 import com.clutch.coupon.test.event.api.dto.CouponEventActivationResponse;
 import com.clutch.coupon.test.event.domain.CouponEvent;
 import com.clutch.coupon.test.event.domain.CouponEventOccurrence;
+import com.clutch.coupon.test.event.domain.CouponEventTrigger;
 import com.clutch.coupon.test.event.exception.CouponEventErrorCode;
 import com.clutch.coupon.test.event.exception.CouponEventException;
 import com.clutch.coupon.test.event.repository.CouponEventOccurrenceRepository;
 import com.clutch.coupon.test.event.repository.CouponEventRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +30,7 @@ import java.util.Optional;
 
 /** 관리자 수동 쿠폰 오픈과 사용자 테스트용 활성 회차 조회를 처리한다. */
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class CouponEventActivationService {
 
@@ -86,6 +89,72 @@ public class CouponEventActivationService {
         initializeStockAfterCommit(event.getId(), occurrence);
 
         return toResponse(event, occurrence, remainingQuantity, true);
+    }
+
+    /**
+     * 경기 중 사건이 감지되어 그 트리거로 등록된 이벤트를 연다.
+     *
+     * 수동 오픈과 달리 이벤트 ID 를 받지 않는다 — 감지하는 쪽(경기 폴링, 샘플 재생)은
+     * 어떤 이벤트가 이 트리거를 기다리는지 모르기 때문이다. (경기, 트리거) 로 찾아 연다.
+     *
+     * 경기를 반드시 함께 본다. 트리거만으로 찾으면 어느 경기의 펜타킬이든
+     * 가장 오래된 PENTAKILL 이벤트를 열어버려 전혀 다른 경기의 이벤트가 발동한다.
+     *
+     * 같은 사건이 두 번 감지돼도 sourceEventKey 가 같아 유니크 제약이 중복 오픈을
+     * 막는다. 그래서 재시도나 중복 호출에 안전하다.
+     *
+     * @param esportsMatchId 사건이 일어난 경기. 이 경기에 걸린 이벤트만 연다
+     * @param externalGameId 사건이 일어난 세트. 중복 방지 키에 들어간다
+     * @param gameTimeSeconds 경기 내 발생 시각(초)
+     * @return 연 회차. 조건에 맞는 이벤트가 없거나 이미 열려 있으면 빈 값
+     */
+    @Transactional
+    public Optional<CouponEventActivationResponse> openByTrigger(
+            CouponEventTrigger trigger,
+            Long esportsMatchId,
+            String externalGameId,
+            Integer gameTimeSeconds
+    ) {
+        if (trigger == null || esportsMatchId == null) {
+            return Optional.empty();
+        }
+
+        Optional<CouponEvent> found = couponEventRepository
+                .findReadyByMatchAndTriggerForUpdate(
+                        esportsMatchId, trigger.name(), CouponEventStatus.READY
+                );
+        if (found.isEmpty()) {
+            log.debug("경기 {} 트리거 {} 로 열 수 있는 대기 이벤트가 없다",
+                    esportsMatchId, trigger);
+            return Optional.empty();
+        }
+        CouponEvent event = found.get();
+        LocalDateTime now = now();
+
+        long remainingQuantity = remainingQuantity(event.getId());
+        if (remainingQuantity <= 0L) {
+            log.info("트리거 {} — 이벤트 {} 재고 소진으로 열지 않는다", trigger, event.getId());
+            return Optional.empty();
+        }
+
+        event.open();
+        CouponEventOccurrence occurrence = occurrenceRepository.save(
+                CouponEventOccurrence.triggeredOpen(
+                        event.getId(),
+                        trigger,
+                        externalGameId,
+                        gameTimeSeconds,
+                        now,
+                        event.getClaimWindowSeconds()
+                )
+        );
+
+        initializeStockAfterCommit(event.getId());
+        log.info("트리거 {} 로 이벤트 {} 오픈 — matchId={} gameId={} gameTime={}s 재고={}",
+                trigger, event.getId(), esportsMatchId, externalGameId,
+                gameTimeSeconds, remainingQuantity);
+
+        return Optional.of(toResponse(event, occurrence, remainingQuantity, true));
     }
 
     /** 전체 이벤트 중 가장 최근에 열린 테스트 발급 회차를 조회한다. */

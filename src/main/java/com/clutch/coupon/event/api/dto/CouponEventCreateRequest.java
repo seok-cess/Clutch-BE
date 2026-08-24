@@ -21,8 +21,8 @@ import java.util.List;
  * @param items 발급할 쿠폰 종류, 수량 및 단계별 오픈 시점
  */
 public record CouponEventCreateRequest(
+        // 양수 검사는 서비스가 한다 — 예약된 테스트 경기 ID(음수)를 허용해야 하기 때문이다
         @NotNull(message = "경기 ID는 필수입니다.")
-        @Positive(message = "경기 ID는 양수여야 합니다.")
         Long esportsMatchId,
 
         @NotBlank(message = "이벤트 이름은 필수입니다.")

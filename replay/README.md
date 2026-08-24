@@ -209,3 +209,29 @@ replay 전용 `gameTimeSeconds`도 함께 내려준다. 화면은 이 값을 우
 - 재생 제어 UI는 replay profile의 프론트 라이브 화면에서만 제공한다. mock 서버 프로세스 자체를
   실행·종료하는 기능은 제공하지 않는다.
 - 한 번에 매치 하나만 재생한다. 여러 매치를 동시에 재생하려면 서버를 여러 포트로 여러 개 띄우면 된다.
+
+## 쿠폰 PENTAKILL 트리거 시연
+
+기본 fixture(`sample-match-bo3-001`)는 실제 GEN–KT 녹화라 펜타킬이 없다. 30초 안에 한 선수가
+얻은 최대 킬이 3이라 쿠폰 `PENTAKILL` 트리거가 발동하지 않는다.
+
+`sample-match-pentakill` fixture 는 원본 1세트 10분 지점에 펜타킬을 주입한 사본이다.
+원본은 수정하지 않는다.
+
+```
+node replay/inject-pentakill.js \
+  --src replay/fixtures/sample-match-bo3-001 \
+  --out replay/fixtures/sample-match-pentakill \
+  --game 1 --at 600 --participant 3
+```
+
+재생 방법:
+
+```
+node replay/replay-server.js --dir replay/fixtures/sample-match-pentakill --speed 20
+```
+
+쿠폰 이벤트는 관리자 화면에서 **테스트 이벤트** 체크박스를 켜고 트리거를 `PENTAKILL` 로
+만들어 둔다. replay 는 실행마다 경기 ID 가 달라지므로(`replay-<runId>-m1`) 실제 경기로는
+미리 등록할 수 없다. 테스트 이벤트는 예약 경기 ID(`CouponTestMatch.SAMPLE_MATCH_ID`)에
+매달리고, STUB 모드에서 감지된 트리거가 이 ID 로도 발동한다.
