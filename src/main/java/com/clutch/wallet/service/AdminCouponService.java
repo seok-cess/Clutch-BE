@@ -13,6 +13,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 
+/**
+ * 관리자의 쿠폰 취소 유스케이스를 처리하는 서비스.
+ */
 @Service
 @Transactional
 public class AdminCouponService {
@@ -23,6 +26,13 @@ public class AdminCouponService {
         this.userCouponRepository = userCouponRepository;
     }
 
+    /**
+     * 관리자가 사용자 쿠폰을 취소한다.
+     *
+     * @param couponId 취소할 사용자 쿠폰 ID
+     * @param reason 취소 사유
+     * @return 취소된 쿠폰 정보
+     */
     public CouponResponse cancel(Long couponId, String reason){
         Instant now = Instant.now();
         int updated = userCouponRepository.cancel(couponId, now, reason);
@@ -36,6 +46,11 @@ public class AdminCouponService {
         return CouponResponse.from(coupon);
     }
 
+    /**
+     * 취소 실패 원인을 조회해 상태에 맞는 예외를 던진다.
+     *
+     * @param couponId 취소를 시도한 사용자 쿠폰 ID
+     */
     private void handlerCancelFailure(Long couponId){
         UserCoupon coupon = userCouponRepository.findById(couponId)
                 .orElseThrow(CouponNotFoundException::new);
