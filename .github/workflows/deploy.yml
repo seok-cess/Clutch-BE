@@ -32,7 +32,7 @@ jobs:
       - name: Deploy
         shell: powershell
         run: |
-          docker compose up -d --wait mysql redis kafka
+          docker compose up -d --wait mysql redis kafka replay
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
           docker compose up -d --force-recreate mysql-exporter redis-exporter
