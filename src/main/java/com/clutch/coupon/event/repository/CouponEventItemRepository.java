@@ -2,7 +2,6 @@ package com.clutch.coupon.event.repository;
 
 import com.clutch.coupon.event.domain.CouponEventItem;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -37,23 +36,6 @@ public interface CouponEventItemRepository
     Optional<CouponEventItem> findByCouponEventIdAndId(
             Long couponEventId,
             Long couponEventItemId
-    );
-
-    /**
-     * 쿠폰 발급 성공 수량을 재고 범위 안에서 원자적으로 증가시킨다.
-     *
-     * @param couponEventItemId 쿠폰 이벤트 항목 ID
-     * @return 증가에 성공하면 1, 재고가 소진되어 증가하지 못하면 0
-     */
-    @Modifying(flushAutomatically = true)
-    @Query("""
-            update CouponEventItem item
-               set item.successCount = item.successCount + 1
-             where item.id = :couponEventItemId
-               and item.successCount < item.quantity
-            """)
-    int increaseSuccessCountAtomically(
-            @Param("couponEventItemId") Long couponEventItemId
     );
 
     /**

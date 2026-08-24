@@ -2,6 +2,7 @@ package com.clutch.coupon.claim.redis;
 
 import com.clutch.coupon.event.domain.CouponEventItem;
 import com.clutch.coupon.event.repository.CouponEventItemRepository;
+import com.clutch.wallet.repository.UserCouponRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -24,6 +25,9 @@ class CouponStockInitializerTest {
     private CouponEventItemRepository couponEventItemRepository;
 
     @Mock
+    private UserCouponRepository userCouponRepository;
+
+    @Mock
     private StringRedisTemplate stringRedisTemplate;
 
     @Mock
@@ -36,16 +40,19 @@ class CouponStockInitializerTest {
                 30L,
                 100
         );
-        item.increaseSuccessCount();
         setId(item, COUPON_EVENT_ITEM_ID);
 
         when(couponEventItemRepository.findAllByCouponEventId(
                 COUPON_EVENT_ID
         )).thenReturn(List.of(item));
+        when(userCouponRepository.countByCouponEventItemId(
+                COUPON_EVENT_ITEM_ID
+        )).thenReturn(1L);
         when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
 
         CouponStockInitializer initializer = new CouponStockInitializer(
                 couponEventItemRepository,
+                userCouponRepository,
                 stringRedisTemplate
         );
 
