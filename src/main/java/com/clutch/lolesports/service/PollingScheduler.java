@@ -8,6 +8,10 @@ import com.clutch.lolesports.dto.external.EventDetailsResponse;
 import com.clutch.lolesports.dto.external.ScheduleResponse;
 import com.clutch.lolesports.dto.external.StandingsResponse;
 import com.clutch.lolesports.dto.external.WindowResponse;
+import com.clutch.lolesports.source.ExternalSourceMode;
+import com.clutch.lolesports.source.ExternalSourceProperties;
+import com.clutch.lolesports.source.ExternalSourceState;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -26,8 +30,8 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 폴링 스케줄러.
- *  - 라이브 감시: getLive 60초 간격 → 진행중 매치의 gameId 를 활성 게임으로 등록
- *  - 인게임: 활성 게임이 있을 때만 window/details 5초 간격
+ *  - 라이브 감시: REAL은 getLive 60초, STUB replay는 1초 간격 → 진행중 매치의 gameId 를 활성 게임으로 등록
+ *  - 인게임: 활성 게임이 있을 때만 window/details 1초 간격
  *  - 메타(일정/순위): 앱 시작 직후 1회 + 5분 간격
  *
  * 각 작업은 독립적인 백오프를 가진다. 연속 실패 시 지수적으로 간격을 늘리고,
@@ -48,6 +52,7 @@ public class PollingScheduler {
     private final SetWinnerTracker setWinners;
     private final HistoricalGameService historical;
     private final LolesportsProperties props;
+    private final ExternalSourceState sourceState;
 
     /** matchId → 종료로 판정한 시각(epoch ms). 유지 시간이 지나면 라이브에서 뺀다 */
     private final Map<String, Long> finishedAt = new ConcurrentHashMap<>();
@@ -84,6 +89,7 @@ public class PollingScheduler {
      */
     private static final int STATS_UNAVAILABLE_AFTER_FAILURES = 3;
 
+    @Autowired
     public PollingScheduler(LolesportsApiClient api,
                             LiveStatsClient liveStats,
                             DataCacheService cache,
@@ -91,7 +97,8 @@ public class PollingScheduler {
                             GamePersistService persistService,
                             SetWinnerTracker setWinners,
                             HistoricalGameService historical,
-                            LolesportsProperties props) {
+                            LolesportsProperties props,
+                            ExternalSourceState sourceState) {
         this.api = api;
         this.liveStats = liveStats;
         this.cache = cache;
@@ -100,6 +107,7 @@ public class PollingScheduler {
         this.setWinners = setWinners;
         this.historical = historical;
         this.props = props;
+        this.sourceState = sourceState;
         long base = props.poll().backoffBaseMs();
         long max = props.poll().backoffMaxMs();
         this.liveBackoff = new Backoff(base, max);
@@ -107,10 +115,59 @@ public class PollingScheduler {
         this.metaBackoff = new Backoff(base, max);
     }
 
+    /** 기존 단위 테스트와 패키지 내부 조립을 위한 기본 REAL 상태 생성자. */
+    PollingScheduler(LolesportsApiClient api,
+                     LiveStatsClient liveStats,
+                     DataCacheService cache,
+                     PentakillDetector pentakillDetector,
+                     GamePersistService persistService,
+                     SetWinnerTracker setWinners,
+                     HistoricalGameService historical,
+                     LolesportsProperties props) {
+        this(api, liveStats, cache, pentakillDetector, persistService, setWinners, historical, props,
+                new ExternalSourceState(new ExternalSourceProperties(
+                        false, ExternalSourceMode.REAL, null, null)));
+    }
+
+    /** 기존 단위 테스트와 패키지 내부 조립을 위한 기본 REAL 상태 생성자. */
+    PollingScheduler(LolesportsApiClient api,
+                     LiveStatsClient liveStats,
+                     DataCacheService cache,
+                     PentakillDetector pentakillDetector,
+                     GamePersistService persistService,
+                     SetWinnerTracker setWinners,
+                     LolesportsProperties props) {
+        this(api, liveStats, cache, pentakillDetector, persistService, setWinners, null, props,
+                new ExternalSourceState(new ExternalSourceProperties(
+                        false, ExternalSourceMode.REAL, null, null)));
+    }
+
     // ---- 1) 라이브 경기 감시 (60초) ----
 
-    @Scheduled(fixedDelayString = "${lolesports.poll.live-check-ms:60000}")
     public void pollLiveMatches() {
+        sourceState.withReadLock(this::pollLiveMatchesInternal);
+    }
+
+    /** 실제 소스는 호출 부하를 고려해 기존 주기로 감시한다. */
+    @Scheduled(fixedDelayString = "${lolesports.poll.live-check-ms:60000}")
+    public void pollRealLiveMatches() {
+        if (sourceState.mode() != ExternalSourceMode.STUB) {
+            pollLiveMatches();
+        }
+    }
+
+    /**
+     * replay는 시간축을 최대 20배까지 압축하므로, 상태 전환도 1초마다 읽어야 한다.
+     * 60초 주기를 그대로 쓰면 한 번의 조회 사이에 세트 시작·종료를 모두 건너뛴다.
+     */
+    @Scheduled(fixedDelay = 1000)
+    public void pollStubLiveMatches() {
+        if (sourceState.mode() == ExternalSourceMode.STUB) {
+            pollLiveMatches();
+        }
+    }
+
+    private void pollLiveMatchesInternal() {
         if (!liveBackoff.allowed()) {
             return;
         }
@@ -426,6 +483,10 @@ public class PollingScheduler {
 
     @Scheduled(fixedDelayString = "${lolesports.poll.in-game-ms:1000}")
     public void pollInGameStats() {
+        sourceState.withReadLock(this::pollInGameStatsInternal);
+    }
+
+    private void pollInGameStatsInternal() {
         // livestats 를 아예 제공하지 않는 리그만 제외한다. 나머지는 404 를 받아도
         // 미루지 않고 1초마다 그대로 물어본다 — 소스가 여는 즉시 화면에 뜨게 하기 위함.
         List<String> activeGames = cache.getActiveGameIds().stream()
@@ -579,6 +640,10 @@ public class PollingScheduler {
 
     @Scheduled(fixedDelayString = "${lolesports.poll.meta-ms:300000}")
     public void pollMeta() {
+        sourceState.withReadLock(this::pollMetaInternal);
+    }
+
+    private void pollMetaInternal() {
         if (!metaBackoff.allowed()) {
             return;
         }
@@ -606,6 +671,29 @@ public class PollingScheduler {
         out.put("inGame", inGameBackoff.status());
         out.put("meta", metaBackoff.status());
         return out;
+    }
+
+    /**
+     * 외부 소스 전환 직후 이전 폴링 사이클의 메모리 상태를 제거한다.
+     * 호출자는 {@link ExternalSourceState}의 쓰기 잠금을 보유해야 한다.
+     */
+    public void resetForExternalSourceChange() {
+        if (cache != null) {
+            cache.clearExternalSourceData();
+        }
+        finishedAt.clear();
+        previousActiveGames.clear();
+        lastKnownMatches.clear();
+        statsFailures.clear();
+        liveBackoff.reset();
+        inGameBackoff.reset();
+        metaBackoff.reset();
+        if (pentakillDetector != null) {
+            pentakillDetector.clearAll();
+        }
+        if (setWinners != null) {
+            setWinners.clearAll();
+        }
     }
 
     /** 과거 일정을 몇 페이지까지 거슬러 받을지 (상대 전적 표본 확보용) */
@@ -667,6 +755,11 @@ public class PollingScheduler {
         }
 
         synchronized void success() {
+            failures = 0;
+            nextAllowedAt = 0;
+        }
+
+        synchronized void reset() {
             failures = 0;
             nextAllowedAt = 0;
         }

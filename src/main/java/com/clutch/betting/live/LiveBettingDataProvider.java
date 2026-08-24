@@ -31,14 +31,27 @@ public interface LiveBettingDataProvider {
      * @param externalTeamIds 참가 팀 외부 ID 목록
      * @param sets 세트 상태 목록
      * @param matchFinished 매치 승부 확정 여부
+     * @param bestOf 최대 세트 수 또는 알 수 없으면 null
      */
     record LiveMatchSnapshot(
             String externalMatchId,
             LocalDateTime scheduledStartAt,
             List<String> externalTeamIds,
             List<SetSnapshot> sets,
-            boolean matchFinished
+            boolean matchFinished,
+            Integer bestOf
     ) {
+
+        /** 이전 호출부와 호환되는 다전제 수 미지정 생성자다. */
+        public LiveMatchSnapshot(
+                String externalMatchId,
+                LocalDateTime scheduledStartAt,
+                List<String> externalTeamIds,
+                List<SetSnapshot> sets,
+                boolean matchFinished
+        ) {
+            this(externalMatchId, scheduledStartAt, externalTeamIds, sets, matchFinished, null);
+        }
     }
 
     /**
@@ -47,6 +60,7 @@ public interface LiveBettingDataProvider {
      * @param externalGameId 외부 게임 ID
      * @param setNumber 세트 번호
      * @param startedAt 세트 시작 시각
+     * @param gameTimeSeconds 피드가 제공한 게임 경과 초. 없으면 실제 벽시계 시각으로 처리한다.
      * @param active 현재 진행 세트 여부
      * @param finished 세트 종료 여부
      * @param finishedAt livestats 피드가 세트 종료를 알린 시각
@@ -56,10 +70,24 @@ public interface LiveBettingDataProvider {
             String externalGameId,
             int setNumber,
             LocalDateTime startedAt,
+            Long gameTimeSeconds,
             boolean active,
             boolean finished,
             LocalDateTime finishedAt,
             String winnerExternalTeamId
     ) {
+
+        /** replay 전용 게임 시계가 없던 기존 호출부와 호환되는 생성자다. */
+        public SetSnapshot(
+                String externalGameId,
+                int setNumber,
+                LocalDateTime startedAt,
+                boolean active,
+                boolean finished,
+                LocalDateTime finishedAt,
+                String winnerExternalTeamId
+        ) {
+            this(externalGameId, setNumber, startedAt, null, active, finished, finishedAt, winnerExternalTeamId);
+        }
     }
 }

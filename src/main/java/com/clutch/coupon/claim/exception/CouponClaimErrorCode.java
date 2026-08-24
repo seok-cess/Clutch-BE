@@ -74,6 +74,10 @@ public enum CouponClaimErrorCode {
     COUPON_STOCK_INCONSISTENT(
             HttpStatus.SERVICE_UNAVAILABLE,
             "쿠폰 발급 데이터가 일치하지 않습니다."
+    ),
+    INVALID_ADMIN_CLAIM_QUERY(
+            HttpStatus.BAD_REQUEST,
+            "관리자 발급 내역 조회 조건이 올바르지 않습니다."
     );
 
 

@@ -207,6 +207,13 @@ public class SetWinnerTracker {
         pendingWins.remove(matchId);
     }
 
+    /** 외부 데이터 소스 전환 시 이전 소스의 승자 추적 상태를 비운다. */
+    public void clearAll() {
+        lastWins.clear();
+        winners.clear();
+        pendingWins.clear();
+    }
+
     /** /api/debug 노출용 */
     public Map<String, Object> debugSnapshot() {
         Map<String, Object> out = new LinkedHashMap<>();

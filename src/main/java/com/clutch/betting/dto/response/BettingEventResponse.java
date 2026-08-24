@@ -4,8 +4,6 @@ import com.clutch.betting.domain.BettingEventStatus;
 import com.clutch.betting.domain.UserBetStatus;
 import com.clutch.betting.dto.BettingEventView;
 
-import java.time.LocalDateTime;
-
 /**
  * 현재 세트 배팅 이벤트의 상태와 사용자 참여 정보를 반환한다.
  *
@@ -16,8 +14,6 @@ import java.time.LocalDateTime;
  * @param firstTeamId 첫 번째 선택 팀 ID
  * @param secondTeamId 두 번째 선택 팀 ID
  * @param status 배팅 이벤트 상태
- * @param closesAt 배팅 마감 시각
- * @param remainingSeconds 마감까지 남은 초
  * @param bettingAvailable 현재 사용자의 배팅 가능 여부
  * @param myBet 현재 사용자의 배팅 요약
  */
@@ -29,8 +25,6 @@ public record BettingEventResponse(
         String firstTeamId,
         String secondTeamId,
         BettingEventStatus status,
-        LocalDateTime closesAt,
-        long remainingSeconds,
         boolean bettingAvailable,
         MyBetResponse myBet
 ) {
@@ -50,8 +44,6 @@ public record BettingEventResponse(
                 view.firstExternalTeamId(),
                 view.secondExternalTeamId(),
                 view.status(),
-                view.closesAt(),
-                view.remainingSeconds(),
                 view.bettingAvailable(),
                 MyBetResponse.from(view.myBet())
         );
