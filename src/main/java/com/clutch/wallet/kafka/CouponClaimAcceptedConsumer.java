@@ -40,8 +40,16 @@ public class CouponClaimAcceptedConsumer {
         }catch(DataIntegrityViolationException e){
 
         }catch(Exception e){
-            couponIssuanceService.recordIssueFailure(event.claimId(), e.getMessage());
+            couponIssuanceService.recordIssueFailure(event.claimId(), resolveFailureReason(e));
         }
+    }
+
+    String resolveFailureReason(Exception e) {
+        String message = e.getMessage();
+        if(message == null || message.isBlank()){
+            return e.getClass().getSimpleName();
+        }
+        return message;
     }
 
     /**
