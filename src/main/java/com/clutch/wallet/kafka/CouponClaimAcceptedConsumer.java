@@ -39,6 +39,8 @@ public class CouponClaimAcceptedConsumer {
             couponIssuanceService.issue(event);
         }catch(DataIntegrityViolationException e){
 
+        }catch(Exception e){
+            couponIssuanceService.recordIssueFailure(event.claimId(), e.getMessage());
         }
     }
 
