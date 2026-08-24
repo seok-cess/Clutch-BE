@@ -204,9 +204,11 @@ class CouponIssuanceKafkaE2eTest {
                 payload
         ).get(5, TimeUnit.SECONDS);
 
+        // Kafka와 Outbox는 적어도 한 번 전달되므로, 재시도·동시 발행으로
+        // 동일 이벤트가 더 소비될 수 있다. 최종 상태의 멱등성은 아래에서 검증한다.
         verify(
                 couponIssuanceService,
-                timeout(10_000).times(2)
+                timeout(10_000).atLeast(2)
         ).issue(
                 argThat((CouponClaimAcceptedEvent acceptedEvent) ->
                         claimId.equals(
