@@ -43,4 +43,21 @@ class UserTest {
 
         assertThat(user.getPoint()).isEqualTo(50L);
     }
+
+    /**
+     * 사용자 로그 표현에 이름, 이메일과 전화번호가 포함되지 않는지 검증한다.
+     */
+    @Test
+    void excludesPersonalDataFromToString() {
+        User user = User.create(
+                UserRole.USER,
+                "viewer@example.com",
+                "홍길동",
+                "01012345678"
+        );
+
+        assertThat(user.toString())
+                .isEqualTo("User(id=null, role=USER)")
+                .doesNotContain("viewer@example.com", "홍길동", "01012345678");
+    }
 }

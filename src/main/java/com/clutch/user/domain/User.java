@@ -38,11 +38,7 @@ public class User {
     @Column(name = "email", nullable = false, unique = true)
     private String email;
 
-    /** 회원 이름. 기존 회원과의 호환을 위해 NULL 을 허용한다 */
-    @Column(name = "name", length = 50)
-    private String name;
 
-    /** 숫자만 남긴 전화번호(예: 01012345678). 전 회원에 걸쳐 고유하다 */
     @Column(name = "phone_number", length = 20, unique = true)
     private String phoneNumber;
 
@@ -57,17 +53,42 @@ public class User {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    private User(UserRole role, String email) {
+    private User(
+            UserRole role,
+            String email,
+            String name,
+            String phoneNumber
+    ) {
         this.role = Objects.requireNonNull(role, "사용자 권한은 필수입니다.");
         if (email == null || email.isBlank()) {
             throw new IllegalArgumentException("이메일은 필수입니다.");
         }
         this.email = email;
+        this.name = normalizeName(name);
+        this.phoneNumber = normalizePhoneNumber(phoneNumber);
         this.point = 0L;
     }
 
     public static User create(UserRole role, String email) {
-        return new User(role, email);
+        return new User(role, email, null, null);
+    }
+
+    /**
+     * 이름과 전화번호를 포함한 가상 사용자를 생성한다.
+     *
+     * @param role 사용자 권한
+     * @param email 이메일
+     * @param name 이름
+     * @param phoneNumber 전화번호
+     * @return 생성된 사용자
+     */
+    public static User create(
+            UserRole role,
+            String email,
+            String name,
+            String phoneNumber
+    ) {
+        return new User(role, email, name, phoneNumber);
     }
 
     /**
@@ -86,5 +107,39 @@ public class User {
      */
     public void changePoint(long pointDelta) {
         this.point = Math.addExact(this.point, pointDelta);
+    }
+
+    /**
+     * 로그에 개인정보가 노출되지 않도록 식별자와 권한만 반환한다.
+     *
+     * @return 개인정보가 제외된 사용자 식별 문자열
+     */
+    @Override
+    public String toString() {
+        return "User(id=" + id + ", role=" + role + ")";
+    }
+
+    private static String normalizeName(String name) {
+        if (name == null || name.isBlank()) {
+            return null;
+        }
+        String normalized = name.trim();
+        if (normalized.length() > 50) {
+            throw new IllegalArgumentException("이름은 50자 이하여야 합니다.");
+        }
+        return normalized;
+    }
+
+    private static String normalizePhoneNumber(String phoneNumber) {
+        if (phoneNumber == null || phoneNumber.isBlank()) {
+            return null;
+        }
+        String normalized = phoneNumber.replaceAll("[^0-9]", "");
+        if (normalized.length() < 10 || normalized.length() > 15) {
+            throw new IllegalArgumentException(
+                    "전화번호는 숫자 10자 이상 15자 이하여야 합니다."
+            );
+        }
+        return normalized;
     }
 }
