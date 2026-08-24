@@ -149,7 +149,7 @@ public class CouponEventActivationService {
                 )
         );
 
-        initializeStockAfterCommit(event.getId());
+        initializeStockAfterCommit(event.getId(), occurrence);
         log.info("트리거 {} 로 이벤트 {} 오픈 — matchId={} gameId={} gameTime={}s 재고={}",
                 trigger, event.getId(), esportsMatchId, externalGameId,
                 gameTimeSeconds, remainingQuantity);

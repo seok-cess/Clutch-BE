@@ -9,6 +9,7 @@ import com.clutch.coupon.event.repository.CouponEventItemRepository;
 import com.clutch.coupon.test.event.api.dto.CouponEventActivationResponse;
 import com.clutch.coupon.test.event.domain.CouponEvent;
 import com.clutch.coupon.test.event.domain.CouponEventOccurrence;
+import com.clutch.coupon.test.event.domain.CouponEventTrigger;
 import com.clutch.coupon.test.event.exception.CouponEventErrorCode;
 import com.clutch.coupon.test.event.exception.CouponEventException;
 import com.clutch.coupon.test.event.repository.CouponEventOccurrenceRepository;
@@ -243,6 +244,71 @@ class CouponEventActivationServiceTest {
                     assertThat(active.remainingQuantity()).isEqualTo(99L);
                     assertThat(active.claimable()).isTrue();
                 });
+    }
+
+    @Test
+    void 트리거로_대기_이벤트를_열고_회차_기준으로_재고를_초기화한다() {
+        CouponEvent event = event(1L, CouponEventStatus.READY);
+        CouponEventItem item = CouponEventItem.create(1L, 10L, 100);
+        when(couponEventRepository.findReadyByMatchAndTriggerForUpdate(
+                500L,
+                CouponEventTrigger.PENTAKILL.name(),
+                CouponEventStatus.READY
+        )).thenReturn(Optional.of(event));
+        when(couponEventItemRepository.findAllByCouponEventId(1L))
+                .thenReturn(List.of(item));
+        when(occurrenceRepository.save(any(CouponEventOccurrence.class)))
+                .thenAnswer(invocation -> withId(
+                        invocation.getArgument(0),
+                        20L
+                ));
+
+        Optional<CouponEventActivationResponse> response = activationService
+                .openByTrigger(
+                        CouponEventTrigger.PENTAKILL,
+                        500L,
+                        "GAME-1",
+                        720
+                );
+
+        assertThat(event.getEventStatus()).isEqualTo(CouponEventStatus.OPEN);
+        assertThat(response).isPresent()
+                .hasValueSatisfying(opened -> {
+                    assertThat(opened.couponEventOccurrenceId()).isEqualTo(20L);
+                    assertThat(opened.openedAt()).isEqualTo(NOW_UTC);
+                    assertThat(opened.expiresAt())
+                            .isEqualTo(NOW_UTC.plusSeconds(60));
+                    assertThat(opened.remainingQuantity()).isEqualTo(100L);
+                    assertThat(opened.claimable()).isTrue();
+                });
+        verify(couponStockInitializer).initialize(
+                eq(1L),
+                eq(20L),
+                eq(NOW_UTC),
+                eq(NOW_UTC.plusSeconds(60))
+        );
+    }
+
+    @Test
+    void 트리거로_열_대기_이벤트가_없으면_빈_값을_돌려준다() {
+        when(couponEventRepository.findReadyByMatchAndTriggerForUpdate(
+                500L,
+                CouponEventTrigger.PENTAKILL.name(),
+                CouponEventStatus.READY
+        )).thenReturn(Optional.empty());
+
+        Optional<CouponEventActivationResponse> response = activationService
+                .openByTrigger(
+                        CouponEventTrigger.PENTAKILL,
+                        500L,
+                        "GAME-1",
+                        720
+                );
+
+        assertThat(response).isEmpty();
+        verify(occurrenceRepository, never()).save(any());
+        verify(couponStockInitializer, never())
+                .initialize(any(), any(), any(), any());
     }
 
     @Test
