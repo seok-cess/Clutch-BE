@@ -12,7 +12,32 @@ jobs:
       - windows
       - x64
 
+    env:
+      MYSQL_EXPORTER_PASSWORD: ${{ secrets.MYSQL_EXPORTER_PASSWORD }}
+      DB_POOL_SIZE: ${{ secrets.DB_POOL_SIZE }}
+
     steps:
+      - name: Restore Tailscale and SSH
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          $tailscale = Get-Service -Name Tailscale
+          if ($tailscale.Status -eq "Running") {
+            Restart-Service -Name Tailscale -Force
+          } else {
+            Start-Service -Name Tailscale
+          }
+
+          $sshd = Get-Service -Name sshd
+          if ($sshd.Status -ne "Running") {
+            Start-Service -Name sshd
+          }
+
+          Get-Service Tailscale, sshd
+          tailscale status
+          Get-NetTCPConnection -LocalPort 22 -State Listen
+
       - name: Checkout dev
         uses: actions/checkout@v6
         with:
@@ -21,10 +46,20 @@ jobs:
       - name: Prepare application config
         shell: powershell
         run: |
-          Copy-Item -LiteralPath src/main/resources/application.example.yaml -Destination src/main/resources/application.yaml -Force
+          Copy-Item -LiteralPath src/main/resources/application.example.yaml `
+            -Destination src/main/resources/application.yaml `
+            -Force
 
       - name: Deploy
         shell: powershell
         run: |
-          docker compose --profile app up -d --build --remove-orphans --wait
+          docker compose up -d --wait mysql redis kafka
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          docker compose up -d --force-recreate mysql-exporter redis-exporter
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          docker compose --profile app up -d --build --force-recreate --no-deps --wait app
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
           docker compose --profile app ps
