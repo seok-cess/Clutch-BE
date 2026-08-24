@@ -125,8 +125,7 @@ public class CouponStockRecoveryService {
             long issuedCoupons = issuanceRecoveryReader
                     .countIssuedCoupons(item.getId());
 
-            if (item.getSuccessCount() != succeededRequests
-                    || succeededRequests != issuedCoupons
+            if (succeededRequests != issuedCoupons
                     || issuedCoupons > item.getQuantity()) {
                 throw new CouponClaimException(
                         COUPON_STOCK_INCONSISTENT

@@ -58,6 +58,9 @@ class CouponClaimConcurrencyIntegrationTest {
     @Autowired
     private CouponClaimService couponClaimService;
 
+    @Autowired
+    private CouponSuccessCountSynchronizer successCountSynchronizer;
+
     /**
      * SQL 실행기
      */
@@ -233,6 +236,8 @@ class CouponClaimConcurrencyIntegrationTest {
                 COUPON_EVENT_ITEM_ID
         );
 
+        successCountSynchronizer.synchronize();
+
         Integer successCount = jdbcTemplate.queryForObject(
                 """
                         SELECT success_count
@@ -385,6 +390,8 @@ class CouponClaimConcurrencyIntegrationTest {
                 Integer.class,
                 COUPON_EVENT_OCCURRENCE_ID
         );
+
+        successCountSynchronizer.synchronize();
 
         Integer successCount = jdbcTemplate.queryForObject(
                 """

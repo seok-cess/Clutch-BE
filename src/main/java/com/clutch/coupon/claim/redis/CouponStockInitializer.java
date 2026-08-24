@@ -2,6 +2,7 @@ package com.clutch.coupon.claim.redis;
 
 import com.clutch.coupon.event.domain.CouponEventItem;
 import com.clutch.coupon.event.repository.CouponEventItemRepository;
+import com.clutch.wallet.repository.UserCouponRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
@@ -16,6 +17,7 @@ import java.util.List;
 public class CouponStockInitializer {
 
     private final CouponEventItemRepository couponEventItemRepository;
+    private final UserCouponRepository userCouponRepository;
     private final StringRedisTemplate stringRedisTemplate;
 
     /**
@@ -36,7 +38,11 @@ public class CouponStockInitializer {
         for (CouponEventItem item : items) {
             stringRedisTemplate.opsForValue().setIfAbsent(
                     CouponClaimRedisKeys.stock(item.getId()),
-                    String.valueOf(item.remainingStock())
+                    String.valueOf(
+                            item.getQuantity()
+                                    - userCouponRepository
+                                    .countByCouponEventItemId(item.getId())
+                    )
             );
         }
     }

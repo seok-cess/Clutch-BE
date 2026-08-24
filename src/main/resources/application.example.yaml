@@ -67,6 +67,8 @@ watch:
 coupon:
   stock-recovery:
     interval-ms: ${COUPON_STOCK_RECOVERY_INTERVAL_MS:2000}
+  success-count-sync:
+    interval-ms: ${COUPON_SUCCESS_COUNT_SYNC_INTERVAL_MS:5000}
   test:
     event:
       expiration-interval-ms: ${COUPON_TEST_EVENT_EXPIRATION_INTERVAL_MS:1000}
