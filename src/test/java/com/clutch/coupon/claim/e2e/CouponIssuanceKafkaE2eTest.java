@@ -60,6 +60,10 @@ class CouponIssuanceKafkaE2eTest {
             "coupon-issuance-e2e-"
                     + UUID.randomUUID();
 
+    private static final String ACCEPTED_GROUP =
+            "coupon-issuance-e2e-accepted-"
+                    + UUID.randomUUID();
+
     @Autowired
     private CouponClaimRequestRepository
             claimRequestRepository;
@@ -104,6 +108,10 @@ class CouponIssuanceKafkaE2eTest {
     static void kafkaProperties(
             DynamicPropertyRegistry registry
     ) {
+        registry.add(
+                "coupon.claim.kafka.accepted-group",
+                () -> ACCEPTED_GROUP
+        );
         registry.add(
                 "coupon.claim.kafka.issue-result-group",
                 () -> RESULT_GROUP
