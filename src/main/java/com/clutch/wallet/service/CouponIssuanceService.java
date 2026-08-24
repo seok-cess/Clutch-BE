@@ -124,6 +124,11 @@ public class CouponIssuanceService implements
         );
     }
 
+    @Transactional
+    public void recordIssueFailure(Long claimId, String failureReason){
+        writeResultOutbox(claimId, null, CouponIssueResultStatus.FAILED, failureReason);
+    }
+
     /**
      * 쿠폰 생성 결과 Outbox 저장
      *

@@ -83,7 +83,7 @@ class CouponStockRecoveryServiceTest {
 
     @Test
     void rebuildsStockAndClaimedUsersFromMysql() {
-        givenOpenOccurrenceAndItem(10, 3);
+        givenOpenOccurrenceAndItem(10);
         when(claimRequestRepository
                 .countByCouponEventItemIdAndRequestStatus(
                         ITEM_ID,
@@ -129,7 +129,7 @@ class CouponStockRecoveryServiceTest {
 
     @Test
     void stopsRecoveryWhenMysqlCountsDoNotMatch() {
-        givenOpenOccurrenceAndItem(10, 3);
+        givenOpenOccurrenceAndItem(10);
         when(claimRequestRepository
                 .countByCouponEventItemIdAndRequestStatus(
                         ITEM_ID,
@@ -153,10 +153,7 @@ class CouponStockRecoveryServiceTest {
                 .isEqualTo(CouponStockRecoveryState.FAILED);
     }
 
-    private void givenOpenOccurrenceAndItem(
-            int quantity,
-            int successCount
-    ) {
+    private void givenOpenOccurrenceAndItem(int quantity) {
         CouponEventOccurrence occurrence =
                 mock(CouponEventOccurrence.class);
         lenient().when(occurrence.getId()).thenReturn(OCCURRENCE_ID);
@@ -168,7 +165,6 @@ class CouponStockRecoveryServiceTest {
         CouponEventItem item = mock(CouponEventItem.class);
         when(item.getId()).thenReturn(ITEM_ID);
         lenient().when(item.getQuantity()).thenReturn(quantity);
-        when(item.getSuccessCount()).thenReturn(successCount);
         when(itemRepository.findAllByCouponEventId(EVENT_ID))
                 .thenReturn(List.of(item));
     }
