@@ -17,27 +17,6 @@ jobs:
       DB_POOL_SIZE: ${{ secrets.DB_POOL_SIZE }}
 
     steps:
-      - name: Restore Tailscale and SSH
-        shell: powershell
-        run: |
-          $ErrorActionPreference = "Stop"
-
-          $tailscale = Get-Service -Name Tailscale
-          if ($tailscale.Status -eq "Running") {
-            Restart-Service -Name Tailscale -Force
-          } else {
-            Start-Service -Name Tailscale
-          }
-
-          $sshd = Get-Service -Name sshd
-          if ($sshd.Status -ne "Running") {
-            Start-Service -Name sshd
-          }
-
-          Get-Service Tailscale, sshd
-          tailscale status
-          Get-NetTCPConnection -LocalPort 22 -State Listen
-
       - name: Checkout dev
         uses: actions/checkout@v6
         with:
