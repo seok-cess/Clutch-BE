@@ -24,6 +24,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -39,6 +40,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -204,6 +206,19 @@ class CouponClaimServiceTest {
                 .increaseSuccessCountAtomically(
                         COUPON_EVENT_ITEM_ID
                 );
+
+        InOrder issuanceBeforeCountUpdate = inOrder(
+                couponIssuer,
+                couponEventItemRepository
+        );
+        issuanceBeforeCountUpdate.verify(couponIssuer).issue(
+                any(CouponIssuanceCommand.class)
+        );
+        issuanceBeforeCountUpdate.verify(couponEventItemRepository)
+                .increaseSuccessCountAtomically(
+                        COUPON_EVENT_ITEM_ID
+                );
+
         verify(couponStockStreamService).publish(
                 COUPON_EVENT_ITEM_ID
         );
@@ -603,31 +618,7 @@ class CouponClaimServiceTest {
     @Test
     void databaseRollbackCompensatesRedisClaim() {
         // given
-        givenOpenEventAndItem();
-
-        when(couponEventItem.getId())
-                .thenReturn(COUPON_EVENT_ITEM_ID);
-
-        when(couponBenefitSnapshotRepository
-                .findByCouponEventItemId(
-                        COUPON_EVENT_ITEM_ID
-                ))
-                .thenReturn(Optional.of(BENEFIT_SNAPSHOT));
-
-        when(couponClaimRequestRepository
-                .existsByUserIdAndCouponEventOccurrenceId(
-                        USER_ID,
-                        COUPON_EVENT_OCCURRENCE_ID
-                ))
-                .thenReturn(false);
-
-        when(couponClaimRedisExecutor.claim(
-                COUPON_EVENT_ITEM_ID,
-                COUPON_EVENT_OCCURRENCE_ID,
-                USER_ID
-        ))
-                .thenReturn(CouponClaimRedisResult.SUCCESS);
-
+        givenSuccessfulClaim();
         when(couponEventItemRepository
                 .increaseSuccessCountAtomically(
                         COUPON_EVENT_ITEM_ID
