@@ -14,7 +14,6 @@ import com.clutch.coupon.claim.recovery.CouponStockRecoveryStateManager;
 import com.clutch.coupon.claim.repository.CouponClaimRequestRepository;
 import com.clutch.coupon.event.domain.CouponEventItem;
 import com.clutch.coupon.event.domain.CouponEventOccurrence;
-import com.clutch.coupon.event.repository.CouponEventItemRepository;
 import com.clutch.coupon.event.repository.CouponEventOccurrenceRepository;
 import com.clutch.coupon.event.repository.CouponEventRepository;
 import lombok.RequiredArgsConstructor;
@@ -51,8 +50,6 @@ public class CouponClaimService {
     private final CouponClaimItemSelector couponClaimItemSelector;
     private final CouponClaimRedisExecutor couponClaimRedisExecutor;
     private final CouponStockRecoveryStateManager recoveryStateManager;
-    private final CouponEventItemRepository couponEventItemRepository;
-
     private final CouponBenefitSnapshotRepository
             couponBenefitSnapshotRepository;
 
@@ -177,18 +174,6 @@ public class CouponClaimService {
                                 )
                         )
                 );
-
-        int updatedRows =
-                couponEventItemRepository
-                        .increaseSuccessCountAtomically(
-                                couponEventItem.getId()
-                        );
-
-        if (updatedRows != 1) {
-            throw new CouponClaimException(
-                    COUPON_STOCK_EXHAUSTED
-            );
-        }
 
         savedClaimRequest.succeed(
                 LocalDateTime.ofInstant(

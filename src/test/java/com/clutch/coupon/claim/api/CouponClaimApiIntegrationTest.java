@@ -215,7 +215,7 @@ class CouponClaimApiIntegrationTest {
      * 정상 쿠폰 발급 요청 저장 검증
      */
     @Test
-    void claimPersistsRequestAndIncreasesSuccessCount()
+    void claimPersistsRequestWithoutSynchronousSuccessCountUpdate()
             throws Exception {
         // given
         LocalDateTime currentTime =
@@ -362,7 +362,7 @@ class CouponClaimApiIntegrationTest {
 
         assertThat(claimCount).isEqualTo(1);
         assertThat(requestStatus).isEqualTo("SUCCEEDED");
-        assertThat(successCount).isEqualTo(1);
+        assertThat(successCount).isZero();
         assertThat(couponId).isNotNull();
         assertThat(couponStatus).isEqualTo("ISSUED");
         assertThat(walletOutboxTopic)
