@@ -11,6 +11,9 @@ public final class CouponClaimRedisKeys {
     private static final String CLAIMED_USERS_KEY_FORMAT =
             "coupon:occurrence:%d:claimed-users";
 
+    private static final String CONTEXT_KEY_FORMAT =
+            "coupon:occurrence:%d:claim-context";
+
     private CouponClaimRedisKeys() {
     }
 
@@ -34,6 +37,20 @@ public final class CouponClaimRedisKeys {
             Long couponEventOccurrenceId
     ) {
         return CLAIMED_USERS_KEY_FORMAT.formatted(
+                couponEventOccurrenceId
+        );
+    }
+
+    /**
+     * 발급 회차의 단계 및 혜택 스냅샷 키
+     *
+     * @param couponEventOccurrenceId 쿠폰 이벤트 회차 식별자
+     * @return 발급 컨텍스트 Redis 키
+     */
+    public static String context(
+            Long couponEventOccurrenceId
+    ) {
+        return CONTEXT_KEY_FORMAT.formatted(
                 couponEventOccurrenceId
         );
     }

@@ -4,6 +4,7 @@ import com.clutch.coupon.claim.domain.ClaimRequestStatus;
 import com.clutch.coupon.claim.exception.CouponClaimErrorCode;
 import com.clutch.coupon.claim.exception.CouponClaimException;
 import com.clutch.coupon.claim.redis.CouponClaimRedisKeys;
+import com.clutch.coupon.claim.redis.CouponStockInitializer;
 import com.clutch.coupon.claim.repository.CouponClaimRequestRepository;
 import com.clutch.coupon.contract.issuance.CouponIssuanceRecoveryReader;
 import com.clutch.coupon.event.domain.CouponEventItem;
@@ -59,6 +60,9 @@ class CouponStockRecoveryServiceTest {
     private RedisScript<Long> recoveryScript;
 
     @Mock
+    private CouponStockInitializer couponStockInitializer;
+
+    @Mock
     private ValueOperations<String, String> valueOperations;
 
     @Mock
@@ -77,6 +81,7 @@ class CouponStockRecoveryServiceTest {
                 claimRequestRepository,
                 issuanceRecoveryReader,
                 stringRedisTemplate,
+                couponStockInitializer,
                 recoveryScript
         );
     }

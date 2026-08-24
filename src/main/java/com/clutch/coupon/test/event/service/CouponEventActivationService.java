@@ -83,7 +83,7 @@ public class CouponEventActivationService {
                 )
         );
 
-        initializeStockAfterCommit(event.getId());
+        initializeStockAfterCommit(event.getId(), occurrence);
 
         return toResponse(event, occurrence, remainingQuantity, true);
     }
@@ -166,10 +166,13 @@ public class CouponEventActivationService {
      * <p>초기화 실패는 실제 Redis 장애로 취급해 이후 발급을 fail-closed로 막고,
      * 기존 복구 스케줄러가 DB 기준 재구축을 수행하게 한다.</p>
      */
-    private void initializeStockAfterCommit(Long couponEventId) {
+    private void initializeStockAfterCommit(
+            Long couponEventId,
+            CouponEventOccurrence occurrence
+    ) {
         if (!TransactionSynchronizationManager
                 .isSynchronizationActive()) {
-            initializeStock(couponEventId);
+            initializeStock(couponEventId, occurrence);
             return;
         }
 
@@ -177,15 +180,23 @@ public class CouponEventActivationService {
                 new TransactionSynchronization() {
                     @Override
                     public void afterCommit() {
-                        initializeStock(couponEventId);
+                        initializeStock(couponEventId, occurrence);
                     }
                 }
         );
     }
 
-    private void initializeStock(Long couponEventId) {
+    private void initializeStock(
+            Long couponEventId,
+            CouponEventOccurrence occurrence
+    ) {
         try {
-            couponStockInitializer.initialize(couponEventId);
+            couponStockInitializer.initialize(
+                    couponEventId,
+                    occurrence.getId(),
+                    occurrence.getOpenedAt(),
+                    occurrence.getExpiresAt()
+            );
         } catch (DataAccessException exception) {
             recoveryStateManager.markUnavailable();
             throw exception;
