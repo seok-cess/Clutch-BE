@@ -17,12 +17,18 @@
 ## Decision
 
 - Redis Lua가 재고 차감과 사용자 중복 방지를 계속 최종적으로 결정한다.
+- 회차를 열 때 활성 단계, 쿠폰 항목, 혜택 스냅샷과 유효 시간을 Redis 발급
+  컨텍스트로 함께 준비한다. 요청은 이 컨텍스트와 Redis Lua를 먼저 사용한다.
+- Redis가 `STOCK_EXHAUSTED` 또는 `ALREADY_CLAIMED`를 반환한 요청은 MySQL
+  transaction과 조회를 시작하지 않는다. Redis 컨텍스트가 없으면 DB로 우회하지
+  않고 fail-closed로 발급을 막는다.
 - 요청 MySQL transaction에는 발급 요청, `user_coupon`, 결과 Outbox만 저장한다.
 - 요청 transaction에서 `coupon_event_item.success_count`를 증가시키지 않는다.
 - `success_count`는 5초 주기의 단일 스케줄러가 실제 `user_coupon` 수로 보정하는
   비동기 집계값으로 바꾼다.
 - Redis 재고 초기화와 장애 복구는 `success_count`가 아니라 실제 `user_coupon` 수를
   사용한다.
+- Redis 복구는 재고와 당첨 사용자 집합뿐 아니라 발급 컨텍스트도 함께 재구축한다.
 - 복구 정합성 검증은 `SUCCEEDED` 발급 요청 수와 실제 `user_coupon` 수가 일치하는지로
   수행한다.
 
@@ -45,6 +51,7 @@
 ## Consequences
 
 - 사용자는 기존처럼 응답에서 실제 쿠폰 ID를 즉시 받는다.
+- 품절·중복 요청이 공통 이벤트 메타데이터 조회를 위해 MySQL에 몰리지 않는다.
 - 발급 가능 여부에 대한 MySQL 단일 행 잠금이 사라진다.
 - `success_count`와 실제 쿠폰 수는 최대 집계 주기만큼 일시적으로 다를 수 있다.
 - 관리자 집계는 지연된 값임을 전제로 하며, 재고·복구 판단에는 사용하지 않는다.
