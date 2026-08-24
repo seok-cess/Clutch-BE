@@ -19,6 +19,14 @@ public final class CouponTestMatch {
     /** 테스트 이벤트가 매달리는 예약 경기 ID */
     public static final long SAMPLE_MATCH_ID = -1L;
 
+    /**
+     * 예약 경기의 외부 ID. V15 마이그레이션이 넣는 값과 같아야 한다.
+     *
+     * <p>감지기는 외부 ID 로 경기를 가리키므로, 시연 프레임을 이 ID 로 태그하면
+     * {@code CouponTriggerAdapter} 가 {@link #SAMPLE_MATCH_ID} 로 해석한다.</p>
+     */
+    public static final String SAMPLE_EXTERNAL_MATCH_ID = "clutch-test-match";
+
     private CouponTestMatch() {
     }
 
