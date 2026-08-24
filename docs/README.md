@@ -36,6 +36,7 @@ Notion에서 논의한 내용이 실제 구현을 제약하는 기술 결정으�
 - Redis 쿠폰 재고 복구 결정: `adr/002-redis-coupon-stock-recovery.md`
 - Redis 쿠폰 재고 복구 학습: `learning/coupon-redis-recovery.md`
 - 새 쿠폰 회차 첫 발급 실패 트러블슈팅: `learning/coupon-first-claim-initialization-troubleshooting.md`
+- 20,000 VU Redis 선판단 트러블슈팅: `learning/coupon-20000-vu-redis-first-troubleshooting.md`
 - 시청 포인트 지급 규칙: `domain/viewing-point.md`
 - 승패 배팅 규칙: `domain/betting.md`
 - Git, 커밋과 Pull Request: `conventions/git-convention.md`
