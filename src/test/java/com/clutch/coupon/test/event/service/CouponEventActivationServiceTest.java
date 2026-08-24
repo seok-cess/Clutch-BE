@@ -31,6 +31,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
@@ -106,7 +107,12 @@ class CouponEventActivationServiceTest {
         assertThat(response.expiresAt()).isEqualTo(NOW_UTC.plusSeconds(60));
         assertThat(response.remainingQuantity()).isEqualTo(100L);
         assertThat(response.claimable()).isTrue();
-        verify(couponStockInitializer).initialize(1L);
+        verify(couponStockInitializer).initialize(
+                eq(1L),
+                eq(20L),
+                eq(NOW_UTC),
+                eq(NOW_UTC.plusSeconds(60))
+        );
     }
 
     @Test
@@ -131,7 +137,12 @@ class CouponEventActivationServiceTest {
                 ));
         doThrow(new RedisConnectionFailureException("Redis 연결 실패"))
                 .when(couponStockInitializer)
-                .initialize(1L);
+                .initialize(
+                        eq(1L),
+                        eq(20L),
+                        eq(NOW_UTC),
+                        eq(NOW_UTC.plusSeconds(60))
+                );
 
         assertThatThrownBy(() -> activationService.manualOpen(1L))
                 .isInstanceOf(RedisConnectionFailureException.class);

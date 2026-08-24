@@ -3,11 +3,10 @@ package com.clutch.lolesports.client;
 import com.clutch.lolesports.config.LolesportsProperties;
 import com.clutch.lolesports.dto.external.DetailsResponse;
 import com.clutch.lolesports.dto.external.WindowResponse;
+import com.clutch.lolesports.source.ExternalSourceRouter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
-import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 import java.time.Duration;
@@ -47,14 +46,14 @@ public class LiveStatsClient {
     private static final long SAFETY_MARGIN_SECONDS = 5;
     private static final long MAX_LAG_SECONDS = 300;
 
-    private final WebClient client;
+    private final ExternalSourceRouter sourceRouter;
     private final LolesportsProperties props;
 
     /** 서버 요구에 맞춰 자동 조정되는 현재 lag(초). 초기값은 설정값 */
     private final AtomicLong effectiveLag;
 
-    public LiveStatsClient(@Qualifier("liveStatsWebClient") WebClient client, LolesportsProperties props) {
-        this.client = client;
+    public LiveStatsClient(ExternalSourceRouter sourceRouter, LolesportsProperties props) {
+        this.sourceRouter = sourceRouter;
         this.props = props;
         this.effectiveLag = new AtomicLong(props.liveStatsLagSeconds());
     }
@@ -62,7 +61,7 @@ public class LiveStatsClient {
     /** 팀 단위 스탯. 게임 시작 전이면 204/404 → null 반환 */
     public WindowResponse getWindow(String gameId) {
         try {
-            return client.get()
+            return sourceRouter.liveStatsClient().get()
                     .uri(uri -> uri.path("/window/{gameId}")
                             .queryParam("startingTime", startingTime())
                             .build(gameId))
@@ -83,7 +82,7 @@ public class LiveStatsClient {
         long epoch = at.getEpochSecond();
         epoch -= epoch % 10;
         String ts = DateTimeFormatter.ISO_INSTANT.format(Instant.ofEpochSecond(epoch));
-        return client.get()
+        return sourceRouter.liveStatsClient().get()
                 .uri(uri -> uri.path("/window/{gameId}")
                         .queryParam("startingTime", ts)
                         .build(gameId))
@@ -95,7 +94,7 @@ public class LiveStatsClient {
     /** 선수 상세 스탯. 게임 시작 전이면 204/404 → null 반환 */
     public DetailsResponse getDetails(String gameId) {
         try {
-            return client.get()
+            return sourceRouter.liveStatsClient().get()
                     .uri(uri -> uri.path("/details/{gameId}")
                             .queryParam("startingTime", startingTime())
                             .build(gameId))
@@ -128,8 +127,12 @@ public class LiveStatsClient {
      */
     public String getGameStartTimestamp(String gameId) {
         try {
-            WindowResponse res = client.get()
-                    .uri(uri -> uri.path("/window/{gameId}").build(gameId))
+            WindowResponse res = sourceRouter.liveStatsClient().get()
+                    .uri(uri -> uri.path("/window/{gameId}")
+                            // replay는 화면 프레임과 게임 시작 시각에 서로 다른 시간축을 쓴다.
+                            // 실제 lolesports 서버는 알 수 없는 query parameter를 무시한다.
+                            .queryParam("clutchGameStartProbe", "true")
+                            .build(gameId))
                     .retrieve()
                     .bodyToMono(WindowResponse.class)
                     .block(TIMEOUT);
@@ -146,7 +149,7 @@ public class LiveStatsClient {
                     res.frames().get(res.frames().size() - 1).rfc460Timestamp());
             for (int i = 0; i < GAME_START_MAX_WINDOWS; i++) {
                 cursor = cursor.plusSeconds(10);
-                WindowResponse next = getWindowAt(gameId, cursor);
+                WindowResponse next = getGameStartWindowAt(gameId, cursor);
                 if (next == null || next.frames() == null || next.frames().isEmpty()) {
                     break;
                 }
@@ -174,6 +177,21 @@ public class LiveStatsClient {
             }
         }
         return null;
+    }
+
+    /** 게임 시작 프레임 탐색용 window — replay가 전체 재생 시간축을 적용하도록 표시한다. */
+    private WindowResponse getGameStartWindowAt(String gameId, Instant at) {
+        long epoch = at.getEpochSecond();
+        epoch -= epoch % 10;
+        String ts = DateTimeFormatter.ISO_INSTANT.format(Instant.ofEpochSecond(epoch));
+        return sourceRouter.liveStatsClient().get()
+                .uri(uri -> uri.path("/window/{gameId}")
+                        .queryParam("startingTime", ts)
+                        .queryParam("clutchGameStartProbe", "true")
+                        .build(gameId))
+                .retrieve()
+                .bodyToMono(WindowResponse.class)
+                .block(TIMEOUT);
     }
 
     /**

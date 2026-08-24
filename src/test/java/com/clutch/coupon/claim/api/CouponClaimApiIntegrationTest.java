@@ -1,6 +1,8 @@
 package com.clutch.coupon.claim.api;
 
 import com.clutch.coupon.claim.redis.CouponClaimRedisKeys;
+import com.clutch.coupon.claim.redis.CouponClaimContext;
+import com.clutch.coupon.claim.redis.CouponClaimContextStore;
 import com.clutch.coupon.claim.recovery.CouponStockRecoveryStateManager;
 import com.clutch.coupon.event.domain.CouponEventOccurrence;
 import com.clutch.coupon.event.domain.CouponEventOccurrenceStatus;
@@ -19,6 +21,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -60,6 +63,9 @@ class CouponClaimApiIntegrationTest {
      */
     @Autowired
     private StringRedisTemplate stringRedisTemplate;
+
+    @Autowired
+    private CouponClaimContextStore couponClaimContextStore;
 
     @Autowired
     private CouponStockRecoveryStateManager recoveryStateManager;
@@ -189,6 +195,21 @@ class CouponClaimApiIntegrationTest {
                 0
         );
 
+        couponClaimContextStore.save(new CouponClaimContext(
+                COUPON_EVENT_ID,
+                COUPON_EVENT_OCCURRENCE_ID,
+                currentTime.minusMinutes(1).toInstant(ZoneOffset.UTC)
+                        .toEpochMilli(),
+                currentTime.plusMinutes(10).toInstant(ZoneOffset.UTC)
+                        .toEpochMilli(),
+                List.of(new CouponClaimContext.CouponClaimContextPhase(
+                        0,
+                        COUPON_EVENT_ITEM_ID,
+                        "RATE",
+                        new BigDecimal("10.00")
+                ))
+        ));
+
         stringRedisTemplate.opsForValue().set(
                 CouponClaimRedisKeys.stock(COUPON_EVENT_ITEM_ID),
                 "10"
@@ -215,7 +236,7 @@ class CouponClaimApiIntegrationTest {
      * 정상 쿠폰 발급 요청 저장 검증
      */
     @Test
-    void claimPersistsRequestAndIncreasesSuccessCount()
+    void claimPersistsRequestWithoutSynchronousSuccessCountUpdate()
             throws Exception {
         // given
         LocalDateTime currentTime =
@@ -362,7 +383,7 @@ class CouponClaimApiIntegrationTest {
 
         assertThat(claimCount).isEqualTo(1);
         assertThat(requestStatus).isEqualTo("SUCCEEDED");
-        assertThat(successCount).isEqualTo(1);
+        assertThat(successCount).isZero();
         assertThat(couponId).isNotNull();
         assertThat(couponStatus).isEqualTo("ISSUED");
         assertThat(walletOutboxTopic)
@@ -480,6 +501,9 @@ class CouponClaimApiIntegrationTest {
                                 COUPON_EVENT_ITEM_ID
                         ),
                         CouponClaimRedisKeys.claimedUsers(
+                                COUPON_EVENT_OCCURRENCE_ID
+                        ),
+                        CouponClaimRedisKeys.context(
                                 COUPON_EVENT_OCCURRENCE_ID
                         )
                 )

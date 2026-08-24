@@ -10,11 +10,12 @@ import com.clutch.coupon.claim.domain.CouponClaimRequest;
 import com.clutch.coupon.claim.exception.CouponClaimException;
 import com.clutch.coupon.claim.redis.CouponClaimRedisExecutor;
 import com.clutch.coupon.claim.redis.CouponClaimRedisResult;
+import com.clutch.coupon.claim.redis.CouponClaimContext;
+import com.clutch.coupon.claim.redis.CouponClaimContextStore;
 import com.clutch.coupon.claim.recovery.CouponStockRecoveryStateManager;
 import com.clutch.coupon.claim.repository.CouponClaimRequestRepository;
 import com.clutch.coupon.event.domain.CouponEventItem;
 import com.clutch.coupon.event.domain.CouponEventOccurrence;
-import com.clutch.coupon.event.repository.CouponEventItemRepository;
 import com.clutch.coupon.event.repository.CouponEventOccurrenceRepository;
 import com.clutch.coupon.event.repository.CouponEventRepository;
 import lombok.RequiredArgsConstructor;
@@ -51,13 +52,13 @@ public class CouponClaimService {
     private final CouponClaimItemSelector couponClaimItemSelector;
     private final CouponClaimRedisExecutor couponClaimRedisExecutor;
     private final CouponStockRecoveryStateManager recoveryStateManager;
-    private final CouponEventItemRepository couponEventItemRepository;
-
     private final CouponBenefitSnapshotRepository
             couponBenefitSnapshotRepository;
 
     private final CouponIssuer couponIssuer;
     private final CouponStockStreamService couponStockStreamService;
+    private final CouponClaimContextStore couponClaimContextStore;
+    private final CouponClaimPersistenceService couponClaimPersistenceService;
 
     /**
      * 쿠폰 발급 요청 처리
@@ -67,8 +68,40 @@ public class CouponClaimService {
      * @param couponEventOccurrenceId 쿠폰 이벤트 회차 식별자
      * @return 쿠폰 발급 요청 생성 응답
      */
-    @Transactional
     public CouponClaimCreateResponse claim(
+            Long userId,
+            Long couponEventId,
+            Long couponEventOccurrenceId
+    ) {
+        recoveryStateManager.requireReady();
+
+        CouponClaimContext context = couponClaimContextStore.get(
+                couponEventId,
+                couponEventOccurrenceId
+        );
+        CouponClaimContext.CouponClaimContextPhase phase = context
+                .findActivePhase(Instant.now())
+                .orElseThrow(() -> new CouponClaimException(
+                        COUPON_EVENT_ITEM_NOT_AVAILABLE
+                ));
+
+        CouponClaimRedisResult redisResult = executeRedisClaim(
+                phase.couponEventItemId(),
+                couponEventOccurrenceId,
+                userId
+        );
+        validateRedisResult(redisResult);
+
+        return couponClaimPersistenceService.persist(
+                userId,
+                context,
+                phase
+        );
+    }
+
+    /** 기존 DB 선조회 경로. 회귀 비교를 위해 현재 작업 중에만 유지한다. */
+    @Transactional
+    private CouponClaimCreateResponse legacyClaim(
             Long userId,
             Long couponEventId,
             Long couponEventOccurrenceId
@@ -158,18 +191,6 @@ public class CouponClaimService {
 
         CouponClaimRequest savedClaimRequest =
                 couponClaimRequestRepository.save(claimRequest);
-
-        int updatedRows =
-                couponEventItemRepository
-                        .increaseSuccessCountAtomically(
-                                couponEventItem.getId()
-                        );
-
-        if (updatedRows != 1) {
-            throw new CouponClaimException(
-                    COUPON_STOCK_EXHAUSTED
-            );
-        }
 
         Instant issuedAt = Instant.now();
 

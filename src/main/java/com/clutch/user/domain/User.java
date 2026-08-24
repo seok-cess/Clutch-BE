@@ -37,13 +37,14 @@ public class User {
 
     @Column(name = "email", nullable = false, unique = true)
     private String email;
-    /** 관리자 화면에서 마스킹하여 표시할 회원 이름. 기존 회원과의 호환을 위해 NULL을 허용한다. */
+
+    /** 회원 이름. 기존 회원과의 호환을 위해 NULL 을 허용한다 */
     @Column(name = "name", length = 50)
     private String name;
 
-    /** 숫자만 저장하는 전화번호이며, 전체 회원에서 고유하다. */
     @Column(name = "phone_number", length = 20, unique = true)
     private String phoneNumber;
+
     @Column(name = "point", nullable = false)
     private long point;
 
@@ -94,7 +95,7 @@ public class User {
     }
 
     /**
-     * 개인정보를 로그에 흘리지 않기 위해 식별자만 남긴다.
+     * 개인정보를 로그에 흘리지 않기 위해 식별자와 권한만 남긴다.
      *
      * 엔티티를 그대로 로그에 넘기는 코드는 언제든 생길 수 있고, 그때 기본
      * toString 이면 이름·전화번호·이메일이 파일로 남는다. 여기서 원천 차단한다.
@@ -109,16 +110,6 @@ public class User {
      */
     public void changePoint(long pointDelta) {
         this.point = Math.addExact(this.point, pointDelta);
-    }
-
-    /**
-     * 로그에 개인정보가 노출되지 않도록 식별자와 권한만 반환한다.
-     *
-     * @return 개인정보가 제외된 사용자 식별 문자열
-     */
-    @Override
-    public String toString() {
-        return "User(id=" + id + ", role=" + role + ")";
     }
 
     private static String normalizeName(String name) {

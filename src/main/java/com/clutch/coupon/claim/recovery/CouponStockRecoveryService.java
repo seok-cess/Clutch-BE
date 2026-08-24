@@ -3,6 +3,7 @@ package com.clutch.coupon.claim.recovery;
 import com.clutch.coupon.claim.domain.ClaimRequestStatus;
 import com.clutch.coupon.claim.exception.CouponClaimException;
 import com.clutch.coupon.claim.redis.CouponClaimRedisKeys;
+import com.clutch.coupon.claim.redis.CouponStockInitializer;
 import com.clutch.coupon.claim.repository.CouponClaimRequestRepository;
 import com.clutch.coupon.contract.issuance.CouponIssuanceRecoveryReader;
 import com.clutch.coupon.event.domain.CouponEventItem;
@@ -37,6 +38,7 @@ public class CouponStockRecoveryService {
     private final CouponClaimRequestRepository claimRequestRepository;
     private final CouponIssuanceRecoveryReader issuanceRecoveryReader;
     private final StringRedisTemplate stringRedisTemplate;
+    private final CouponStockInitializer couponStockInitializer;
 
     private final RedisScript<Long> recoveryScript;
 
@@ -47,6 +49,7 @@ public class CouponStockRecoveryService {
             CouponClaimRequestRepository claimRequestRepository,
             CouponIssuanceRecoveryReader issuanceRecoveryReader,
             StringRedisTemplate stringRedisTemplate,
+            CouponStockInitializer couponStockInitializer,
             @Qualifier("couponStockRecoveryScript")
             RedisScript<Long> recoveryScript
     ) {
@@ -56,6 +59,7 @@ public class CouponStockRecoveryService {
         this.claimRequestRepository = claimRequestRepository;
         this.issuanceRecoveryReader = issuanceRecoveryReader;
         this.stringRedisTemplate = stringRedisTemplate;
+        this.couponStockInitializer = couponStockInitializer;
         this.recoveryScript = recoveryScript;
     }
 
@@ -79,6 +83,12 @@ public class CouponStockRecoveryService {
                 RecoverySnapshot snapshot = createSnapshot(occurrence);
                 rebuildRedis(snapshot);
                 verifyRedis(snapshot);
+                couponStockInitializer.initialize(
+                        occurrence.getCouponEventId(),
+                        occurrence.getId(),
+                        occurrence.getOpenedAt(),
+                        occurrence.getExpiresAt()
+                );
                 recoveredItems += snapshot.items().size();
                 recoveredUsers += snapshot.userIds().size();
             }
@@ -125,8 +135,7 @@ public class CouponStockRecoveryService {
             long issuedCoupons = issuanceRecoveryReader
                     .countIssuedCoupons(item.getId());
 
-            if (item.getSuccessCount() != succeededRequests
-                    || succeededRequests != issuedCoupons
+            if (succeededRequests != issuedCoupons
                     || issuedCoupons > item.getQuantity()) {
                 throw new CouponClaimException(
                         COUPON_STOCK_INCONSISTENT

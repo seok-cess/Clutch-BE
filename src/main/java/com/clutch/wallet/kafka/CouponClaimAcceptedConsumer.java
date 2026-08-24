@@ -29,14 +29,27 @@ public class CouponClaimAcceptedConsumer {
      *
      * @param payload 직렬화된 쿠폰 발급 접수 이벤트
      */
-    @KafkaListener(topics = CouponKafkaTopics.CLAIM_ACCEPTED, groupId = "coupon-wallet-issuer")
+    @KafkaListener(
+            topics = CouponKafkaTopics.CLAIM_ACCEPTED,
+            groupId = "${coupon.claim.kafka.accepted-group:coupon-wallet-issuer}"
+    )
     public void onClaimAccepted(String payload){
         CouponClaimAcceptedEvent event = parse(payload);
         try{
             couponIssuanceService.issue(event);
         }catch(DataIntegrityViolationException e){
 
+        }catch(Exception e){
+            couponIssuanceService.recordIssueFailure(event.claimId(), resolveFailureReason(e));
         }
+    }
+
+    String resolveFailureReason(Exception e) {
+        String message = e.getMessage();
+        if(message == null || message.isBlank()){
+            return e.getClass().getSimpleName();
+        }
+        return message;
     }
 
     /**

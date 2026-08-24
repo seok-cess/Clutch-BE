@@ -1,7 +1,10 @@
 package com.clutch.coupon.claim.redis;
 
+import com.clutch.coupon.claim.outbox.CouponBenefitSnapshotRepository;
 import com.clutch.coupon.event.domain.CouponEventItem;
+import com.clutch.coupon.event.repository.CouponEventPhaseRepository;
 import com.clutch.coupon.event.repository.CouponEventItemRepository;
+import com.clutch.wallet.repository.UserCouponRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -9,6 +12,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.mockito.Mockito.verify;
@@ -24,10 +28,22 @@ class CouponStockInitializerTest {
     private CouponEventItemRepository couponEventItemRepository;
 
     @Mock
+    private CouponEventPhaseRepository couponEventPhaseRepository;
+
+    @Mock
+    private CouponBenefitSnapshotRepository benefitSnapshotRepository;
+
+    @Mock
+    private UserCouponRepository userCouponRepository;
+
+    @Mock
     private StringRedisTemplate stringRedisTemplate;
 
     @Mock
     private ValueOperations<String, String> valueOperations;
+
+    @Mock
+    private CouponClaimContextStore couponClaimContextStore;
 
     @Test
     void 없는_재고_키만_남은_수량으로_초기화한다() {
@@ -36,20 +52,31 @@ class CouponStockInitializerTest {
                 30L,
                 100
         );
-        item.increaseSuccessCount();
         setId(item, COUPON_EVENT_ITEM_ID);
 
         when(couponEventItemRepository.findAllByCouponEventId(
                 COUPON_EVENT_ID
         )).thenReturn(List.of(item));
+        when(userCouponRepository.countByCouponEventItemId(
+                COUPON_EVENT_ITEM_ID
+        )).thenReturn(1L);
         when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
 
         CouponStockInitializer initializer = new CouponStockInitializer(
                 couponEventItemRepository,
-                stringRedisTemplate
+                couponEventPhaseRepository,
+                benefitSnapshotRepository,
+                userCouponRepository,
+                stringRedisTemplate,
+                couponClaimContextStore
         );
 
-        initializer.initialize(COUPON_EVENT_ID);
+        initializer.initialize(
+                COUPON_EVENT_ID,
+                30L,
+                LocalDateTime.of(2026, 8, 24, 0, 0),
+                LocalDateTime.of(2026, 8, 24, 0, 1)
+        );
 
         verify(valueOperations).setIfAbsent(
                 CouponClaimRedisKeys.stock(COUPON_EVENT_ITEM_ID),

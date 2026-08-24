@@ -20,7 +20,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
-import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -90,11 +89,7 @@ public class BettingService {
         if (!event.isOpenAt(now())) {
             throw new BettingException(BettingErrorCode.EVENT_NOT_OPEN);
         }
-        if (!liveBettingDataProvider.isAcceptingBets(
-                event.getExternalMatchId(),
-                event.getExternalGameId(),
-                event.getSetNumber()
-        )) {
+        if (isLiveAvailabilityRequiredAndUnavailable(event)) {
             throw new BettingException(BettingErrorCode.LIVE_DATA_UNAVAILABLE);
         }
         if (!event.hasParticipant(selectedExternalTeamId)) {
@@ -167,8 +162,6 @@ public class BettingService {
                 event.getFirstExternalTeamId(),
                 event.getSecondExternalTeamId(),
                 event.getStatus(),
-                event.getClosesAt(),
-                remainingSeconds(event.getClosesAt(), now),
                 userBet == null && liveAvailable,
                 toSummary(userBet)
         );
@@ -217,7 +210,18 @@ public class BettingService {
     }
 
     private boolean isBettingAvailable(BettingEvent event, LocalDateTime now) {
-        return event.isOpenAt(now) && liveBettingDataProvider.isAcceptingBets(
+        return event.isOpenAt(now) && !isLiveAvailabilityRequiredAndUnavailable(event);
+    }
+
+    /**
+     * 첫 세트는 실제 livestats 첫 프레임을 동기화 서비스가 받는 순간 이벤트 자체를 닫는다.
+     * 시작 전에는 예정 경기 캐시가 잠깐 비어도 OPEN 이벤트가 배팅을 막으면 안 된다.
+     */
+    private boolean isLiveAvailabilityRequiredAndUnavailable(BettingEvent event) {
+        if (event.getSetNumber() == 1) {
+            return false;
+        }
+        return !liveBettingDataProvider.isAcceptingBets(
                 event.getExternalMatchId(),
                 event.getExternalGameId(),
                 event.getSetNumber()
@@ -246,20 +250,6 @@ public class BettingService {
      */
     private LocalDateTime now() {
         return LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC);
-    }
-
-    /**
-     * 미정 마감은 -1, 마감 이후는 0으로 표현해 남은 초를 계산한다.
-     *
-     * @param closesAt 배팅 마감 시각
-     * @param now 판단 기준 시각
-     * @return 마감까지 남은 초, 마감 미정이면 -1
-     */
-    private long remainingSeconds(LocalDateTime closesAt, LocalDateTime now) {
-        if (closesAt == null) {
-            return -1L;
-        }
-        return Math.max(0L, Duration.between(now, closesAt).toSeconds());
     }
 
     /**

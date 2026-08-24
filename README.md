@@ -17,6 +17,7 @@ Java 21과 Spring Boot 기반 프로젝트입니다. 팀원 모두가 같은 MyS
 | `mysql` | `mysql:8.4.7` | 애플리케이션 데이터베이스 | `3306` | 실행 |
 | `redis` | `redis:8.4.4-alpine` | 캐시 및 Spring Session 저장소 | `6379` | 실행 |
 | `kafka` | `apache/kafka:4.2.0` | 이벤트 메시지 브로커 | `9092` | 실행 |
+| `replay` | `node:22-alpine` | STUB 경기 fixture 재생 서버 | `4000` | 실행 |
 | `app` | 프로젝트 `Dockerfile`로 빌드 | Spring Boot 애플리케이션 | `8080` | `app` 프로필에서만 실행 |
 | `k6` | `grafana/k6:2.0.0` | 부하 및 스모크 테스트 | 없음 | 테스트할 때만 실행 |
 
@@ -67,7 +68,7 @@ Copy-Item src/main/resources/application.example.yaml src/main/resources/applica
 
 `application.yaml`은 개인 비밀번호나 로컬 설정을 담을 수 있어 Git에 커밋되지 않습니다. 공통 설정을 추가하거나 변경했다면 `application.example.yaml`도 함께 수정해야 합니다.
 
-### 3. MySQL, Redis, Kafka 실행
+### 3. MySQL, Redis, Kafka, replay 실행
 
 ```bash
 docker compose up -d --wait
@@ -84,12 +85,13 @@ docker compose up -d --wait
 docker compose ps
 ```
 
-다음 세 서비스가 모두 `healthy`여야 합니다.
+MySQL, Redis, Kafka는 모두 `healthy`이고, replay는 `running`이어야 합니다.
 
 ```text
 mysql    Up ... (healthy)
 redis    Up ... (healthy)
 kafka    Up ... (healthy)
+replay   Up
 ```
 
 정상적으로 올라오지 않은 서비스는 로그를 확인합니다.
@@ -111,16 +113,19 @@ docker compose logs -f
 Gradle로 실행하는 경우:
 
 ```bash
-./gradlew bootRun
+REPLAY_SERVER_URL=http://localhost:4000 ./gradlew bootRun
 ```
 
 Windows에서는 다음 명령을 사용합니다.
 
 ```powershell
+$env:REPLAY_SERVER_URL = 'http://localhost:4000'
 .\gradlew.bat bootRun
 ```
 
-IntelliJ에서는 `ClutchApplication`의 `main` 메서드를 실행해도 됩니다.
+IntelliJ에서는 `REPLAY_SERVER_URL=http://localhost:4000` 환경변수를 설정한 뒤
+`ClutchApplication`의 `main` 메서드를 실행합니다. 이 주소는 Docker replay 컨테이너를
+가리키며, 운영자 화면에서 STUB으로 전환했을 때만 사용됩니다.
 
 ### 6. 애플리케이션 상태 확인
 
@@ -232,7 +237,7 @@ docker compose run --rm `
 
 ### 부하 테스트 모니터링
 
-부하 테스트 지표는 별도 모니터링 컴퓨터에서 실행 중인 Prometheus와 Grafana를 사용합니다. 백엔드 서버가 `100.101.76.93`, 모니터링 서버가 `100.71.50.106`인 경우에는 다음 명령을 사용합니다.
+부하 테스트 지표는 별도 모니터링 컴퓨터에서 실행 중인 Prometheus와 Grafana를 사용합니다. 백엔드 서버가 `100.101.76.93`, 모니터링 서버가 `100.105.168.7`인 경우에는 다음 명령을 사용합니다.
 
 ```powershell
 $CouponVus = 20000
@@ -250,7 +255,7 @@ docker compose run --rm `
   -e CLAIM_REQUEST_TIMEOUT=10m `
   -e SCENARIO_MAX_DURATION=12m `
   -e VERIFY_INDIVIDUAL_PERSISTENCE=false `
-  -e K6_PROMETHEUS_RW_SERVER_URL=http://100.71.50.106:9090/api/v1/write `
+  -e K6_PROMETHEUS_RW_SERVER_URL=http://100.105.168.7:9090/api/v1/write `
   -e K6_PROMETHEUS_RW_PUSH_INTERVAL=10s `
   -e K6_PROMETHEUS_RW_TREND_STATS="p(50),p(95),p(99),p(99.9),avg,min,max" `
   k6 run `
@@ -261,7 +266,7 @@ docker compose run --rm `
   Tee-Object -FilePath ".\k6\logs\$TestId.log"
 ```
 
-이 경우 Grafana는 테스트 PC에서 `http://100.71.50.106:3000`으로 접속합니다. 모니터링 서버 방화벽에서는 테스트 PC가 사용하는 주소에만 3000번과 9090번 포트를 허용합니다.
+이 경우 Grafana는 테스트 PC에서 `http://100.105.168.7:3000`으로 접속합니다. 모니터링 서버 방화벽에서는 테스트 PC가 사용하는 주소에만 3000번과 9090번 포트를 허용합니다.
 
 테스트는 쿠폰 요청 성공 50건, 재고 소진 50건, 예상하지 않은 오류 0건을 합격 기준으로 사용합니다. `VERIFY_INDIVIDUAL_PERSISTENCE=true`가 기본값이며 성공한 사용자는 `내 쿠폰` API를 반복 조회하여 사용자 쿠폰이 실제 저장됐는지도 확인합니다. 대규모 신청 부하에서는 위 명령처럼 값을 `false`로 지정하여 개별 조회를 끄고, 신청이 끝난 뒤 `teardown`에서 최종 발급 수량을 한 번 확인합니다. 신청 요청 제한 시간은 기본 10분이고 전체 시나리오 제한 시간은 기본 12분입니다. 같은 날 다시 실행해도 수동 테스트 트리거에는 새로운 순번이 자동으로 부여되지만, 이벤트와 발급 데이터는 데이터베이스에 계속 남습니다.
 
@@ -273,6 +278,7 @@ docker compose run --rm `
 | MySQL root | `localhost:3306` | `root` | `clutch_root_local_password` |
 | Redis | `localhost:6379` | 없음 | `clutch_local_password` |
 | Kafka | `localhost:9092` | 없음 | 없음 |
+| replay STUB | `http://localhost:4000` | - | - |
 | Spring Boot | `http://localhost:8080` | - | - |
 
 위 계정과 비밀번호는 로컬 개발 전용입니다. 운영 환경에서 사용하면 안 됩니다.

@@ -2,6 +2,8 @@ package com.clutch.coupon.claim.service;
 
 import com.clutch.coupon.claim.exception.CouponClaimException;
 import com.clutch.coupon.claim.redis.CouponClaimRedisKeys;
+import com.clutch.coupon.claim.redis.CouponClaimContext;
+import com.clutch.coupon.claim.redis.CouponClaimContextStore;
 import com.clutch.coupon.claim.recovery.CouponStockRecoveryStateManager;
 import com.clutch.lolesports.service.PollingScheduler;
 import org.junit.jupiter.api.AfterEach;
@@ -16,6 +18,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -58,6 +61,9 @@ class CouponClaimConcurrencyIntegrationTest {
     @Autowired
     private CouponClaimService couponClaimService;
 
+    @Autowired
+    private CouponSuccessCountSynchronizer successCountSynchronizer;
+
     /**
      * SQL 실행기
      */
@@ -69,6 +75,9 @@ class CouponClaimConcurrencyIntegrationTest {
      */
     @Autowired
     private StringRedisTemplate stringRedisTemplate;
+
+    @Autowired
+    private CouponClaimContextStore couponClaimContextStore;
 
     @Autowired
     private CouponStockRecoveryStateManager recoveryStateManager;
@@ -187,6 +196,21 @@ class CouponClaimConcurrencyIntegrationTest {
                 0
         );
 
+        couponClaimContextStore.save(new CouponClaimContext(
+                COUPON_EVENT_ID,
+                COUPON_EVENT_OCCURRENCE_ID,
+                currentTime.minusMinutes(1).toInstant(ZoneOffset.UTC)
+                        .toEpochMilli(),
+                currentTime.plusMinutes(10).toInstant(ZoneOffset.UTC)
+                        .toEpochMilli(),
+                List.of(new CouponClaimContext.CouponClaimContextPhase(
+                        0,
+                        COUPON_EVENT_ITEM_ID,
+                        "RATE",
+                        new BigDecimal("10.00")
+                ))
+        ));
+
         stringRedisTemplate.opsForValue().set(
                 CouponClaimRedisKeys.stock(COUPON_EVENT_ITEM_ID),
                 String.valueOf(STOCK_QUANTITY)
@@ -232,6 +256,8 @@ class CouponClaimConcurrencyIntegrationTest {
                 Integer.class,
                 COUPON_EVENT_ITEM_ID
         );
+
+        successCountSynchronizer.synchronize();
 
         Integer successCount = jdbcTemplate.queryForObject(
                 """
@@ -385,6 +411,8 @@ class CouponClaimConcurrencyIntegrationTest {
                 Integer.class,
                 COUPON_EVENT_OCCURRENCE_ID
         );
+
+        successCountSynchronizer.synchronize();
 
         Integer successCount = jdbcTemplate.queryForObject(
                 """
@@ -568,6 +596,9 @@ class CouponClaimConcurrencyIntegrationTest {
                                 COUPON_EVENT_ITEM_ID
                         ),
                         CouponClaimRedisKeys.claimedUsers(
+                                COUPON_EVENT_OCCURRENCE_ID
+                        ),
+                        CouponClaimRedisKeys.context(
                                 COUPON_EVENT_OCCURRENCE_ID
                         )
                 )

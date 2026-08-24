@@ -1,5 +1,6 @@
 package com.clutch.lolesports.config;
 
+import com.clutch.lolesports.source.ExternalSourceProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.codec.ClientCodecConfigurer;
@@ -16,8 +17,11 @@ import org.springframework.web.reactive.function.client.WebClient;
 @Configuration
 public class WebClientConfig {
 
-    /** getSchedule 등 응답이 커서 기본 256KB 버퍼로는 부족할 수 있음 */
-    private static final int MAX_IN_MEMORY_SIZE = 4 * 1024 * 1024;
+    /**
+     * getSchedule 및 live-stats details 응답은 수 MB가 될 수 있다.
+     * 리플레이가 여러 프레임을 한 번에 반환하는 경우도 수용한다.
+     */
+    private static final int MAX_IN_MEMORY_SIZE = 32 * 1024 * 1024;
 
     private ExchangeStrategies strategies() {
         return ExchangeStrategies.builder()
@@ -25,9 +29,9 @@ public class WebClientConfig {
                 .build();
     }
 
-    /** esports-api.lolesports.com/persisted/gw — x-api-key 필요 */
+    /** 실제 esports-api.lolesports.com/persisted/gw — x-api-key 필요 */
     @Bean
-    public WebClient esportsWebClient(LolesportsProperties props) {
+    public WebClient realEsportsWebClient(LolesportsProperties props) {
         return WebClient.builder()
                 .baseUrl(props.esportsApiBaseUrl())
                 .defaultHeader("x-api-key", props.apiKey())
@@ -35,11 +39,29 @@ public class WebClientConfig {
                 .build();
     }
 
-    /** feed.lolesports.com/livestats/v1 — api key 불필요 */
+    /** replay 스텁의 persisted API 호환 엔드포인트. */
     @Bean
-    public WebClient liveStatsWebClient(LolesportsProperties props) {
+    public WebClient stubEsportsWebClient(ExternalSourceProperties props) {
+        return WebClient.builder()
+                .baseUrl(props.stubEsportsApiBaseUrl())
+                .exchangeStrategies(strategies())
+                .build();
+    }
+
+    /** 실제 feed.lolesports.com/livestats/v1 — api key 불필요 */
+    @Bean
+    public WebClient realLiveStatsWebClient(LolesportsProperties props) {
         return WebClient.builder()
                 .baseUrl(props.liveStatsBaseUrl())
+                .exchangeStrategies(strategies())
+                .build();
+    }
+
+    /** replay 스텁의 livestats API 호환 엔드포인트. */
+    @Bean
+    public WebClient stubLiveStatsWebClient(ExternalSourceProperties props) {
+        return WebClient.builder()
+                .baseUrl(props.stubLiveStatsBaseUrl())
                 .exchangeStrategies(strategies())
                 .build();
     }

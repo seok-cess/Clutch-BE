@@ -4,6 +4,7 @@ import com.clutch.coupon.claim.domain.ClaimRequestStatus;
 import com.clutch.coupon.claim.exception.CouponClaimErrorCode;
 import com.clutch.coupon.claim.exception.CouponClaimException;
 import com.clutch.coupon.claim.redis.CouponClaimRedisKeys;
+import com.clutch.coupon.claim.redis.CouponStockInitializer;
 import com.clutch.coupon.claim.repository.CouponClaimRequestRepository;
 import com.clutch.coupon.contract.issuance.CouponIssuanceRecoveryReader;
 import com.clutch.coupon.event.domain.CouponEventItem;
@@ -59,6 +60,9 @@ class CouponStockRecoveryServiceTest {
     private RedisScript<Long> recoveryScript;
 
     @Mock
+    private CouponStockInitializer couponStockInitializer;
+
+    @Mock
     private ValueOperations<String, String> valueOperations;
 
     @Mock
@@ -77,13 +81,14 @@ class CouponStockRecoveryServiceTest {
                 claimRequestRepository,
                 issuanceRecoveryReader,
                 stringRedisTemplate,
+                couponStockInitializer,
                 recoveryScript
         );
     }
 
     @Test
     void rebuildsStockAndClaimedUsersFromMysql() {
-        givenOpenOccurrenceAndItem(10, 3);
+        givenOpenOccurrenceAndItem(10);
         when(claimRequestRepository
                 .countByCouponEventItemIdAndRequestStatus(
                         ITEM_ID,
@@ -129,7 +134,7 @@ class CouponStockRecoveryServiceTest {
 
     @Test
     void stopsRecoveryWhenMysqlCountsDoNotMatch() {
-        givenOpenOccurrenceAndItem(10, 3);
+        givenOpenOccurrenceAndItem(10);
         when(claimRequestRepository
                 .countByCouponEventItemIdAndRequestStatus(
                         ITEM_ID,
@@ -153,10 +158,7 @@ class CouponStockRecoveryServiceTest {
                 .isEqualTo(CouponStockRecoveryState.FAILED);
     }
 
-    private void givenOpenOccurrenceAndItem(
-            int quantity,
-            int successCount
-    ) {
+    private void givenOpenOccurrenceAndItem(int quantity) {
         CouponEventOccurrence occurrence =
                 mock(CouponEventOccurrence.class);
         lenient().when(occurrence.getId()).thenReturn(OCCURRENCE_ID);
@@ -168,7 +170,6 @@ class CouponStockRecoveryServiceTest {
         CouponEventItem item = mock(CouponEventItem.class);
         when(item.getId()).thenReturn(ITEM_ID);
         lenient().when(item.getQuantity()).thenReturn(quantity);
-        when(item.getSuccessCount()).thenReturn(successCount);
         when(itemRepository.findAllByCouponEventId(EVENT_ID))
                 .thenReturn(List.of(item));
     }
