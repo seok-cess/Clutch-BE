@@ -95,6 +95,17 @@ public class User {
     }
 
     /**
+     * 개인정보를 로그에 흘리지 않기 위해 식별자와 권한만 남긴다.
+     *
+     * 엔티티를 그대로 로그에 넘기는 코드는 언제든 생길 수 있고, 그때 기본
+     * toString 이면 이름·전화번호·이메일이 파일로 남는다. 여기서 원천 차단한다.
+     */
+    @Override
+    public String toString() {
+        return "User(id=" + id + ", role=" + role + ")";
+    }
+
+    /**
      * 증감값을 사용자 포인트에 반영한다. 양수는 지급, 음수는 차감, 0은 변경 없음이다.
      */
     public void changePoint(long pointDelta) {
