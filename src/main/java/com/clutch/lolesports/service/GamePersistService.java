@@ -151,6 +151,31 @@ public class GamePersistService {
     }
 
     /**
+     * 라이브 목록에서 사라진 뒤 결과 재조회로 확정된 세트 승자를 DB에 반영한다.
+     *
+     * <p>승자 판정 자체는 {@link SetWinnerTracker}가 공식 {@code gameWins} 증가분으로
+     * 수행한다. 이 메서드는 이미 적재된 게임 행에 그 확정 결과를 영속화하는 역할만 한다.</p>
+     *
+     * @param externalMatchId 결과를 재조회한 매치의 외부 ID
+     */
+    @Transactional
+    public void persistTrackedWinners(String externalMatchId) {
+        matchRepo.findByExternalMatchId(externalMatchId).ifPresent(match -> {
+            Map<String, MatchTeam> teamsByExternalId = matchTeamRepo
+                    .findByMatchIdOrderByDisplayOrderAsc(match.getId())
+                    .stream()
+                    .filter(team -> team.getExternalTeamId() != null)
+                    .collect(java.util.stream.Collectors.toMap(
+                            MatchTeam::getExternalTeamId,
+                            team -> team
+                    ));
+            for (EsportsGame game : gameRepo.findByMatchIdOrderByGameNumberAsc(match.getId())) {
+                applyWinner(game, externalMatchId, teamsByExternalId);
+            }
+        });
+    }
+
+    /**
      * 세트 통계 적재 후 늦게 확정된 승자를 기존 esports_game 행에 반영한다.
      *
      * <p>livestats 종료 직후에는 gameWins가 아직 오르지 않아 승자 없이 적재될 수 있다.
@@ -362,7 +387,9 @@ public class GamePersistService {
      * (그래프 마커·용 툴팁이 이 값을 쓴다).
      */
     private String buildObjectivesJson(String gameId, Instant start) {
-        List<WindowResponse.Frame> frames = cache.getWindowSeries(gameId, Instant.now(), 1);
+        // persistGame은 finished 프레임을 받은 뒤 호출되므로 캐시에 받은 전 구간을 사용한다.
+        // 그래야 replay 고배속에서 실제 시각보다 뒤에 있는 프레임의 오브젝트도 빠지지 않는다.
+        List<WindowResponse.Frame> frames = cache.getWindowSeries(gameId, Instant.MAX, 1);
         List<Map<String, Object>> out = new ArrayList<>();
         WindowResponse.Frame prev = null;
 
@@ -496,8 +523,10 @@ public class GamePersistService {
         if (start == null) {
             return null;
         }
+        // 종료 프레임을 이미 받은 뒤에 적재한다. 리플레이 고배속에서는 프레임 시각이 실제 벽시계보다
+        // 앞서 있을 수 있으므로 Instant.now()로 자르면 마지막 구간이 DB에서 빠진다.
         List<WindowResponse.Frame> frames =
-                cache.getWindowSeries(externalGameId, Instant.now(), TIMELINE_STEP_SECONDS);
+                cache.getWindowSeries(externalGameId, Instant.MAX, TIMELINE_STEP_SECONDS);
 
         List<GameTimelinePoint> points = new ArrayList<>();
         Integer from = null;

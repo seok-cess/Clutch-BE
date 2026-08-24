@@ -1,6 +1,10 @@
 spring:
   application:
     name: clutch
+  profiles:
+    # 모든 환경은 실제 LoL Esports API(REAL)로 시작한다.
+    # 운영자 화면에서 STUB으로 전환한 경우에만 replay 서버를 사용한다.
+    default: operator-routing
   datasource:
     url: ${DB_URL:jdbc:mysql://localhost:3306/clutch?serverTimezone=UTC&characterEncoding=UTF-8}
     username: ${DB_USERNAME:clutch}
@@ -65,6 +69,9 @@ watch:
 
 # ---- 쿠폰 이벤트 회차 만료 처리 ----
 coupon:
+  claim:
+    kafka:
+      accepted-group: ${COUPON_CLAIM_ACCEPTED_GROUP:coupon-wallet-issuer}
   stock-recovery:
     interval-ms: ${COUPON_STOCK_RECOVERY_INTERVAL_MS:2000}
   test:
@@ -74,9 +81,13 @@ coupon:
 # ---- 세트별 승패 배팅 ----
 betting:
   first-set-open-before-start: ${BETTING_FIRST_SET_OPEN_BEFORE_START:20m}
+  # 모든 세트의 실제 시작 후 배팅 유예 시간 (키 이름은 기존 호환성 유지)
   first-set-close-after-start: ${BETTING_FIRST_SET_CLOSE_AFTER_START:1m}
+  # 다음 세트의 실제 시작 시각을 아직 받지 못했을 때만 쓰는 안전 마감 시간
   next-set-betting-duration: ${BETTING_NEXT_SET_BETTING_DURATION:20m}
   synchronization-interval: ${BETTING_SYNCHRONIZATION_INTERVAL:1s}
+  # 라이브 목록에서 사라진 종료 세트의 공식 gameWins 결과 재조회 주기
+  result-reconciliation-interval: ${BETTING_RESULT_RECONCILIATION_INTERVAL:1m}
 
 # ---- lolesports 비공식 피드 연동 ----
 lolesports:

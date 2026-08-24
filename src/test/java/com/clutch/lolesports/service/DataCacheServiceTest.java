@@ -83,6 +83,20 @@ class DataCacheServiceTest {
     }
 
     @Test
+    void replay_프레임은_변환된_벽시계_기준으로_전진한다() {
+        DataCacheService cache = new DataCacheService();
+        List<WindowResponse.Frame> batch = java.util.stream.IntStream.range(0, 10)
+                .mapToObj(i -> frame(i * 1000L, 100 + i * 10L))
+                .toList();
+
+        cache.addWindowFrames(GAME, null, batch);
+
+        assertEquals(100L, cache.getReplayWindowFrame(GAME, T0).blueTeam().totalGold());
+        assertEquals(130L, cache.getReplayWindowFrame(GAME, T0.plusSeconds(3)).blueTeam().totalGold());
+        assertEquals(190L, cache.getReplayWindowFrame(GAME, T0.plusSeconds(15)).blueTeam().totalGold());
+    }
+
+    @Test
     void 실제_인게임과_일시정지_프레임에서만_세트_진행으로_판정한다() {
         DataCacheService cache = new DataCacheService();
 

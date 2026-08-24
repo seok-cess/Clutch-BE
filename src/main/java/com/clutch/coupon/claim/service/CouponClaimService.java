@@ -159,18 +159,6 @@ public class CouponClaimService {
         CouponClaimRequest savedClaimRequest =
                 couponClaimRequestRepository.save(claimRequest);
 
-        int updatedRows =
-                couponEventItemRepository
-                        .increaseSuccessCountAtomically(
-                                couponEventItem.getId()
-                        );
-
-        if (updatedRows != 1) {
-            throw new CouponClaimException(
-                    COUPON_STOCK_EXHAUSTED
-            );
-        }
-
         Instant issuedAt = Instant.now();
 
         CouponIssuanceResult issuanceResult =
@@ -189,6 +177,18 @@ public class CouponClaimService {
                                 )
                         )
                 );
+
+        int updatedRows =
+                couponEventItemRepository
+                        .increaseSuccessCountAtomically(
+                                couponEventItem.getId()
+                        );
+
+        if (updatedRows != 1) {
+            throw new CouponClaimException(
+                    COUPON_STOCK_EXHAUSTED
+            );
+        }
 
         savedClaimRequest.succeed(
                 LocalDateTime.ofInstant(

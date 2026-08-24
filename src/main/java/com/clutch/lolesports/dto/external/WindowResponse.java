@@ -46,8 +46,20 @@ public record WindowResponse(
             String rfc460Timestamp,  // 프레임 중복 처리 기준값
             String gameState,        // in_game | paused | finished 추정
             TeamFrame blueTeam,
-            TeamFrame redTeam
+            TeamFrame redTeam,
+            // 실제 livestats에는 없고 replay 스텁이만 제공하는, 게임 시작 기준 경과 초
+            Long gameTimeSeconds
     ) {
+
+        /** 실제 livestats 응답과 기존 테스트가 쓰는 4개 필드 생성자. */
+        public Frame(
+                String rfc460Timestamp,
+                String gameState,
+                TeamFrame blueTeam,
+                TeamFrame redTeam
+        ) {
+            this(rfc460Timestamp, gameState, blueTeam, redTeam, null);
+        }
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)

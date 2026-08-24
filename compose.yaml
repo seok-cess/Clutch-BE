@@ -124,6 +124,9 @@ services:
     restart: unless-stopped
     environment:
       TZ: UTC
+      # 컨테이너 배포는 REAL로 시작하고 운영자 API를 통해서만 STUB으로 전환한다.
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-operator-routing}
+      REPLAY_SERVER_URL: http://replay:4000
       DB_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-clutch}?serverTimezone=UTC&characterEncoding=UTF-8
       DB_USERNAME: ${MYSQL_USER:-clutch}
       DB_PASSWORD: ${MYSQL_PASSWORD:-clutch_local_password}
@@ -151,6 +154,22 @@ services:
       timeout: 5s
       retries: 10
       start_period: 30s
+
+  replay:
+    image: node:22-alpine
+    restart: unless-stopped
+    working_dir: /workspace/replay
+    command:
+      - node
+      - replay-server.js
+      - --dir
+      - "${REPLAY_FIXTURE_DIR:-fixtures/sample-match-bo3-001}"
+      - --speed
+      - "${REPLAY_SPEED:-1}"
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./replay:/workspace/replay:ro
 
   k6:
     profiles: [load-test]

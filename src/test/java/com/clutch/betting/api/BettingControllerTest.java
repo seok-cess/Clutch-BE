@@ -44,8 +44,6 @@ class BettingControllerTest {
                 "team-a",
                 "team-b",
                 BettingEventStatus.OPEN,
-                LocalDateTime.of(2026, 8, 14, 10, 2),
-                60L,
                 true,
                 null
         ));
@@ -54,7 +52,9 @@ class BettingControllerTest {
                         .header("X-User-Id", "10"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.bettingEventId").value(1))
-                .andExpect(jsonPath("$.bettingAvailable").value(true));
+                .andExpect(jsonPath("$.bettingAvailable").value(true))
+                .andExpect(jsonPath("$.closesAt").doesNotExist())
+                .andExpect(jsonPath("$.remainingSeconds").doesNotExist());
     }
 
     @Test

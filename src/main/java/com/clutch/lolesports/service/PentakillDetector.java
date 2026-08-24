@@ -58,4 +58,9 @@ public class PentakillDetector {
     public void clearGame(String gameId) {
         lastKillsByGame.remove(gameId);
     }
+
+    /** 외부 데이터 소스 전환 시 이전 소스의 프레임 비교 상태를 비운다. */
+    public void clearAll() {
+        lastKillsByGame.clear();
+    }
 }

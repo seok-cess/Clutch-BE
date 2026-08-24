@@ -3,8 +3,6 @@ package com.clutch.betting.dto;
 import com.clutch.betting.domain.BettingEventStatus;
 import com.clutch.betting.domain.UserBetStatus;
 
-import java.time.LocalDateTime;
-
 /**
  * 현재 배팅 이벤트와 사용자 참여 여부를 API 계층에 전달하는 조회 모델이다.
  *
@@ -15,8 +13,6 @@ import java.time.LocalDateTime;
  * @param firstExternalTeamId 첫 번째 참가 팀 ID
  * @param secondExternalTeamId 두 번째 참가 팀 ID
  * @param status 배팅 이벤트 상태
- * @param closesAt 배팅 마감 시각
- * @param remainingSeconds 마감까지 남은 초
  * @param bettingAvailable 현재 사용자의 배팅 가능 여부
  * @param myBet 현재 사용자의 배팅 요약
  */
@@ -28,8 +24,6 @@ public record BettingEventView(
         String firstExternalTeamId,
         String secondExternalTeamId,
         BettingEventStatus status,
-        LocalDateTime closesAt,
-        long remainingSeconds,
         boolean bettingAvailable,
         UserBetSummary myBet
 ) {

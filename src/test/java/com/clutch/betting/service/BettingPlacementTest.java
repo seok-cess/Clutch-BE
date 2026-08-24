@@ -49,7 +49,7 @@ class BettingPlacementTest {
     void placesBetAndStoresStakeTransaction() {
         BettingEvent event = openEvent();
         given(eventRepository.findByIdForUpdate(10L)).willReturn(Optional.of(event));
-        given(liveBettingDataProvider.isAcceptingBets("match-1", "game-1", 1)).willReturn(true);
+        given(liveBettingDataProvider.isAcceptingBets("match-1", "game-1", 1)).willReturn(false);
         given(userRepository.decreasePointIfEnough(20L, 1_000L)).willReturn(1);
         given(userBetRepository.saveAndFlush(any(UserBet.class))).willAnswer(invocation -> {
             UserBet bet = invocation.getArgument(0);
@@ -99,10 +99,10 @@ class BettingPlacementTest {
     }
 
     @Test
-    void rejectsBetWhenLiveCacheIsUnavailable() {
-        BettingEvent event = openEvent();
+    void rejectsLaterSetBetWhenLiveCacheIsUnavailable() {
+        BettingEvent event = openEvent(2);
         given(eventRepository.findByIdForUpdate(10L)).willReturn(Optional.of(event));
-        given(liveBettingDataProvider.isAcceptingBets("match-1", "game-1", 1)).willReturn(false);
+        given(liveBettingDataProvider.isAcceptingBets("match-1", "game-2", 2)).willReturn(false);
 
         assertBettingError(
                 () -> service.place(20L, 10L, "team-a", 1_000L),
@@ -125,15 +125,19 @@ class BettingPlacementTest {
     }
 
     private BettingEvent openEvent() {
+        return openEvent(1);
+    }
+
+    private BettingEvent openEvent(int setNumber) {
         BettingEvent event = BettingEvent.open(
                 "match-1",
-                1,
+                setNumber,
                 "team-a",
                 "team-b",
                 LocalDateTime.of(2026, 8, 14, 10, 0),
                 LocalDateTime.of(2026, 8, 14, 10, 2)
         );
-        event.attachGame("game-1");
+        event.attachGame("game-" + setNumber);
         return event;
     }
 
