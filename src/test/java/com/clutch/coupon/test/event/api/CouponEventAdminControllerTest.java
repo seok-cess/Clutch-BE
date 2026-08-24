@@ -5,6 +5,7 @@ import com.clutch.coupon.test.event.api.dto.CouponEventActivationResponse;
 import com.clutch.coupon.test.event.exception.CouponEventErrorCode;
 import com.clutch.coupon.test.event.exception.CouponEventException;
 import com.clutch.coupon.test.event.service.CouponEventActivationService;
+import com.clutch.coupon.test.event.service.CouponEventTestCleanupService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -27,6 +28,9 @@ class CouponEventAdminControllerTest {
 
     @MockitoBean
     private CouponEventActivationService activationService;
+
+    @MockitoBean
+    private CouponEventTestCleanupService cleanupService;
 
     @Test
     void 관리자_수동_오픈은_201을_응답한다() throws Exception {

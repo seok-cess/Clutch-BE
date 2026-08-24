@@ -524,8 +524,14 @@ public class PollingScheduler {
                     cache.addWindowFrames(gameId, window.gameMetadata(), window.frames());
             clearStatsUnavailable(gameId);
             resolveGameStart(gameId);
+            // 감지기는 어느 경기의 세트인지 알아야 그 경기에 걸린 쿠폰 이벤트만 연다
+            DataCacheService.LiveMatch owner = lastKnownMatches.get(gameId);
+            String externalMatchId = owner != null ? owner.matchId() : null;
+            Instant gameStart = cache.getGameStart(gameId);
             for (WindowResponse.Frame frame : added) {
-                pentakillDetector.onNewWindowFrame(gameId, frame);
+                pentakillDetector.onNewWindowFrame(
+                        externalMatchId, gameId, frame, gameStart
+                );
             }
             return true;
         } catch (WebClientResponseException.NotFound e) {
