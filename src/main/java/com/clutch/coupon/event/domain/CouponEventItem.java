@@ -134,4 +134,21 @@ public class CouponEventItem {
 
         successCount++;
     }
+
+    /**
+     * 실제 발급 쿠폰 수로 성공 집계를 맞춘다.
+     *
+     * <p>발급 요청 경로에서 공통 행을 갱신하지 않기 위해, 집계 작업만 이 값을
+     * 변경한다.</p>
+     *
+     * @param issuedCouponCount 실제 발급된 사용자 쿠폰 수
+     */
+    public void synchronizeSuccessCount(int issuedCouponCount) {
+        if (issuedCouponCount < 0 || issuedCouponCount > quantity) {
+            throw new IllegalArgumentException(
+                    "쿠폰 발급 성공 수량 범위 오류"
+            );
+        }
+        this.successCount = issuedCouponCount;
+    }
 }

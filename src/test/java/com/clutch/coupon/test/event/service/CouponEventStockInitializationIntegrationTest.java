@@ -186,7 +186,7 @@ class CouponEventStockInitializationIntegrationTest {
                 COUPON_EVENT_ITEM_ID
         );
 
-        assertThat(successCount).isEqualTo(1);
+        assertThat(successCount).isZero();
     }
 
     private void cleanUpTestData() {

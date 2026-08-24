@@ -10,7 +10,6 @@ import com.clutch.coupon.claim.repository.CouponClaimRequestRepository;
 import com.clutch.coupon.event.domain.CouponEvent;
 import com.clutch.coupon.event.domain.CouponEventItem;
 import com.clutch.coupon.event.domain.CouponEventOccurrence;
-import com.clutch.coupon.event.repository.CouponEventItemRepository;
 import com.clutch.coupon.event.repository.CouponEventOccurrenceRepository;
 import com.clutch.coupon.event.repository.CouponEventRepository;
 import com.clutch.coupon.claim.redis.CouponClaimRedisExecutor;
@@ -24,12 +23,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
-import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.dao.DataIntegrityViolationException;
 import java.math.BigDecimal;
 
 import java.time.LocalDateTime;
@@ -39,8 +38,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -69,9 +68,6 @@ class CouponClaimServiceTest {
 
     @Mock
     private CouponEventOccurrenceRepository couponEventOccurrenceRepository;
-
-    @Mock
-    private CouponEventItemRepository couponEventItemRepository;
 
     @Mock
     private CouponClaimRequestRepository couponClaimRequestRepository;
@@ -138,12 +134,6 @@ class CouponClaimServiceTest {
         ))
                 .thenReturn(CouponClaimRedisResult.SUCCESS);
 
-        when(couponEventItemRepository
-                .increaseSuccessCountAtomically(
-                        COUPON_EVENT_ITEM_ID
-                ))
-                .thenReturn(1);
-
         when(couponClaimRequestRepository
                 .save(any(CouponClaimRequest.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -201,23 +191,6 @@ class CouponClaimServiceTest {
                 COUPON_EVENT_OCCURRENCE_ID,
                 USER_ID
         );
-
-        verify(couponEventItemRepository)
-                .increaseSuccessCountAtomically(
-                        COUPON_EVENT_ITEM_ID
-                );
-
-        InOrder issuanceBeforeCountUpdate = inOrder(
-                couponIssuer,
-                couponEventItemRepository
-        );
-        issuanceBeforeCountUpdate.verify(couponIssuer).issue(
-                any(CouponIssuanceCommand.class)
-        );
-        issuanceBeforeCountUpdate.verify(couponEventItemRepository)
-                .increaseSuccessCountAtomically(
-                        COUPON_EVENT_ITEM_ID
-                );
 
         verify(couponStockStreamService).publish(
                 COUPON_EVENT_ITEM_ID
@@ -437,10 +410,6 @@ class CouponClaimServiceTest {
         verify(couponClaimRequestRepository, never())
                 .save(any(CouponClaimRequest.class));
 
-        verify(couponEventItemRepository, never())
-                .increaseSuccessCountAtomically(
-                        COUPON_EVENT_ITEM_ID
-                );
     }
 
     /** Redis 연결 장애 발급 차단 검증 */
@@ -578,9 +547,6 @@ class CouponClaimServiceTest {
                 COUPON_EVENT_OCCURRENCE_ID,
                 USER_ID
         )).thenReturn(CouponClaimRedisResult.SUCCESS);
-        when(couponEventItemRepository
-                .increaseSuccessCountAtomically(COUPON_EVENT_ITEM_ID))
-                .thenReturn(1);
         when(couponClaimRequestRepository
                 .save(any(CouponClaimRequest.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -619,11 +585,9 @@ class CouponClaimServiceTest {
     void databaseRollbackCompensatesRedisClaim() {
         // given
         givenSuccessfulClaim();
-        when(couponEventItemRepository
-                .increaseSuccessCountAtomically(
-                        COUPON_EVENT_ITEM_ID
-                ))
-                .thenReturn(0);
+        reset(couponIssuer);
+        when(couponIssuer.issue(any(CouponIssuanceCommand.class)))
+                .thenThrow(new DataIntegrityViolationException("DB failure"));
 
         TransactionSynchronizationManager
                 .initSynchronization();
@@ -636,7 +600,7 @@ class CouponClaimServiceTest {
                             COUPON_EVENT_ID,
                             COUPON_EVENT_OCCURRENCE_ID
                     ))
-                    .isInstanceOf(CouponClaimException.class);
+                    .isInstanceOf(DataIntegrityViolationException.class);
 
             assertThat(
                     TransactionSynchronizationManager
