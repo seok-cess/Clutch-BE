@@ -38,14 +38,6 @@ public class User {
     @Column(name = "email", nullable = false, unique = true)
     private String email;
 
-    /** 회원 이름. 기존 회원과의 호환을 위해 NULL 을 허용한다 */
-    @Column(name = "name", length = 50)
-    private String name;
-
-    /** 숫자만 남긴 전화번호(예: 01012345678). 전 회원에 걸쳐 고유하다 */
-    @Column(name = "phone_number", length = 20, unique = true)
-    private String phoneNumber;
-
     @Column(name = "point", nullable = false)
     private long point;
 
@@ -68,17 +60,6 @@ public class User {
 
     public static User create(UserRole role, String email) {
         return new User(role, email);
-    }
-
-    /**
-     * 개인정보를 로그에 흘리지 않기 위해 식별자만 남긴다.
-     *
-     * 엔티티를 그대로 로그에 넘기는 코드는 언제든 생길 수 있고, 그때 기본
-     * toString 이면 이름·전화번호·이메일이 파일로 남는다. 여기서 원천 차단한다.
-     */
-    @Override
-    public String toString() {
-        return "User(id=" + id + ", role=" + role + ")";
     }
 
     /**

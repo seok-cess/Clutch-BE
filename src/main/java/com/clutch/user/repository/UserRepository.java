@@ -2,8 +2,6 @@ package com.clutch.user.repository;
 
 import com.clutch.user.domain.User;
 import jakarta.persistence.LockModeType;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
@@ -64,21 +62,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
             @Param("userId") Long userId,
             @Param("amount") long amount
     );
-
-    /**
-     * 관리자 목록 조회 — ID 커서 기준 오름차순.
-     *
-     * 회원이 100만 건 규모라 offset 페이징은 뒷장으로 갈수록 앞 행을 모두 세느라
-     * 느려진다. 마지막으로 본 ID 부터 이어 읽어 페이지 위치와 무관하게 일정하다.
-     *
-     * @param cursor 이전 페이지의 마지막 회원 ID, 첫 조회면 null
-     */
-    @Query("""
-            select user from User user
-            where (:cursor is null or user.id > :cursor)
-            order by user.id asc
-            """)
-    Slice<User> findSliceForAdmin(@Param("cursor") Long cursor, Pageable pageable);
 
     /**
      * 영속성 컨텍스트의 오래된 엔티티 대신 최신 포인트 값만 조회한다.
