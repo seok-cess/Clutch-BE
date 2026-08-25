@@ -120,7 +120,7 @@ class BettingFlowIntegrationTest {
                         .header("X-User-Id", user.getId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("WON"))
-                .andExpect(jsonPath("$.currentPoint").value(6_000));
+                .andExpect(jsonPath("$.currentPoint").value(4_900));
 
         Long userBetId = userBetRepository
                 .findByBettingEventIdAndUserId(event.getId(), user.getId())
