@@ -1,5 +1,6 @@
 package com.clutch.betting.dto;
 
+import com.clutch.betting.domain.UserBet;
 import com.clutch.betting.domain.UserBetStatus;
 
 /**
@@ -22,4 +23,17 @@ public record BetPlacementResult(
         UserBetStatus status,
         long remainingPoint
 ) {
+
+    /** 등록된 사용자 배팅과 포인트 차감 후 잔액을 서비스 결과로 묶는다. */
+    public static BetPlacementResult from(UserBet userBet, long remainingPoint) {
+        return new BetPlacementResult(
+                userBet.getId(),
+                userBet.getUserId(),
+                userBet.getBettingEventId(),
+                userBet.getSelectedExternalTeamId(),
+                userBet.getAmount(),
+                userBet.getStatus(),
+                remainingPoint
+        );
+    }
 }

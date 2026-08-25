@@ -1,12 +1,12 @@
 package com.clutch.betting.api;
 
-import com.clutch.betting.dto.request.BetCreateRequest;
-import com.clutch.betting.dto.response.BetCreateResponse;
-import com.clutch.betting.dto.response.BettingCandidateResponse;
-import com.clutch.betting.dto.response.BettingEventResponse;
-import com.clutch.betting.dto.response.MyBetResponse;
-import com.clutch.betting.dto.response.UserBetResponse;
-import com.clutch.betting.service.BettingCandidateQueryService;
+import com.clutch.betting.api.request.BetCreateRequest;
+import com.clutch.betting.api.request.BettingWinnerRecoveryRequest;
+import com.clutch.betting.api.response.BetCreateResponse;
+import com.clutch.betting.api.response.BettingCandidateResponse;
+import com.clutch.betting.api.response.BettingEventResponse;
+import com.clutch.betting.api.response.MyBetResponse;
+import com.clutch.betting.api.response.UserBetResponse;
 import com.clutch.betting.service.BettingService;
 import com.clutch.wallet.web.CurrentUserId;
 import jakarta.validation.Valid;
@@ -19,13 +19,19 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
-/** 세트별 배팅 조회·등록 요청을 서비스 계층으로 전달한다. */
+/**
+ * 세트별 배팅 후보·이벤트·사용자 배팅 조회와 등록 요청을 HTTP API로 제공한다.
+ *
+ * <p>운영자 승자 복구 엔드포인트도 배팅 이벤트를 직접 조작하지 않고 동일한 서비스
+ * 유스케이스로 위임한다.</p>
+ */
 @Validated
 @RestController
 @RequiredArgsConstructor
@@ -33,16 +39,35 @@ import java.util.List;
 public class BettingController {
 
     private final BettingService bettingService;
-    private final BettingCandidateQueryService bettingCandidateQueryService;
 
-    /** 시작 전에도 실제로 배팅이 열린 매치를 배팅 카드용으로 반환한다. */
+    /**
+     * 시작 전을 포함해 실제 OPEN 배팅 이벤트가 있는 매치를 배팅 카드용으로 반환한다.
+     *
+     * @return 현재 노출 가능한 배팅 후보 매치 목록
+     */
     @GetMapping("/betting-candidates")
     public ResponseEntity<List<BettingCandidateResponse>> getBettingCandidates() {
         return ResponseEntity.ok(
-                bettingCandidateQueryService.findOpenMatchCandidates().stream()
+                bettingService.findBettingCandidates().stream()
                         .map(BettingCandidateResponse::from)
                         .toList()
         );
+    }
+
+    /**
+     * 자동 승자 판정이 불가능한 종료 이벤트에 운영자가 확인한 승자를 기록하고 즉시 정산한다.
+     *
+     * @param bettingEventId 승자를 복구할 배팅 이벤트 ID
+     * @param request 운영자가 확인한 승리 팀 ID
+     * @return 처리 완료를 나타내는 204 응답
+     */
+    @PutMapping("/admin/betting-events/{bettingEventId}/winner")
+    public ResponseEntity<Void> recoverWinner(
+            @PathVariable @Positive Long bettingEventId,
+            @Valid @RequestBody BettingWinnerRecoveryRequest request
+    ) {
+        bettingService.recoverWinnerAndSettle(bettingEventId, request.winnerTeamId());
+        return ResponseEntity.noContent().build();
     }
 
     /**

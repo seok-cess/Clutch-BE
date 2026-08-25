@@ -21,7 +21,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
-class BettingResultReconciliationServiceTest {
+class BettingResultRefreshServiceTest {
 
     private final EsportsGameRepository gameRepository = mock(EsportsGameRepository.class);
     private final BettingEventRepository eventRepository = mock(BettingEventRepository.class);
@@ -29,7 +29,7 @@ class BettingResultReconciliationServiceTest {
     private final GamePersistService gamePersistService = mock(GamePersistService.class);
     private final BettingEventSynchronizationService synchronizationService =
             mock(BettingEventSynchronizationService.class);
-    private final BettingResultReconciliationService service = new BettingResultReconciliationService(
+    private final BettingResultRefreshService service = new BettingResultRefreshService(
             gameRepository,
             eventRepository,
             apiClient,
@@ -58,7 +58,7 @@ class BettingResultReconciliationServiceTest {
         given(eventRepository.findAllByExternalMatchId("match-1")).willReturn(events);
         given(apiClient.getEventDetails("match-1")).willReturn(result(2, 1, "completed"));
 
-        service.reconcilePendingResults();
+        service.refreshPendingResults();
 
         verify(synchronizationService).closeFinishedEventsForReconciliation("match-1");
         verify(gamePersistService).persistTrackedWinners("match-1");
@@ -87,7 +87,7 @@ class BettingResultReconciliationServiceTest {
         given(eventRepository.findAllByExternalMatchId("match-1")).willReturn(events);
         given(apiClient.getEventDetails("match-1")).willReturn(result(1, 1, "inProgress"));
 
-        service.reconcilePendingResults();
+        service.refreshPendingResults();
 
         verify(gamePersistService, never()).persistTrackedWinners("match-1");
         verify(synchronizationService, never())
@@ -123,7 +123,7 @@ class BettingResultReconciliationServiceTest {
                 .willReturn(List.of(first, second, third, speculativeFourth));
         given(apiClient.getEventDetails("match-1")).willReturn(result(2, 1, "completed"));
 
-        service.reconcilePendingResults();
+        service.refreshPendingResults();
 
         verify(synchronizationService).cancelFutureEventsAfterConfirmedMatch("match-1", 3);
     }
@@ -145,7 +145,7 @@ class BettingResultReconciliationServiceTest {
         given(eventRepository.findAllByExternalMatchId("match-1")).willReturn(events);
         given(apiClient.getEventDetails("match-1")).willReturn(result(2, 1, "completed"));
 
-        service.reconcilePendingResults();
+        service.refreshPendingResults();
 
         verify(synchronizationService).synchronizeConfirmedWinners(
                 eq("match-1"),

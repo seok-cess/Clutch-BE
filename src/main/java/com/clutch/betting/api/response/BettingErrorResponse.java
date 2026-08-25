@@ -1,4 +1,4 @@
-package com.clutch.betting.dto.response;
+package com.clutch.betting.api.response;
 
 import com.clutch.betting.exception.BettingErrorCode;
 

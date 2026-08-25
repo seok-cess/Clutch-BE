@@ -10,7 +10,6 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -22,13 +21,7 @@ import java.time.LocalDateTime;
 /** 사용자가 특정 세트에서 선택한 팀과 배팅 금액 및 정산 상태를 관리한다. */
 @Getter
 @Entity
-@Table(
-        name = "user_bet",
-        uniqueConstraints = @UniqueConstraint(
-                name = "uk_user_bet_event_user",
-                columnNames = {"betting_event_id", "user_id"}
-        )
-)
+@Table
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class UserBet {
 

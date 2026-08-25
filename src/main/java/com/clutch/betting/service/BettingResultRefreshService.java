@@ -7,6 +7,8 @@ import com.clutch.lolesports.dto.external.EventDetailsResponse;
 import com.clutch.lolesports.repository.EsportsGameRepository;
 import com.clutch.lolesports.service.GamePersistService;
 import com.clutch.lolesports.service.SetWinnerTracker;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -15,6 +17,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -25,9 +28,9 @@ import java.util.Set;
  * 직접 재조회하고, 공식 {@code gameWins} 증가분이 확인됐을 때만 기존 정산 경로에 넘긴다.</p>
  */
 @Service
-public class BettingResultReconciliationService {
-
-    private static final Logger log = LoggerFactory.getLogger(BettingResultReconciliationService.class);
+@Slf4j
+@RequiredArgsConstructor
+public class BettingResultRefreshService {
 
     private final EsportsGameRepository gameRepository;
     private final BettingEventRepository bettingEventRepository;
@@ -36,54 +39,74 @@ public class BettingResultReconciliationService {
     private final GamePersistService gamePersistService;
     private final BettingEventSynchronizationService synchronizationService;
 
-    public BettingResultReconciliationService(
-            EsportsGameRepository gameRepository,
-            BettingEventRepository bettingEventRepository,
-            LolesportsApiClient apiClient,
-            SetWinnerTracker setWinnerTracker,
-            GamePersistService gamePersistService,
-            BettingEventSynchronizationService synchronizationService
-    ) {
-        this.gameRepository = gameRepository;
-        this.bettingEventRepository = bettingEventRepository;
-        this.apiClient = apiClient;
-        this.setWinnerTracker = setWinnerTracker;
-        this.gamePersistService = gamePersistService;
-        this.synchronizationService = synchronizationService;
+    /** 종료됐지만 승자가 없는 세트 또는 선개설 후속 세트가 있는 매치별로 공식 결과를 재조회한다. */
+    public void refreshPendingResults() {
+        pendingExternalMatchIds().forEach(this::refreshSafely);
     }
 
-    /** 종료됐지만 승자가 없는 세트 또는 선개설 후속 세트가 있는 매치별로 공식 결과를 재조회한다. */
-    public void reconcilePendingResults() {
+    /** 결과 복구가 필요한 세트·이벤트에서 중복 없는 매치 ID 목록을 만든다. */
+    private Set<String> pendingExternalMatchIds() {
         Set<String> externalMatchIds = new LinkedHashSet<>(
                 gameRepository.findExternalMatchIdsPendingWinnerReconciliation()
         );
         externalMatchIds.addAll(bettingEventRepository.findExternalMatchIdsWithOpenSpeculativeFutureEvent());
         externalMatchIds.addAll(bettingEventRepository.findExternalMatchIdsWithClosedEventWithoutWinner());
-        for (String externalMatchId : externalMatchIds) {
-            try {
-                reconcileMatch(externalMatchId);
-            } catch (RuntimeException exception) {
-                log.warn("배팅 결과 재조회 실패 (matchId={}): {}", externalMatchId, exception.toString());
-            }
+        return externalMatchIds;
+    }
+
+    /** 한 매치의 재조회 실패가 다른 매치의 결과 복구를 막지 않게 격리한다. */
+    private void refreshSafely(String externalMatchId) {
+        try {
+            refreshMatch(externalMatchId);
+        } catch (RuntimeException exception) {
+            log.warn("배팅 결과 재조회 실패 (matchId={}): {}", externalMatchId, exception.toString());
         }
     }
 
-    private void reconcileMatch(String externalMatchId) {
+    /**
+     * 한 매치의 공식 상세를 재조회해 승자 복구와 불필요한 후속 이벤트 취소를 처리한다.
+     *
+     * @param externalMatchId 재조회할 외부 매치 ID
+     */
+    private void refreshMatch(String externalMatchId) {
         if (externalMatchId == null || externalMatchId.isBlank()) {
             return;
         }
 
-        synchronizationService.closeFinishedEventsForReconciliation(externalMatchId);
-        List<BettingEvent> events = bettingEventRepository.findAllByExternalMatchId(externalMatchId);
-        restoreConfirmedWinners(externalMatchId, events);
-
-        EventDetailsResponse response = apiClient.getEventDetails(externalMatchId);
-        EventDetailsResponse.Match match = matchOf(response);
-        if (match == null || match.teams() == null || match.games() == null) {
-            log.debug("배팅 결과 재조회 응답이 불완전합니다 (matchId={})", externalMatchId);
+        List<BettingEvent> events = prepareEventsForRefresh(externalMatchId);
+        EventDetailsResponse.Match match = fetchCompleteMatch(externalMatchId);
+        if (match == null) {
             return;
         }
 
+        observeAndSynchronizeWinners(externalMatchId, events, match);
+        cancelUnusedFutureEventsIfMatchFinished(externalMatchId, match);
+    }
+
+    /** 종료 프레임이 확인된 이벤트를 닫고, 재시작에 대비해 기존 승자를 추적기에 복원한다. */
+    private List<BettingEvent> prepareEventsForRefresh(String externalMatchId) {
+        synchronizationService.closeFinishedEventsForReconciliation(externalMatchId);
+        List<BettingEvent> events = bettingEventRepository.findAllByExternalMatchId(externalMatchId);
+        restoreConfirmedWinners(externalMatchId, events);
+        return events;
+    }
+
+    /** 공식 상세 응답에서 팀과 세트 정보가 모두 있는 매치만 반환한다. */
+    private EventDetailsResponse.Match fetchCompleteMatch(String externalMatchId) {
+        EventDetailsResponse.Match match = matchOf(apiClient.getEventDetails(externalMatchId));
+        if (match == null || match.teams() == null || match.games() == null) {
+            log.debug("배팅 결과 재조회 응답이 불완전합니다 (matchId={})", externalMatchId);
+            return null;
+        }
+        return match;
+    }
+
+    /** 공식 스코어에서 추적한 신규 세트 승자만 이벤트에 반영한다. */
+    private void observeAndSynchronizeWinners(
+            String externalMatchId,
+            List<BettingEvent> events,
+            EventDetailsResponse.Match match
+    ) {
         setWinnerTracker.observe(externalMatchId, match.teams(), match.games());
         Map<String, String> winners = pendingEventWinners(externalMatchId, events);
         if (!winners.isEmpty()) {
@@ -91,6 +114,13 @@ public class BettingResultReconciliationService {
             synchronizationService.synchronizeConfirmedWinners(externalMatchId, winners);
             log.info("배팅 결과 재조회로 세트 승자 {}건 확정 (matchId={})", winners.size(), externalMatchId);
         }
+    }
+
+    /** 공식 최종 스코어가 확정됐으면 실제로 진행되지 않은 후속 세트 이벤트를 취소한다. */
+    private void cancelUnusedFutureEventsIfMatchFinished(
+            String externalMatchId,
+            EventDetailsResponse.Match match
+    ) {
         if (isMatchFinished(match)) {
             lastFinishedSetNumber(match).ifPresent(lastSetNumber ->
                     synchronizationService.cancelFutureEventsAfterConfirmedMatch(
@@ -128,6 +158,7 @@ public class BettingResultReconciliationService {
         return winners;
     }
 
+    /** 공식 상세 응답의 중첩 구조가 완전할 때만 매치 데이터를 꺼낸다. */
     private EventDetailsResponse.Match matchOf(EventDetailsResponse response) {
         if (response == null || response.data() == null || response.data().event() == null) {
             return null;
@@ -148,7 +179,8 @@ public class BettingResultReconciliationService {
                 .anyMatch(result -> result.gameWins() >= requiredWins);
     }
 
-    private java.util.Optional<Integer> lastFinishedSetNumber(EventDetailsResponse.Match match) {
+    /** 완료 상태 세트 중 가장 큰 번호를 찾아 이후 선개설 이벤트의 취소 기준으로 사용한다. */
+    private Optional<Integer> lastFinishedSetNumber(EventDetailsResponse.Match match) {
         return match.games().stream()
                 .filter(game -> "completed".equalsIgnoreCase(game.state()))
                 .map(EventDetailsResponse.Game::number)

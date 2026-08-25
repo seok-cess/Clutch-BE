@@ -8,7 +8,6 @@ import com.clutch.betting.dto.BettingEventView;
 import com.clutch.betting.dto.MyBetView;
 import com.clutch.betting.dto.UserBetView;
 import com.clutch.betting.service.BettingService;
-import com.clutch.betting.service.BettingCandidateQueryService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -16,13 +15,16 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -36,12 +38,9 @@ class BettingControllerTest {
     @MockitoBean
     private BettingService bettingService;
 
-    @MockitoBean
-    private BettingCandidateQueryService bettingCandidateQueryService;
-
     @Test
     void getsOpenBettingCandidates() throws Exception {
-        given(bettingCandidateQueryService.findOpenMatchCandidates()).willReturn(List.of(
+        given(bettingService.findBettingCandidates()).willReturn(List.of(
                 new BettingCandidateView(
                         "match-1",
                         "LCK",
@@ -65,6 +64,18 @@ class BettingControllerTest {
                 .andExpect(jsonPath("$[0].matchId").value("match-1"))
                 .andExpect(jsonPath("$[0].teams[0].gameWins").value(1))
                 .andExpect(jsonPath("$[0].games[0].gameId").value("game-1"));
+    }
+
+    @Test
+    void recoversVerifiedWinnerAndSettlesEvent() throws Exception {
+        mockMvc.perform(put("/api/admin/betting-events/50/winner")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"winnerTeamId":"team-a"}
+                                """))
+                .andExpect(status().isNoContent());
+
+        verify(bettingService).recoverWinnerAndSettle(50L, "team-a");
     }
 
     @Test
@@ -148,6 +159,10 @@ class BettingControllerTest {
                 "team-b",
                 "team-a",
                 1_000L,
+                3_000L,
+                2_000L,
+                new BigDecimal("3.00"),
+                true,
                 UserBetStatus.WON,
                 BettingEventStatus.SETTLED,
                 LocalDateTime.of(2026, 8, 14, 10, 1)
@@ -159,6 +174,10 @@ class BettingControllerTest {
                 .andExpect(jsonPath("$[0].externalMatchId").value("match-1"))
                 .andExpect(jsonPath("$[0].setNumber").value(2))
                 .andExpect(jsonPath("$[0].selectedTeamId").value("team-a"))
+                .andExpect(jsonPath("$[0].settlementPoint").value(3_000))
+                .andExpect(jsonPath("$[0].netPointChange").value(2_000))
+                .andExpect(jsonPath("$[0].payoutMultiplier").value(3.0))
+                .andExpect(jsonPath("$[0].payoutMultiplierConfirmed").value(true))
                 .andExpect(jsonPath("$[0].status").value("WON"));
     }
 

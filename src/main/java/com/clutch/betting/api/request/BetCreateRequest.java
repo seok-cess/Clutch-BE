@@ -1,5 +1,6 @@
-package com.clutch.betting.dto.request;
+package com.clutch.betting.api.request;
 
+import com.clutch.betting.domain.UserBet;
 import com.clutch.betting.exception.BettingErrorCode;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -15,8 +16,8 @@ public record BetCreateRequest(
         @NotBlank(message = BettingErrorCode.Message.SELECTED_TEAM_ID_REQUIRED)
         String selectedTeamId,
 
-        @Min(value = 1_000, message = BettingErrorCode.Message.BET_AMOUNT_TOO_LOW)
-        @Max(value = 100_000, message = BettingErrorCode.Message.BET_AMOUNT_TOO_HIGH)
+        @Min(value = UserBet.MIN_AMOUNT, message = BettingErrorCode.Message.BET_AMOUNT_TOO_LOW)
+        @Max(value = UserBet.MAX_AMOUNT, message = BettingErrorCode.Message.BET_AMOUNT_TOO_HIGH)
         long amount
 ) {
 }
