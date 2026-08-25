@@ -32,7 +32,7 @@ Notion의 논의가 구현 결정으로 확정되면 관련 코드와 함께 `do
 
 - 패키지와 계층 책임: `docs/architecture/package-structure.md`
 - 쿠폰 발급 도메인 규칙: `docs/domain/coupon.md`
-- 시청 포인트 지급 규칙: `docs/domain/viewing-point.md`
+- 시청 세션과 포인트 지급 규칙: `docs/domain/watch-session.md`
 - 승패 배팅 규칙: `docs/domain/betting.md`
 - 매치·세트 상태와 결과 데이터 계약: `docs/domain/match-set-result.md`
 - 데이터베이스 규칙: `docs/conventions/database-convention.md`
@@ -68,7 +68,7 @@ Notion의 논의가 구현 결정으로 확정되면 관련 코드와 함께 `do
 - 총 풀에서 운영 수수료 10%를 제외한 배당 풀을 적중자의 배팅 금액 비율로 정산하고,
   실패 시 배팅 포인트를 몰수한다.
 
-상세 규칙은 `docs/domain/viewing-point.md`와 `docs/domain/betting.md`를 따른다.
+상세 규칙은 `docs/domain/watch-session.md`와 `docs/domain/betting.md`를 따른다.
 
 ## 파일 형식 규칙
 
