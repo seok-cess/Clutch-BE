@@ -1,4 +1,4 @@
-package com.clutch.watch.dto.response;
+package com.clutch.watch.api.response;
 
 /**
  * 시청 세션 API 오류 응답.

@@ -1,4 +1,4 @@
-package com.clutch.watch.dto.request;
+package com.clutch.watch.api.request;
 
 import jakarta.validation.constraints.Positive;
 

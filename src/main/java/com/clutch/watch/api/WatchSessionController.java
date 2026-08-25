@@ -2,11 +2,11 @@ package com.clutch.watch.api;
 
 import com.clutch.watch.dto.WatchHeartbeatResult;
 import com.clutch.watch.dto.WatchSessionStartResult;
-import com.clutch.watch.dto.request.HeartbeatRequest;
-import com.clutch.watch.dto.request.WatchPointClaimRequest;
-import com.clutch.watch.dto.response.HeartbeatResponse;
-import com.clutch.watch.dto.response.WatchPointClaimResponse;
-import com.clutch.watch.dto.response.WatchSessionStartResponse;
+import com.clutch.watch.api.request.HeartbeatRequest;
+import com.clutch.watch.api.request.WatchPointClaimRequest;
+import com.clutch.watch.api.response.HeartbeatResponse;
+import com.clutch.watch.api.response.WatchPointClaimResponse;
+import com.clutch.watch.api.response.WatchSessionStartResponse;
 import com.clutch.watch.service.WatchPointClaimService;
 import com.clutch.watch.service.WatchSessionService;
 import jakarta.validation.Valid;
