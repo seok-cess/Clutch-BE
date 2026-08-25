@@ -3,10 +3,12 @@ package com.clutch.betting.api;
 import com.clutch.betting.domain.BettingEventStatus;
 import com.clutch.betting.domain.UserBetStatus;
 import com.clutch.betting.dto.BetPlacementResult;
+import com.clutch.betting.dto.BettingCandidateView;
 import com.clutch.betting.dto.BettingEventView;
 import com.clutch.betting.dto.MyBetView;
 import com.clutch.betting.dto.UserBetView;
 import com.clutch.betting.service.BettingService;
+import com.clutch.betting.service.BettingCandidateQueryService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -33,6 +35,37 @@ class BettingControllerTest {
 
     @MockitoBean
     private BettingService bettingService;
+
+    @MockitoBean
+    private BettingCandidateQueryService bettingCandidateQueryService;
+
+    @Test
+    void getsOpenBettingCandidates() throws Exception {
+        given(bettingCandidateQueryService.findOpenMatchCandidates()).willReturn(List.of(
+                new BettingCandidateView(
+                        "match-1",
+                        "LCK",
+                        "week 1",
+                        "2026-08-14T10:00:00Z",
+                        3,
+                        false,
+                        null,
+                        List.of(new BettingCandidateView.Team(
+                                "team-a", "A", "A", null, null, 1, null, null
+                        )),
+                        List.of(new BettingCandidateView.Game(
+                                "game-1", 1, "inProgress", false, null, false
+                        )),
+                        "game-1"
+                )
+        ));
+
+        mockMvc.perform(get("/api/betting-candidates"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].matchId").value("match-1"))
+                .andExpect(jsonPath("$[0].teams[0].gameWins").value(1))
+                .andExpect(jsonPath("$[0].games[0].gameId").value("game-1"));
+    }
 
     @Test
     void getsCurrentBettingEvent() throws Exception {
