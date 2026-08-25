@@ -30,7 +30,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 폴링 스케줄러.
- *  - 라이브 감시: REAL은 getLive 60초, STUB replay는 1초 간격 → 진행중 매치의 gameId 를 활성 게임으로 등록
+ *  - 라이브 감시: REAL은 getLive 60초, STUB replay는 0.25초 간격 → 진행중 매치의 gameId 를 활성 게임으로 등록
  *  - 인게임: 활성 게임이 있을 때만 window/details 1초 간격
  *  - 메타(일정/순위): 앱 시작 직후 1회 + 5분 간격
  *
@@ -157,10 +157,10 @@ public class PollingScheduler {
     }
 
     /**
-     * replay는 시간축을 최대 20배까지 압축하므로, 상태 전환도 1초마다 읽어야 한다.
-     * 60초 주기를 그대로 쓰면 한 번의 조회 사이에 세트 시작·종료를 모두 건너뛴다.
+     * replay는 시간축을 최대 20배까지 압축하므로, 상태 전환도 0.25초마다 읽어야 한다.
+     * 1초 주기면 20배속에서 한 번에 재생 시간 20초를 건너뛴다.
      */
-    @Scheduled(fixedDelay = 1000)
+    @Scheduled(fixedDelay = 250)
     public void pollStubLiveMatches() {
         if (sourceState.mode() == ExternalSourceMode.STUB) {
             pollLiveMatches();
