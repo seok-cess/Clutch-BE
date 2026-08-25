@@ -99,7 +99,7 @@ class BetSettlementIntegrationTest {
         assertThat(userBetRepository.findById(loserBet.getId()).orElseThrow().getStatus())
                 .isEqualTo(UserBetStatus.LOST);
         assertThat(userRepository.findById(winner.getId()).orElseThrow().getPoint())
-                .isEqualTo(2_000L);
+                .isEqualTo(2_700L);
         assertThat(userRepository.findById(loser.getId()).orElseThrow().getPoint())
                 .isZero();
     }

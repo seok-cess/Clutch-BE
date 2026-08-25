@@ -15,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigInteger;
 import java.util.List;
 
 /** 승자가 확정된 이벤트의 사용자 배팅과 포인트 지급을 한 트랜잭션으로 정산한다. */
@@ -22,7 +23,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class BetSettlementService {
 
-    private static final long PAYOUT_MULTIPLIER = 2L;
+    private static final long OPERATING_FEE_PERCENT = 10L;
+    private static final long PERCENTAGE_BASE = 100L;
 
     private final BettingEventRepository eventRepository;
     private final UserBetRepository userBetRepository;
@@ -30,7 +32,7 @@ public class BetSettlementService {
     private final UserRepository userRepository;
 
     /**
-     * 이벤트와 배팅을 잠근 뒤 적중에는 2배 지급, 실패에는 몰수 결과를 기록한다.
+     * 이벤트와 배팅을 잠근 뒤 총 풀의 10% 수수료를 제외한 금액을 적중 배팅금 비율로 지급한다.
      *
      * @param bettingEventId 정산할 배팅 이벤트 ID
      * @throws BettingException 이벤트가 없거나 결과가 준비되지 않았거나 사용자를 찾을 수 없을 때
@@ -50,8 +52,27 @@ public class BetSettlementService {
                         bettingEventId,
                         UserBetStatus.PLACED
                 );
-        for (UserBet userBet : placedBets) {
-            settleBet(userBet, event.getWinnerExternalTeamId());
+        long totalPool = sumAmounts(placedBets);
+        List<UserBet> winningBets = placedBets.stream()
+                .filter(userBet -> userBet.getSelectedExternalTeamId()
+                        .equals(event.getWinnerExternalTeamId()))
+                .toList();
+
+        placedBets.stream()
+                .filter(userBet -> !userBet.getSelectedExternalTeamId()
+                        .equals(event.getWinnerExternalTeamId()))
+                .forEach(UserBet::lose);
+
+        if (!winningBets.isEmpty()) {
+            long distributablePool = totalPool - operatingFee(totalPool);
+            long totalWinningStake = sumAmounts(winningBets);
+            for (UserBet winningBet : winningBets) {
+                payout(winningBet, proportionalPayout(
+                        distributablePool,
+                        winningBet.getAmount(),
+                        totalWinningStake
+                ));
+            }
         }
         event.settle();
     }
@@ -69,24 +90,37 @@ public class BetSettlementService {
         }
     }
 
-    /**
-     * 한 사용자 배팅을 승패에 따라 지급 또는 몰수 처리한다.
-     *
-     * @param userBet 처리할 사용자 배팅
-     * @param winnerExternalTeamId 확정된 승리 팀 ID
-     */
-    private void settleBet(UserBet userBet, String winnerExternalTeamId) {
-        if (!userBet.getSelectedExternalTeamId().equals(winnerExternalTeamId)) {
-            userBet.lose();
-            return;
+    /** 모든 배팅금을 더해 해당 이벤트의 총 풀을 계산한다. */
+    private long sumAmounts(List<UserBet> userBets) {
+        long total = 0L;
+        for (UserBet userBet : userBets) {
+            total = Math.addExact(total, userBet.getAmount());
         }
+        return total;
+    }
 
-        long payoutPoint = Math.multiplyExact(userBet.getAmount(), PAYOUT_MULTIPLIER);
+    /** 총 풀의 10%를 소수점 버림해 운영 수수료를 계산한다. */
+    private long operatingFee(long totalPool) {
+        return totalPool / PERCENTAGE_BASE * OPERATING_FEE_PERCENT
+                + totalPool % PERCENTAGE_BASE * OPERATING_FEE_PERCENT / PERCENTAGE_BASE;
+    }
+
+    /**
+     * 적중 배팅금 비율로 배당 풀을 나누고 소수점 버림으로 생긴 잔여는 운영 수수료에 포함한다.
+     * BigInteger를 사용해 총 풀과 배팅금의 곱셈 중 long 범위를 넘지 않게 한다.
+     */
+    private long proportionalPayout(long distributablePool, long amount, long totalWinningStake) {
+        return BigInteger.valueOf(distributablePool)
+                .multiply(BigInteger.valueOf(amount))
+                .divide(BigInteger.valueOf(totalWinningStake))
+                .longValueExact();
+    }
+
+    /** 적중 배팅 한 건에 계산된 포인트를 지급하고 원장을 기록한다. */
+    private void payout(UserBet userBet, long payoutPoint) {
         increasePoint(userBet.getUserId(), payoutPoint);
         userBet.win();
-        transactionRepository.save(
-                BetPointTransaction.payout(userBet.getId(), payoutPoint)
-        );
+        transactionRepository.save(BetPointTransaction.payout(userBet.getId(), payoutPoint));
     }
 
     /**
