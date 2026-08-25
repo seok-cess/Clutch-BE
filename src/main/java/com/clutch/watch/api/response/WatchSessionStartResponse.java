@@ -1,4 +1,4 @@
-package com.clutch.watch.dto.response;
+package com.clutch.watch.api.response;
 
 import com.clutch.watch.dto.WatchSessionStartResult;
 

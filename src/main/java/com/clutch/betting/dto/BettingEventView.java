@@ -1,6 +1,8 @@
 package com.clutch.betting.dto;
 
+import com.clutch.betting.domain.BettingEvent;
 import com.clutch.betting.domain.BettingEventStatus;
+import com.clutch.betting.domain.UserBet;
 import com.clutch.betting.domain.UserBetStatus;
 
 /**
@@ -28,6 +30,25 @@ public record BettingEventView(
         UserBetSummary myBet
 ) {
 
+    /** 이벤트 상태와 현재 사용자의 배팅 여부를 현재 이벤트 조회 모델로 조합한다. */
+    public static BettingEventView from(
+            BettingEvent event,
+            UserBet userBet,
+            boolean bettingAvailable
+    ) {
+        return new BettingEventView(
+                event.getId(),
+                event.getExternalMatchId(),
+                event.getExternalGameId(),
+                event.getSetNumber(),
+                event.getFirstExternalTeamId(),
+                event.getSecondExternalTeamId(),
+                event.getStatus(),
+                bettingAvailable,
+                UserBetSummary.from(userBet)
+        );
+    }
+
     /**
      * 현재 이벤트에 등록된 사용자 배팅의 최소 조회 정보다.
      *
@@ -42,5 +63,18 @@ public record BettingEventView(
             long amount,
             UserBetStatus status
     ) {
+
+        /** 사용자 배팅이 없으면 null을 유지하고, 있으면 이벤트 응답용 요약을 만든다. */
+        private static UserBetSummary from(UserBet userBet) {
+            if (userBet == null) {
+                return null;
+            }
+            return new UserBetSummary(
+                    userBet.getId(),
+                    userBet.getSelectedExternalTeamId(),
+                    userBet.getAmount(),
+                    userBet.getStatus()
+            );
+        }
     }
 }

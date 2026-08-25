@@ -156,6 +156,9 @@ async function inspectFixture(dir) {
         if (frame?.gameState === 'finished') {
           noteMaximum(finishedFrameAtByGame, record.gameId, frameMs);
         }
+        // paused/loading 프레임은 실제 시작 자원값이 아니다. 이를 기준값으로 삼으면
+        // 첫 in_game 스냅샷에 +500G가 한 번 더 붙어 다음 세트가 1,000G로 시작한다.
+        if (frame?.gameState !== 'in_game') continue;
         for (const team of [frame?.blueTeam, frame?.redTeam]) {
           for (const participant of team?.participants || []) {
             const gold = participant?.totalGold;

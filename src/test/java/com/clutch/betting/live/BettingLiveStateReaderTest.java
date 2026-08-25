@@ -22,13 +22,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 
-class LolesportsLiveBettingDataProviderTest {
+class BettingLiveStateReaderTest {
 
     private final DataCacheService dataCacheService = new DataCacheService();
     private final SetWinnerTracker setWinnerTracker = new SetWinnerTracker();
     private final EsportsGameRepository esportsGameRepository = mock(EsportsGameRepository.class);
     private final EsportsMatchRepository esportsMatchRepository = mock(EsportsMatchRepository.class);
-    private final LolesportsLiveBettingDataProvider provider = new LolesportsLiveBettingDataProvider(
+    private final BettingLiveStateReader provider = new BettingLiveStateReader(
             dataCacheService,
             setWinnerTracker,
             esportsGameRepository,
@@ -36,8 +36,7 @@ class LolesportsLiveBettingDataProviderTest {
             new BettingProperties(
                     Duration.ofMinutes(20),
                     Duration.ofMinutes(1),
-                    Duration.ofMinutes(20),
-                    Duration.ofSeconds(1)
+                    Duration.ofMinutes(20)
             ),
             Clock.fixed(Instant.parse("2026-08-14T10:01:00Z"), ZoneOffset.UTC)
     );
@@ -50,7 +49,7 @@ class LolesportsLiveBettingDataProviderTest {
                 List.of(completedSet(1))
         )));
 
-        LiveBettingDataProvider.LiveMatchSnapshot snapshot = provider.findLiveMatches().getFirst();
+        BettingLiveStateReader.LiveMatchSnapshot snapshot = provider.findLiveMatches().getFirst();
 
         assertThat(snapshot.matchFinished()).isFalse();
     }
@@ -68,7 +67,7 @@ class LolesportsLiveBettingDataProviderTest {
         given(esportsMatchRepository.findByExternalMatchId("match-1"))
                 .willReturn(Optional.of(persistedMatch));
 
-        LiveBettingDataProvider.LiveMatchSnapshot snapshot = provider.findLiveMatches().getFirst();
+        BettingLiveStateReader.LiveMatchSnapshot snapshot = provider.findLiveMatches().getFirst();
 
         assertThat(snapshot.bestOf()).isEqualTo(3);
     }
@@ -84,7 +83,7 @@ class LolesportsLiveBettingDataProviderTest {
         given(esportsMatchRepository.findByExternalMatchId("match-1"))
                 .willReturn(Optional.empty());
 
-        LiveBettingDataProvider.LiveMatchSnapshot snapshot = provider.findLiveMatches().getFirst();
+        BettingLiveStateReader.LiveMatchSnapshot snapshot = provider.findLiveMatches().getFirst();
 
         assertThat(snapshot.bestOf()).isEqualTo(3);
     }
@@ -142,7 +141,7 @@ class LolesportsLiveBettingDataProviderTest {
                 List.of(completedSet(1), activeSet(2))
         )));
 
-        LiveBettingDataProvider.LiveMatchSnapshot snapshot = provider.findLiveMatches().getFirst();
+        BettingLiveStateReader.LiveMatchSnapshot snapshot = provider.findLiveMatches().getFirst();
 
         assertThat(snapshot.matchFinished()).isFalse();
     }
@@ -222,7 +221,7 @@ class LolesportsLiveBettingDataProviderTest {
         given(esportsGameRepository.findWinnerExternalTeamId("game-1"))
                 .willReturn(Optional.of("team-a"));
 
-        LiveBettingDataProvider.SetSnapshot set = provider.findLiveMatches()
+        BettingLiveStateReader.SetSnapshot set = provider.findLiveMatches()
                 .getFirst()
                 .sets()
                 .getFirst();

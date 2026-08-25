@@ -3,15 +3,15 @@ package com.clutch.betting.api;
 import com.clutch.betting.domain.BetPointTransactionType;
 import com.clutch.betting.domain.BettingEvent;
 import com.clutch.betting.domain.BettingEventStatus;
-import com.clutch.betting.live.LiveBettingDataProvider;
-import com.clutch.betting.live.LiveBettingDataProvider.LiveMatchSnapshot;
-import com.clutch.betting.live.LiveBettingDataProvider.SetSnapshot;
+import com.clutch.betting.live.BettingLiveStateReader;
+import com.clutch.betting.live.BettingLiveStateReader.LiveMatchSnapshot;
+import com.clutch.betting.live.BettingLiveStateReader.SetSnapshot;
 import com.clutch.betting.repository.BetPointTransactionRepository;
 import com.clutch.betting.repository.BettingEventRepository;
 import com.clutch.betting.repository.UserBetRepository;
 import com.clutch.betting.scheduler.BettingScheduler;
-import com.clutch.betting.service.BetSettlementService;
 import com.clutch.betting.service.BettingEventSynchronizationService;
+import com.clutch.betting.service.BettingService;
 import com.clutch.lolesports.service.PollingScheduler;
 import com.clutch.user.domain.User;
 import com.clutch.user.domain.UserRole;
@@ -60,7 +60,7 @@ class BettingFlowIntegrationTest {
     private BetPointTransactionRepository transactionRepository;
 
     @Autowired
-    private BetSettlementService settlementService;
+    private BettingService bettingService;
 
     @Autowired
     private BettingEventSynchronizationService synchronizationService;
@@ -69,7 +69,7 @@ class BettingFlowIntegrationTest {
     private EntityManager entityManager;
 
     @MockitoBean
-    private LiveBettingDataProvider liveBettingDataProvider;
+    private BettingLiveStateReader liveStateReader;
 
     @MockitoBean
     private PollingScheduler pollingScheduler;
@@ -96,7 +96,7 @@ class BettingFlowIntegrationTest {
         );
         event.attachGame("bet-flow-game-1");
         eventRepository.saveAndFlush(event);
-        given(liveBettingDataProvider.isAcceptingBets(any(), any(), anyInt())).willReturn(true);
+        given(liveStateReader.isAcceptingBets(any(), any(), anyInt())).willReturn(true);
     }
 
     @Test
@@ -112,7 +112,7 @@ class BettingFlowIntegrationTest {
 
         eventRepository.findById(event.getId()).orElseThrow().recordWinner("team-a");
         eventRepository.flush();
-        settlementService.settle(event.getId());
+        bettingService.settle(event.getId());
         entityManager.flush();
         entityManager.clear();
 

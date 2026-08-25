@@ -1,11 +1,12 @@
 package com.clutch.betting.scheduler;
 
-import com.clutch.betting.live.LiveBettingDataProvider;
-import com.clutch.betting.live.LiveBettingDataProvider.LiveMatchSnapshot;
+import com.clutch.betting.live.BettingLiveStateReader;
+import com.clutch.betting.live.BettingLiveStateReader.LiveMatchSnapshot;
 import com.clutch.betting.repository.BettingEventRepository;
-import com.clutch.betting.service.BetRefundService;
-import com.clutch.betting.service.BetSettlementService;
 import com.clutch.betting.service.BettingEventSynchronizationService;
+import com.clutch.betting.service.BettingResultRefreshService;
+import com.clutch.betting.service.BettingService;
+import com.clutch.lolesports.source.ExternalSourceState;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,31 +14,42 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-/** 라이브 상태 동기화 이후 정산과 환불을 순서대로 실행하는 배팅 주기 작업이다. */
+/** 라이브 동기화·정산과 공식 결과 재조회를 실행하는 배팅 주기 작업이다. */
 @Component
 @RequiredArgsConstructor
 public class BettingScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(BettingScheduler.class);
 
-    private final LiveBettingDataProvider liveBettingDataProvider;
+    private final BettingLiveStateReader liveStateReader;
     private final BettingEventRepository eventRepository;
     private final BettingEventSynchronizationService synchronizationService;
-    private final BetSettlementService settlementService;
-    private final BetRefundService refundService;
+    private final BettingService bettingService;
+    private final BettingResultRefreshService resultRefreshService;
+    private final ExternalSourceState sourceState;
 
     /** 라이브 상태를 반영한 뒤 새로 확정된 정산과 취소 환불을 같은 주기에서 처리한다. */
-    @Scheduled(fixedDelayString = "${betting.synchronization-interval:1s}")
+    @Scheduled(fixedDelayString = "${betting.synchronization-interval:5s}")
     public void process() {
         synchronizeEvents();
         settleReadyEvents();
         refundCancelledEvents();
     }
 
+    /** 라이브 목록에서 사라진 종료 세트의 공식 결과를 외부 소스 읽기 잠금 안에서 재조회한다. */
+    @Scheduled(fixedDelayString = "${betting.result-reconciliation-interval:1m}")
+    public void refreshPendingResults() {
+        try {
+            sourceState.withReadLock(resultRefreshService::refreshPendingResults);
+        } catch (RuntimeException exception) {
+            log.warn("배팅 결과 재조회 작업 실패: {}", exception.toString());
+        }
+    }
+
     /** 라이브 매치별 동기화 실패를 격리하고 다음 매치 처리를 계속한다. */
     private void synchronizeEvents() {
         try {
-            for (LiveMatchSnapshot liveMatch : liveBettingDataProvider.findLiveMatches()) {
+            for (LiveMatchSnapshot liveMatch : liveStateReader.findLiveMatches()) {
                 synchronizeMatch(liveMatch);
             }
         } catch (RuntimeException exception) {
@@ -67,7 +79,7 @@ public class BettingScheduler {
         try {
             for (Long eventId : eventRepository.findIdsReadyToSettle()) {
                 try {
-                    settlementService.settle(eventId);
+                    bettingService.settle(eventId);
                 } catch (RuntimeException exception) {
                     log.warn("배팅 이벤트 정산 실패 (eventId={}): {}",
                             eventId, exception.toString());
@@ -83,7 +95,7 @@ public class BettingScheduler {
         try {
             for (Long eventId : eventRepository.findIdsCancelledWithPlacedBets()) {
                 try {
-                    refundService.refund(eventId);
+                    bettingService.refund(eventId);
                 } catch (RuntimeException exception) {
                     log.warn("취소된 배팅 이벤트 환불 실패 (eventId={}): {}",
                             eventId, exception.toString());

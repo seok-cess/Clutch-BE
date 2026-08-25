@@ -1,6 +1,5 @@
 package com.clutch.lolesports.api;
 
-import com.clutch.betting.service.BettingCandidateQueryService;
 import com.clutch.lolesports.dto.external.DetailsResponse;
 import com.clutch.lolesports.dto.external.EventDetailsResponse;
 import com.clutch.lolesports.dto.external.ScheduleResponse;
@@ -41,7 +40,6 @@ public class ApiController {
     private final com.clutch.lolesports.service.SeasonStatsService seasonStats;
     private final com.clutch.lolesports.service.PollingScheduler polling;
     private final ExternalSourceState sourceState;
-    private final BettingCandidateQueryService bettingCandidateQueryService;
 
     public ApiController(DataCacheService cache, HistoricalGameService historical,
                          LolesportsProperties props, com.clutch.lolesports.client.LiveStatsClient liveStats,
@@ -50,8 +48,7 @@ public class ApiController {
                          com.clutch.lolesports.service.SetWinnerTracker setWinners,
                          com.clutch.lolesports.service.SeasonStatsService seasonStats,
                          com.clutch.lolesports.service.PollingScheduler polling,
-                         ExternalSourceState sourceState,
-                         BettingCandidateQueryService bettingCandidateQueryService) {
+                         ExternalSourceState sourceState) {
         this.cache = cache;
         this.historical = historical;
         this.props = props;
@@ -62,7 +59,6 @@ public class ApiController {
         this.seasonStats = seasonStats;
         this.polling = polling;
         this.sourceState = sourceState;
-        this.bettingCandidateQueryService = bettingCandidateQueryService;
     }
 
     /**
@@ -248,14 +244,6 @@ public class ApiController {
                 .map(this::toLiveMatchItem)
                 .toList();
         return ResponseEntity.ok(new ApiDtos.LiveSummary(!items.isEmpty(), items));
-    }
-
-    /** 시작 전에도 실제로 배팅이 열린 매치를 라이브 화면의 배팅 카드용으로 반환한다. */
-    @GetMapping("/betting-candidates")
-    public ResponseEntity<List<ApiDtos.LiveMatchItem>> bettingCandidates() {
-        return ResponseEntity.ok(bettingCandidateQueryService.findOpenMatchCandidates().stream()
-                .map(this::toLiveMatchItem)
-                .toList());
     }
 
     /** 캐시된 매치를 라이브와 시작 전 배팅 카드가 함께 쓰는 응답 모델로 변환한다. */

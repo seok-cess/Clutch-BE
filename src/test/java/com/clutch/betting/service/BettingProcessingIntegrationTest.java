@@ -9,9 +9,7 @@ import com.clutch.betting.domain.UserBetStatus;
 import com.clutch.betting.repository.BetPointTransactionRepository;
 import com.clutch.betting.repository.BettingEventRepository;
 import com.clutch.betting.repository.UserBetRepository;
-import com.clutch.betting.service.BetRefundService;
 import com.clutch.betting.scheduler.BettingScheduler;
-import com.clutch.betting.service.BetSettlementService;
 import com.clutch.lolesports.service.PollingScheduler;
 import com.clutch.user.domain.User;
 import com.clutch.user.domain.UserRole;
@@ -29,13 +27,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
 @Transactional
-class BetSettlementIntegrationTest {
+class BettingProcessingIntegrationTest {
 
     @Autowired
-    private BetSettlementService settlementService;
-
-    @Autowired
-    private BetRefundService refundService;
+    private BettingService bettingService;
 
     @Autowired
     private BettingEventRepository eventRepository;
@@ -85,10 +80,10 @@ class BetSettlementIntegrationTest {
         ));
         entityManager.clear();
 
-        settlementService.settle(event.getId());
+        bettingService.settle(event.getId());
         entityManager.flush();
         entityManager.clear();
-        settlementService.settle(event.getId());
+        bettingService.settle(event.getId());
         entityManager.flush();
         entityManager.clear();
 
@@ -128,10 +123,10 @@ class BetSettlementIntegrationTest {
         );
         entityManager.clear();
 
-        refundService.refund(event.getId());
+        bettingService.refund(event.getId());
         entityManager.flush();
         entityManager.clear();
-        refundService.refund(event.getId());
+        bettingService.refund(event.getId());
         entityManager.flush();
         entityManager.clear();
 

@@ -7,7 +7,11 @@ import com.clutch.betting.domain.UserBet;
 import com.clutch.betting.domain.UserBetStatus;
 import com.clutch.betting.repository.BetPointTransactionRepository;
 import com.clutch.betting.repository.BettingEventRepository;
+import com.clutch.betting.live.BettingLiveStateReader;
 import com.clutch.betting.repository.UserBetRepository;
+import com.clutch.lolesports.service.DataCacheService;
+import com.clutch.lolesports.service.PollingScheduler;
+import com.clutch.lolesports.service.SetWinnerTracker;
 import com.clutch.user.repository.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -24,18 +28,23 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
-class BetSettlementServiceTest {
+class BettingSettlementTest {
 
     private final BettingEventRepository eventRepository = mock(BettingEventRepository.class);
     private final UserBetRepository userBetRepository = mock(UserBetRepository.class);
     private final BetPointTransactionRepository transactionRepository =
             mock(BetPointTransactionRepository.class);
     private final UserRepository userRepository = mock(UserRepository.class);
-    private final BetSettlementService service = new BetSettlementService(
+    private final BettingService service = new BettingService(
             eventRepository,
             userBetRepository,
             transactionRepository,
-            userRepository
+            userRepository,
+            mock(BettingLiveStateReader.class),
+            mock(DataCacheService.class),
+            mock(SetWinnerTracker.class),
+            mock(PollingScheduler.class),
+            java.time.Clock.systemUTC()
     );
 
     @Test

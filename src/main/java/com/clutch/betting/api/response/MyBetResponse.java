@@ -1,15 +1,14 @@
-package com.clutch.betting.dto;
+package com.clutch.betting.api.response;
 
-import com.clutch.betting.domain.BettingEvent;
 import com.clutch.betting.domain.BettingEventStatus;
-import com.clutch.betting.domain.UserBet;
 import com.clutch.betting.domain.UserBetStatus;
+import com.clutch.betting.dto.MyBetView;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * 현재 사용자의 배팅과 연결된 경기·세트 정보를 전달한다.
+ * 현재 사용자의 배팅 이력 한 건을 반환한다.
  *
  * @param userBetId 사용자 배팅 ID
  * @param bettingEventId 배팅 이벤트 ID
@@ -28,7 +27,7 @@ import java.time.LocalDateTime;
  * @param eventStatus 연결된 배팅 이벤트 상태
  * @param createdAt 배팅 등록 시각(UTC)
  */
-public record MyBetView(
+public record MyBetResponse(
         Long userBetId,
         Long bettingEventId,
         String externalMatchId,
@@ -47,32 +46,30 @@ public record MyBetView(
         LocalDateTime createdAt
 ) {
 
-    /** 사용자 배팅과 정산 표시 정보를 내 배팅 이력 조회 모델로 변환한다. */
-    public static MyBetView from(
-            UserBet userBet,
-            BettingEvent event,
-            Long settlementPoint,
-            Long netPointChange,
-            BigDecimal payoutMultiplier,
-            boolean payoutMultiplierConfirmed
-    ) {
-        return new MyBetView(
-                userBet.getId(),
-                userBet.getBettingEventId(),
-                event.getExternalMatchId(),
-                event.getExternalGameId(),
-                event.getSetNumber(),
-                event.getFirstExternalTeamId(),
-                event.getSecondExternalTeamId(),
-                userBet.getSelectedExternalTeamId(),
-                userBet.getAmount(),
-                settlementPoint,
-                netPointChange,
-                payoutMultiplier,
-                payoutMultiplierConfirmed,
-                userBet.getStatus(),
-                event.getStatus(),
-                userBet.getCreatedAt()
+    /**
+     * 서비스 조회 모델을 API 응답으로 변환한다.
+     *
+     * @param view 사용자 배팅 조회 모델
+     * @return API 사용자 배팅 이력 응답
+     */
+    public static MyBetResponse from(MyBetView view) {
+        return new MyBetResponse(
+                view.userBetId(),
+                view.bettingEventId(),
+                view.externalMatchId(),
+                view.externalGameId(),
+                view.setNumber(),
+                view.firstTeamId(),
+                view.secondTeamId(),
+                view.selectedTeamId(),
+                view.amount(),
+                view.settlementPoint(),
+                view.netPointChange(),
+                view.payoutMultiplier(),
+                view.payoutMultiplierConfirmed(),
+                view.status(),
+                view.eventStatus(),
+                view.createdAt()
         );
     }
 }

@@ -1,12 +1,23 @@
 package com.clutch.betting.service;
 
 import com.clutch.betting.domain.BettingEvent;
+import com.clutch.betting.domain.BettingEventStatus;
+import com.clutch.betting.domain.UserBetStatus;
 import com.clutch.betting.exception.BettingErrorCode;
 import com.clutch.betting.exception.BettingException;
+import com.clutch.betting.live.BettingLiveStateReader;
+import com.clutch.betting.repository.BetPointTransactionRepository;
 import com.clutch.betting.repository.BettingEventRepository;
+import com.clutch.betting.repository.UserBetRepository;
+import com.clutch.lolesports.service.DataCacheService;
+import com.clutch.lolesports.service.PollingScheduler;
+import com.clutch.lolesports.service.SetWinnerTracker;
+import com.clutch.user.repository.UserRepository;
 import org.junit.jupiter.api.Test;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -16,24 +27,33 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
-class BettingResultRecoveryServiceTest {
+class BettingWinnerRecoveryTest {
 
     private final BettingEventRepository eventRepository = mock(BettingEventRepository.class);
-    private final BetSettlementService settlementService = mock(BetSettlementService.class);
-    private final BettingResultRecoveryService service = new BettingResultRecoveryService(
+    private final UserBetRepository userBetRepository = mock(UserBetRepository.class);
+    private final BettingService service = new BettingService(
             eventRepository,
-            settlementService
+            userBetRepository,
+            mock(BetPointTransactionRepository.class),
+            mock(UserRepository.class),
+            mock(BettingLiveStateReader.class),
+            mock(DataCacheService.class),
+            mock(SetWinnerTracker.class),
+            mock(PollingScheduler.class),
+            Clock.systemUTC()
     );
 
     @Test
-    void recordsVerifiedWinnerAndTriggersSettlement() {
+    void recordsVerifiedWinnerAndSettlesEvent() {
         BettingEvent event = closedEvent();
         given(eventRepository.findByIdForUpdate(50L)).willReturn(Optional.of(event));
+        given(userBetRepository.findAllByBettingEventIdAndStatusForUpdate(50L, UserBetStatus.PLACED))
+                .willReturn(List.of());
 
-        service.recoverAndSettle(50L, "team-a");
+        service.recoverWinnerAndSettle(50L, "team-a");
 
         assertThat(event.getWinnerExternalTeamId()).isEqualTo("team-a");
-        verify(settlementService).settle(50L);
+        assertThat(event.getStatus()).isEqualTo(BettingEventStatus.SETTLED);
     }
 
     @Test
@@ -42,11 +62,11 @@ class BettingResultRecoveryServiceTest {
         event.recordWinner("team-a");
         given(eventRepository.findByIdForUpdate(50L)).willReturn(Optional.of(event));
 
-        assertThatThrownBy(() -> service.recoverAndSettle(50L, "team-b"))
+        assertThatThrownBy(() -> service.recoverWinnerAndSettle(50L, "team-b"))
                 .isInstanceOf(BettingException.class)
                 .extracting(exception -> ((BettingException) exception).getErrorCode())
                 .isEqualTo(BettingErrorCode.WINNER_ALREADY_DECIDED);
-        verify(settlementService, never()).settle(50L);
+        verify(userBetRepository, never()).findAllByBettingEventIdAndStatusForUpdate(50L, UserBetStatus.PLACED);
     }
 
     @Test
@@ -55,11 +75,11 @@ class BettingResultRecoveryServiceTest {
         event.cancel();
         given(eventRepository.findByIdForUpdate(50L)).willReturn(Optional.of(event));
 
-        assertThatThrownBy(() -> service.recoverAndSettle(50L, "team-a"))
+        assertThatThrownBy(() -> service.recoverWinnerAndSettle(50L, "team-a"))
                 .isInstanceOf(BettingException.class)
                 .extracting(exception -> ((BettingException) exception).getErrorCode())
                 .isEqualTo(BettingErrorCode.RESULT_NOT_READY);
-        verify(settlementService, never()).settle(50L);
+        verify(userBetRepository, never()).findAllByBettingEventIdAndStatusForUpdate(50L, UserBetStatus.PLACED);
     }
 
     private BettingEvent closedEvent() {

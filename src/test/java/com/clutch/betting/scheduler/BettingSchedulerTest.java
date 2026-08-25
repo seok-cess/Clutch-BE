@@ -1,11 +1,12 @@
 package com.clutch.betting.scheduler;
 
-import com.clutch.betting.live.LiveBettingDataProvider;
-import com.clutch.betting.live.LiveBettingDataProvider.LiveMatchSnapshot;
+import com.clutch.betting.live.BettingLiveStateReader;
+import com.clutch.betting.live.BettingLiveStateReader.LiveMatchSnapshot;
 import com.clutch.betting.repository.BettingEventRepository;
-import com.clutch.betting.service.BetRefundService;
-import com.clutch.betting.service.BetSettlementService;
 import com.clutch.betting.service.BettingEventSynchronizationService;
+import com.clutch.betting.service.BettingResultRefreshService;
+import com.clutch.betting.service.BettingService;
+import com.clutch.lolesports.source.ExternalSourceState;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -14,64 +15,80 @@ import java.util.List;
 
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 class BettingSchedulerTest {
 
-    private final LiveBettingDataProvider liveBettingDataProvider =
-            mock(LiveBettingDataProvider.class);
+    private final BettingLiveStateReader liveStateReader =
+            mock(BettingLiveStateReader.class);
     private final BettingEventRepository eventRepository = mock(BettingEventRepository.class);
     private final BettingEventSynchronizationService synchronizationService =
             mock(BettingEventSynchronizationService.class);
-    private final BetSettlementService settlementService = mock(BetSettlementService.class);
-    private final BetRefundService refundService = mock(BetRefundService.class);
+    private final BettingService bettingService = mock(BettingService.class);
+    private final BettingResultRefreshService resultRefreshService = mock(BettingResultRefreshService.class);
+    private final ExternalSourceState sourceState = mock(ExternalSourceState.class);
     private final BettingScheduler scheduler = new BettingScheduler(
-            liveBettingDataProvider,
+            liveStateReader,
             eventRepository,
             synchronizationService,
-            settlementService,
-            refundService
+            bettingService,
+            resultRefreshService,
+            sourceState
     );
 
     @Test
     void processesSynchronizationSettlementAndRefundInOrderDespiteIndividualFailures() {
         LiveMatchSnapshot firstMatch = snapshot("match-1");
         LiveMatchSnapshot secondMatch = snapshot("match-2");
-        given(liveBettingDataProvider.findLiveMatches())
+        given(liveStateReader.findLiveMatches())
                 .willReturn(List.of(firstMatch, secondMatch));
         given(eventRepository.findIdsReadyToSettle()).willReturn(List.of(1L, 2L));
         given(eventRepository.findIdsCancelledWithPlacedBets()).willReturn(List.of(3L, 4L));
         willThrow(new DataIntegrityViolationException("duplicate event"))
                 .given(synchronizationService).synchronizeMatch(firstMatch);
         willThrow(new IllegalStateException("first settlement failed"))
-                .given(settlementService).settle(1L);
+                .given(bettingService).settle(1L);
         willThrow(new IllegalStateException("first refund failed"))
-                .given(refundService).refund(3L);
+                .given(bettingService).refund(3L);
 
         scheduler.process();
 
-        InOrder order = inOrder(synchronizationService, settlementService, refundService);
+        InOrder order = inOrder(synchronizationService, bettingService);
         order.verify(synchronizationService).synchronizeMatch(firstMatch);
         order.verify(synchronizationService).synchronizeMatch(secondMatch);
-        order.verify(settlementService).settle(1L);
-        order.verify(settlementService).settle(2L);
-        order.verify(refundService).refund(3L);
-        order.verify(refundService).refund(4L);
+        order.verify(bettingService).settle(1L);
+        order.verify(bettingService).settle(2L);
+        order.verify(bettingService).refund(3L);
+        order.verify(bettingService).refund(4L);
     }
 
     @Test
     void continuesWithSettlementAndRefundWhenLiveLookupFails() {
-        given(liveBettingDataProvider.findLiveMatches())
+        given(liveStateReader.findLiveMatches())
                 .willThrow(new IllegalStateException("live lookup failed"));
         given(eventRepository.findIdsReadyToSettle()).willReturn(List.of(1L));
         given(eventRepository.findIdsCancelledWithPlacedBets()).willReturn(List.of(2L));
 
         scheduler.process();
 
-        verify(settlementService).settle(1L);
-        verify(refundService).refund(2L);
+        verify(bettingService).settle(1L);
+        verify(bettingService).refund(2L);
+    }
+
+    @Test
+    void refreshesPendingResultsUnderSourceReadLock() {
+        doAnswer(invocation -> {
+            invocation.getArgument(0, Runnable.class).run();
+            return null;
+        }).when(sourceState).withReadLock(any(Runnable.class));
+
+        scheduler.refreshPendingResults();
+
+        verify(resultRefreshService).refreshPendingResults();
     }
 
     /**

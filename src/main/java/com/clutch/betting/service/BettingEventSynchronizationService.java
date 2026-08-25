@@ -3,8 +3,8 @@ package com.clutch.betting.service;
 import com.clutch.betting.config.BettingProperties;
 import com.clutch.betting.domain.BettingEvent;
 import com.clutch.betting.domain.BettingEventStatus;
-import com.clutch.betting.live.LiveBettingDataProvider.LiveMatchSnapshot;
-import com.clutch.betting.live.LiveBettingDataProvider.SetSnapshot;
+import com.clutch.betting.live.BettingLiveStateReader.LiveMatchSnapshot;
+import com.clutch.betting.live.BettingLiveStateReader.SetSnapshot;
 import com.clutch.betting.repository.BettingEventRepository;
 import com.clutch.lolesports.repository.EsportsMatchRepository;
 import lombok.RequiredArgsConstructor;
@@ -35,23 +35,28 @@ public class BettingEventSynchronizationService {
      */
     @Transactional
     public void synchronizeMatch(LiveMatchSnapshot liveMatch) {
-        if (!hasRequiredMatchData(liveMatch)) {
+        if (!hasSynchronizableSets(liveMatch)) {
             return;
         }
         List<SetSnapshot> sets = liveMatch.sets();
-        if (sets == null) {
-            return;
-        }
-
-        LocalDateTime now = LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC);
+        LocalDateTime now = now();
         if (sets.isEmpty()) {
             openScheduledFirstSetIfAvailable(liveMatch, now);
             return;
         }
+        synchronizeSets(liveMatch, sets, now);
+        cancelUnusedFutureEvents(liveMatch);
+    }
+
+    /** 유효한 매치의 모든 세트를 같은 기준 시각으로 순서대로 동기화한다. */
+    private void synchronizeSets(
+            LiveMatchSnapshot liveMatch,
+            List<SetSnapshot> sets,
+            LocalDateTime now
+    ) {
         for (SetSnapshot set : sets) {
             synchronizeSet(liveMatch, set, now);
         }
-        cancelUnusedFutureEvents(liveMatch);
     }
 
     /**
@@ -142,21 +147,51 @@ public class BettingEventSynchronizationService {
             synchronizeWithoutPeriod(liveMatch, set, event, now);
             return;
         }
+        synchronizeSetWithPeriod(liveMatch, set, event, period, now);
+    }
+
+    /** 기간을 계산할 수 있는 세트의 오픈·게임 연결·마감·종료 순서를 처리한다. */
+    private void synchronizeSetWithPeriod(
+            LiveMatchSnapshot liveMatch,
+            SetSnapshot set,
+            BettingEvent event,
+            BettingPeriod period,
+            LocalDateTime now
+    ) {
         if (now.isBefore(period.openedAt())) {
             updateOpenPeriod(event, period, set.setNumber() > 1);
             return;
         }
 
-        if (event == null) {
-            event = openEvent(liveMatch, set.setNumber(), period);
-        }
+        event = openEventIfMissing(event, liveMatch, set.setNumber(), period);
         updateOpenPeriod(event, period, set.setNumber() > 1);
         attachGameIfPresent(event, set.externalGameId());
         closeNextSetAfterStartGracePeriod(event, set, now);
-        if (set.finished()) {
-            finishEvent(event, set);
-            openNextEventAfterFinishedSet(liveMatch, set, now);
+        finishSetAndOpenNextIfNeeded(liveMatch, set, event, now);
+    }
+
+    /** 아직 이벤트가 없을 때만 주어진 기간으로 생성하고, 있으면 기존 이벤트를 유지한다. */
+    private BettingEvent openEventIfMissing(
+            BettingEvent event,
+            LiveMatchSnapshot liveMatch,
+            int setNumber,
+            BettingPeriod period
+    ) {
+        return event == null ? openEvent(liveMatch, setNumber, period) : event;
+    }
+
+    /** 완료 세트만 종료 결과를 반영하고 다음 세트 선개설을 시도한다. */
+    private void finishSetAndOpenNextIfNeeded(
+            LiveMatchSnapshot liveMatch,
+            SetSnapshot set,
+            BettingEvent event,
+            LocalDateTime now
+    ) {
+        if (!set.finished()) {
+            return;
         }
+        finishEvent(event, set);
+        openNextEventAfterFinishedSet(liveMatch, set, now);
     }
 
     /**
@@ -282,17 +317,23 @@ public class BettingEventSynchronizationService {
     }
 
     /**
-     * 매치 ID와 정확히 두 참가 팀을 가진 스냅샷만 처리 대상으로 인정한다.
+     * 매치 ID·정확히 두 참가 팀·세트 목록을 가진 스냅샷만 처리 대상으로 인정한다.
      *
      * @param liveMatch 검증할 라이브 매치 스냅샷
      * @return 동기화에 필요한 최소 정보가 있으면 true
      */
-    private boolean hasRequiredMatchData(LiveMatchSnapshot liveMatch) {
+    private boolean hasSynchronizableSets(LiveMatchSnapshot liveMatch) {
         return liveMatch != null
                 && liveMatch.externalMatchId() != null
                 && !liveMatch.externalMatchId().isBlank()
                 && liveMatch.externalTeamIds() != null
-                && liveMatch.externalTeamIds().size() == 2;
+                && liveMatch.externalTeamIds().size() == 2
+                && liveMatch.sets() != null;
+    }
+
+    /** 주입된 시계를 UTC 로컬 시각으로 변환한다. */
+    private LocalDateTime now() {
+        return LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC);
     }
 
     /**

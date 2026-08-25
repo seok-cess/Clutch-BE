@@ -129,8 +129,9 @@
 ## 관련 코드
 
 - `com.clutch.betting.service.BettingService`
-- `com.clutch.betting.service.BetSettlementService`
-- `com.clutch.betting.service.BetRefundService`
+- `com.clutch.betting.service.BettingEventSynchronizationService`
+- `com.clutch.betting.service.BettingResultRefreshService`
+- `com.clutch.betting.live.BettingLiveStateReader`
 - `com.clutch.betting.domain.BettingEvent`
 - `com.clutch.betting.domain.UserBet`
 - `com.clutch.betting.domain.BetPointTransaction`

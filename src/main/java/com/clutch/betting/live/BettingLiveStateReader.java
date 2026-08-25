@@ -18,10 +18,15 @@ import java.time.format.DateTimeParseException;
 import java.util.Comparator;
 import java.util.List;
 
-/** lolesports 캐시를 배팅 도메인의 라이브 데이터 계약으로 제공한다. */
+/**
+ * lolesports 캐시를 읽어 배팅 동기화용 라이브 상태로 변환하고 신규 배팅 가능 여부를 판단한다.
+ *
+ * <p>lolesports의 원본 DTO·캐시 구조가 배팅 서비스와 스케줄러로 퍼지지 않도록,
+ * 필요한 매치·세트 상태만 불변 스냅샷으로 제공한다.</p>
+ */
 @Component
 @RequiredArgsConstructor
-public class LolesportsLiveBettingDataProvider implements LiveBettingDataProvider {
+public class BettingLiveStateReader {
 
     private final DataCacheService dataCacheService;
     private final SetWinnerTracker setWinnerTracker;
@@ -35,7 +40,6 @@ public class LolesportsLiveBettingDataProvider implements LiveBettingDataProvide
      *
      * @return 배팅 동기화용 라이브 매치 스냅샷 목록
      */
-    @Override
     public List<LiveMatchSnapshot> findLiveMatches() {
         return dataCacheService.getBettingMatches().stream()
                 .map(this::toSnapshot)
@@ -50,7 +54,6 @@ public class LolesportsLiveBettingDataProvider implements LiveBettingDataProvide
      * @param setNumber 세트 번호
      * @return 최신 캐시 상태에서 배팅 가능하면 true
      */
-    @Override
     public boolean isAcceptingBets(
             String externalMatchId,
             String externalGameId,
@@ -130,6 +133,7 @@ public class LolesportsLiveBettingDataProvider implements LiveBettingDataProvide
                 .toList();
     }
 
+    /** 세트 스냅샷의 식별과 순서에 필요한 외부 게임 ID와 세트 번호가 모두 있는지 확인한다. */
     private boolean hasRequiredGameData(EventDetailsResponse.Game game) {
         return game.id() != null
                 && !game.id().isBlank()
@@ -277,5 +281,73 @@ public class LolesportsLiveBettingDataProvider implements LiveBettingDataProvide
         }
         LocalDateTime now = LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC);
         return now.isBefore(set.startedAt().plus(bettingProperties.firstSetCloseAfterStart()));
+    }
+
+    /**
+     * 팀·세트·종료 여부를 묶은 매치 단위 불변 스냅샷이다.
+     *
+     * @param externalMatchId 외부 매치 ID
+     * @param scheduledStartAt 공식 일정의 매치 시작 시각(UTC) 또는 미확정이면 null
+     * @param externalTeamIds 배팅 선택지로 사용할 참가 팀 외부 ID 목록
+     * @param sets 세트 번호순 라이브 세트 상태
+     * @param matchFinished 다전제 승자가 확정돼 매치가 끝났는지 여부
+     * @param bestOf 최대 세트 수 또는 확인되지 않았으면 null
+     */
+    public record LiveMatchSnapshot(
+            String externalMatchId,
+            LocalDateTime scheduledStartAt,
+            List<String> externalTeamIds,
+            List<SetSnapshot> sets,
+            boolean matchFinished,
+            Integer bestOf
+    ) {
+
+        /** 다전제 수가 아직 확인되지 않은 매치의 스냅샷을 만든다. */
+        public LiveMatchSnapshot(
+                String externalMatchId,
+                LocalDateTime scheduledStartAt,
+                List<String> externalTeamIds,
+                List<SetSnapshot> sets,
+                boolean matchFinished
+        ) {
+            this(externalMatchId, scheduledStartAt, externalTeamIds, sets, matchFinished, null);
+        }
+    }
+
+    /**
+     * 세트 시작·종료·승자 상태를 묶은 불변 스냅샷이다.
+     *
+     * @param externalGameId 외부 게임 ID
+     * @param setNumber 매치 내 세트 번호
+     * @param startedAt 첫 프레임 기준 세트 시작 시각(UTC) 또는 미확정이면 null
+     * @param gameTimeSeconds 피드가 제공한 게임 경과 초 또는 미제공이면 null
+     * @param active 현재 라이브로 진행 중인 세트인지 여부
+     * @param finished 세트 종료가 확인됐는지 여부
+     * @param finishedAt 종료 피드 시각(UTC) 또는 미확정이면 null
+     * @param winnerExternalTeamId 확정된 승리 팀 외부 ID 또는 미확정이면 null
+     */
+    public record SetSnapshot(
+            String externalGameId,
+            int setNumber,
+            LocalDateTime startedAt,
+            Long gameTimeSeconds,
+            boolean active,
+            boolean finished,
+            LocalDateTime finishedAt,
+            String winnerExternalTeamId
+    ) {
+
+        /** 게임 시계가 없는 세트 스냅샷을 만든다. */
+        public SetSnapshot(
+                String externalGameId,
+                int setNumber,
+                LocalDateTime startedAt,
+                boolean active,
+                boolean finished,
+                LocalDateTime finishedAt,
+                String winnerExternalTeamId
+        ) {
+            this(externalGameId, setNumber, startedAt, null, active, finished, finishedAt, winnerExternalTeamId);
+        }
     }
 }
