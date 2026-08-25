@@ -3,6 +3,7 @@ package com.clutch.coupon.test.event.service;
 import com.clutch.coupon.contract.trigger.CouponTestMatch;
 import com.clutch.coupon.test.event.api.dto.SampleFrameRequest;
 import com.clutch.lolesports.dto.external.WindowResponse;
+import com.clutch.lolesports.service.FirstBloodDetector;
 import com.clutch.lolesports.service.PentakillDetector;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -14,8 +15,8 @@ import java.util.List;
  * 시연 화면의 프레임을 실제 감지기에 흘려보낸다.
  *
  * <p>화면이 "펜타킬이 났다"고 지목하면 감지 로직은 한 줄도 검증되지 않는다.
- * 그래서 화면은 킬 수만 보내고, 판정은 폴링이 쓰는 것과 같은
- * {@link PentakillDetector} 가 하도록 한다.</p>
+ * 그래서 화면은 킬 수만 보내고, 판정은 폴링이 쓰는 것과 같은 감지기가 하도록 한다.
+ * 트리거가 늘면 여기에도 함께 걸어야 시연에서 같은 경로를 탄다.</p>
  *
  * <p>경기는 예약된 테스트 경기로 고정한다. 요청이 경기를 고르게 두면 시연 화면을
  * 여는 것만으로 실제 경기의 쿠폰을 열 수 있다.</p>
@@ -34,6 +35,7 @@ public class SampleFrameService {
     private static final Instant FRAME_TIME_BASE = Instant.EPOCH;
 
     private final PentakillDetector pentakillDetector;
+    private final FirstBloodDetector firstBloodDetector;
 
     /** 프레임 한 장을 감지기에 전달한다. 트리거 발동 여부는 감지기가 판단한다. */
     public void submit(SampleFrameRequest request) {
@@ -53,6 +55,12 @@ public class SampleFrameService {
                 frame,
                 FRAME_TIME_BASE
         );
+        firstBloodDetector.onNewWindowFrame(
+                CouponTestMatch.SAMPLE_EXTERNAL_MATCH_ID,
+                request.gameId(),
+                frame,
+                FRAME_TIME_BASE
+        );
     }
 
     /**
@@ -63,6 +71,7 @@ public class SampleFrameService {
      */
     public void reset(String gameId) {
         pentakillDetector.clearGame(gameId);
+        firstBloodDetector.clearGame(gameId);
     }
 
     private WindowResponse.TeamFrame teamFrame(
@@ -71,12 +80,20 @@ public class SampleFrameService {
         List<SampleFrameRequest.Participant> source =
                 participants == null ? List.of() : participants;
 
+        // 팀 누적 킬을 채운다. 참가자 킬만 보내면 팀 집계를 보는 감지기(첫 킬)가
+        // 판정 근거가 없어 그대로 넘어간다
+        int totalKills = source.stream()
+                .map(SampleFrameRequest.Participant::kills)
+                .filter(java.util.Objects::nonNull)
+                .mapToInt(Integer::intValue)
+                .sum();
+
         return new WindowResponse.TeamFrame(
                 null,
                 null,
                 null,
                 null,
-                null,
+                totalKills,
                 List.of(),
                 source.stream()
                         .map(participant -> new WindowResponse.ParticipantFrame(

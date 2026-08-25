@@ -15,6 +15,9 @@ public enum CouponEventTrigger {
     /** 수동 테스트용. 백엔드가 날짜와 당일 순번을 붙여 저장한다 (CLUTCH-216) */
     MANUAL_TEST("수동 테스트"),
 
+    /** 그 세트에서 처음으로 킬이 나왔을 때 */
+    FIRST_BLOOD("첫 킬"),
+
     /** 한 선수가 5킬을 연속으로 처리했을 때 */
     PENTAKILL("펜타킬"),
 

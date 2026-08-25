@@ -3,6 +3,7 @@ package com.clutch.coupon.test.event.service;
 import com.clutch.coupon.contract.trigger.CouponMatchTrigger;
 import com.clutch.coupon.contract.trigger.CouponTestMatch;
 import com.clutch.coupon.test.event.api.dto.SampleFrameRequest;
+import com.clutch.lolesports.service.FirstBloodDetector;
 import com.clutch.lolesports.service.PentakillDetector;
 import org.junit.jupiter.api.Test;
 
@@ -32,6 +33,10 @@ class SampleFrameServiceTest {
             new PentakillDetector(
                     (trigger, matchId, gameId, gameTime) ->
                             fired.add(new Fired(trigger, matchId))
+            ),
+            new FirstBloodDetector(
+                    (trigger, matchId, gameId, gameTime) ->
+                            fired.add(new Fired(trigger, matchId))
             )
     );
 
@@ -45,6 +50,41 @@ class SampleFrameServiceTest {
                 )),
                 List.of()
         ));
+    }
+
+    /** 양 팀 참가자를 함께 보낸다 (화면이 실제로 보내는 모양) */
+    private void submitBothSides(int gameTimeSeconds, int blueKills, int redKills) {
+        service.submit(new SampleFrameRequest(
+                GAME_ID,
+                gameTimeSeconds,
+                List.of(new SampleFrameRequest.Participant(1, blueKills)),
+                List.of(new SampleFrameRequest.Participant(6, redKills))
+        ));
+    }
+
+    @Test
+    void 첫_킬이_나면_감지기가_퍼스트블러드를_발동한다() {
+        // 참가자 킬만 채우고 팀 누적 킬을 비워두면 첫 킬 감지기가 판정하지 못한다.
+        // 시연 경로도 폴링과 같은 프레임 모양을 만들어야 같은 트리거가 걸린다
+        submitBothSides(230, 0, 0);
+        submitBothSides(240, 0, 1);
+
+        assertEquals(1, fired.size(), "첫 킬 한 건이 감지되어야 함");
+        assertEquals(CouponMatchTrigger.FIRST_BLOOD, fired.get(0).trigger());
+        assertEquals(
+                CouponTestMatch.SAMPLE_EXTERNAL_MATCH_ID,
+                fired.get(0).externalMatchId()
+        );
+    }
+
+    @Test
+    void 첫_킬은_한_세트에서_한_번만_발동한다() {
+        submitBothSides(230, 0, 0);
+        submitBothSides(240, 0, 1);
+        submitBothSides(250, 1, 1);
+        submitBothSides(260, 2, 1);
+
+        assertEquals(1, fired.size(), "세트당 첫 킬은 한 번뿐이어야 함");
     }
 
     @Test
