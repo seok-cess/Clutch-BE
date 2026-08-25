@@ -2,9 +2,11 @@ package com.clutch.betting.api;
 
 import com.clutch.betting.dto.request.BetCreateRequest;
 import com.clutch.betting.dto.response.BetCreateResponse;
+import com.clutch.betting.dto.response.BettingCandidateResponse;
 import com.clutch.betting.dto.response.BettingEventResponse;
 import com.clutch.betting.dto.response.MyBetResponse;
 import com.clutch.betting.dto.response.UserBetResponse;
+import com.clutch.betting.service.BettingCandidateQueryService;
 import com.clutch.betting.service.BettingService;
 import com.clutch.wallet.web.CurrentUserId;
 import jakarta.validation.Valid;
@@ -31,6 +33,17 @@ import java.util.List;
 public class BettingController {
 
     private final BettingService bettingService;
+    private final BettingCandidateQueryService bettingCandidateQueryService;
+
+    /** 시작 전에도 실제로 배팅이 열린 매치를 배팅 카드용으로 반환한다. */
+    @GetMapping("/betting-candidates")
+    public ResponseEntity<List<BettingCandidateResponse>> getBettingCandidates() {
+        return ResponseEntity.ok(
+                bettingCandidateQueryService.findOpenMatchCandidates().stream()
+                        .map(BettingCandidateResponse::from)
+                        .toList()
+        );
+    }
 
     /**
      * 특정 매치에서 현재 노출할 배팅 이벤트와 내 배팅을 조회한다.

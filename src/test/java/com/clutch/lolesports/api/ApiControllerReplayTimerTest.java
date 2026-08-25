@@ -1,6 +1,5 @@
 package com.clutch.lolesports.api;
 
-import com.clutch.betting.service.BettingCandidateQueryService;
 import com.clutch.lolesports.client.LiveStatsClient;
 import com.clutch.lolesports.config.LolesportsProperties;
 import com.clutch.lolesports.dto.external.WindowResponse;
@@ -51,8 +50,7 @@ class ApiControllerReplayTimerTest {
                 mock(SetWinnerTracker.class),
                 mock(SeasonStatsService.class),
                 mock(PollingScheduler.class),
-                sourceState,
-                mock(BettingCandidateQueryService.class)
+                sourceState
         );
 
         ApiDtos.Scoreboard result = controller.scoreboard("game-1", null).getBody();
@@ -103,8 +101,7 @@ class ApiControllerReplayTimerTest {
                 mock(SetWinnerTracker.class),
                 mock(SeasonStatsService.class),
                 mock(PollingScheduler.class),
-                sourceState,
-                mock(BettingCandidateQueryService.class)
+                sourceState
         );
     }
 

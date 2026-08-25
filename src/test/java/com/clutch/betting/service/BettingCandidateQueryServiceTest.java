@@ -2,10 +2,13 @@ package com.clutch.betting.service;
 
 import com.clutch.betting.domain.BettingEvent;
 import com.clutch.betting.domain.BettingEventStatus;
+import com.clutch.betting.dto.BettingCandidateView;
 import com.clutch.betting.repository.BettingEventRepository;
 import com.clutch.lolesports.dto.external.EventDetailsResponse;
 import com.clutch.lolesports.dto.external.ScheduleResponse;
 import com.clutch.lolesports.service.DataCacheService;
+import com.clutch.lolesports.service.PollingScheduler;
+import com.clutch.lolesports.service.SetWinnerTracker;
 import org.junit.jupiter.api.Test;
 
 import java.time.Clock;
@@ -22,9 +25,13 @@ class BettingCandidateQueryServiceTest {
 
     private final BettingEventRepository repository = mock(BettingEventRepository.class);
     private final DataCacheService cache = new DataCacheService();
+    private final SetWinnerTracker setWinnerTracker = mock(SetWinnerTracker.class);
+    private final PollingScheduler pollingScheduler = mock(PollingScheduler.class);
     private final BettingCandidateQueryService service = new BettingCandidateQueryService(
             repository,
             cache,
+            setWinnerTracker,
+            pollingScheduler,
             Clock.fixed(Instant.parse("2026-08-14T09:45:00Z"), ZoneOffset.UTC)
     );
 
@@ -36,9 +43,9 @@ class BettingCandidateQueryServiceTest {
                         LocalDateTime.of(2026, 8, 14, 10, 1))
         ));
 
-        List<DataCacheService.LiveMatch> candidates = service.findOpenMatchCandidates();
+        List<BettingCandidateView> candidates = service.findOpenMatchCandidates();
 
-        assertThat(candidates).extracting(DataCacheService.LiveMatch::matchId)
+        assertThat(candidates).extracting(BettingCandidateView::matchId)
                 .containsExactly("match-open");
     }
 
