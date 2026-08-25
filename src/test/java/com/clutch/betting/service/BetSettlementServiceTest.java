@@ -21,6 +21,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 class BetSettlementServiceTest {
@@ -38,24 +39,71 @@ class BetSettlementServiceTest {
     );
 
     @Test
-    void paysTwiceTheAmountToWinnerAndSettlesLoser() {
+    void distributesPoolAfterTenPercentFeeAndSettlesLosers() {
         BettingEvent event = settledReadyEvent();
-        UserBet winner = userBet(100L, 10L, "team-a", 1_000L);
-        UserBet loser = userBet(200L, 20L, "team-b", 2_000L);
+        UserBet firstWinner = userBet(100L, 10L, "team-a", 1_000L);
+        UserBet secondWinner = userBet(200L, 20L, "team-a", 2_000L);
+        UserBet loser = userBet(300L, 30L, "team-b", 7_000L);
         given(eventRepository.findByIdForUpdate(1L)).willReturn(Optional.of(event));
         given(userBetRepository.findAllByBettingEventIdAndStatusForUpdate(
                 1L,
                 UserBetStatus.PLACED
-        )).willReturn(List.of(winner, loser));
-        given(userRepository.increasePoint(10L, 2_000L)).willReturn(1);
+        )).willReturn(List.of(firstWinner, secondWinner, loser));
+        given(userRepository.increasePoint(10L, 3_000L)).willReturn(1);
+        given(userRepository.increasePoint(20L, 6_000L)).willReturn(1);
 
         service.settle(1L);
 
         assertThat(event.getStatus()).isEqualTo(BettingEventStatus.SETTLED);
-        assertThat(winner.getStatus()).isEqualTo(UserBetStatus.WON);
+        assertThat(firstWinner.getStatus()).isEqualTo(UserBetStatus.WON);
+        assertThat(secondWinner.getStatus()).isEqualTo(UserBetStatus.WON);
         assertThat(loser.getStatus()).isEqualTo(UserBetStatus.LOST);
-        verify(userRepository).increasePoint(10L, 2_000L);
-        verify(transactionRepository).save(any(BetPointTransaction.class));
+        verify(userRepository).increasePoint(10L, 3_000L);
+        verify(userRepository).increasePoint(20L, 6_000L);
+        verify(transactionRepository, times(2)).save(any(BetPointTransaction.class));
+    }
+
+    @Test
+    void retainsFractionalPayoutRemainderAsOperatingFee() {
+        BettingEvent event = settledReadyEvent();
+        UserBet firstWinner = userBet(100L, 10L, "team-a", 1_001L);
+        UserBet secondWinner = userBet(200L, 20L, "team-a", 1_000L);
+        UserBet loser = userBet(300L, 30L, "team-b", 1_000L);
+        given(eventRepository.findByIdForUpdate(1L)).willReturn(Optional.of(event));
+        given(userBetRepository.findAllByBettingEventIdAndStatusForUpdate(
+                1L,
+                UserBetStatus.PLACED
+        )).willReturn(List.of(firstWinner, secondWinner, loser));
+        given(userRepository.increasePoint(10L, 1_351L)).willReturn(1);
+        given(userRepository.increasePoint(20L, 1_349L)).willReturn(1);
+
+        service.settle(1L);
+
+        verify(userRepository).increasePoint(10L, 1_351L);
+        verify(userRepository).increasePoint(20L, 1_349L);
+        assertThat(firstWinner.getStatus()).isEqualTo(UserBetStatus.WON);
+        assertThat(secondWinner.getStatus()).isEqualTo(UserBetStatus.WON);
+        assertThat(loser.getStatus()).isEqualTo(UserBetStatus.LOST);
+    }
+
+    @Test
+    void retainsEntirePoolWhenNoBetSelectedWinner() {
+        BettingEvent event = settledReadyEvent();
+        UserBet firstLoser = userBet(100L, 10L, "team-b", 1_000L);
+        UserBet secondLoser = userBet(200L, 20L, "team-b", 2_000L);
+        given(eventRepository.findByIdForUpdate(1L)).willReturn(Optional.of(event));
+        given(userBetRepository.findAllByBettingEventIdAndStatusForUpdate(
+                1L,
+                UserBetStatus.PLACED
+        )).willReturn(List.of(firstLoser, secondLoser));
+
+        service.settle(1L);
+
+        assertThat(event.getStatus()).isEqualTo(BettingEventStatus.SETTLED);
+        assertThat(firstLoser.getStatus()).isEqualTo(UserBetStatus.LOST);
+        assertThat(secondLoser.getStatus()).isEqualTo(UserBetStatus.LOST);
+        verify(userRepository, never()).increasePoint(any(), any(Long.class));
+        verify(transactionRepository, never()).save(any(BetPointTransaction.class));
     }
 
     @Test

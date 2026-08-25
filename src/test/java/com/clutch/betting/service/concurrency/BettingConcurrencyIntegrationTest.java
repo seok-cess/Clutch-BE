@@ -127,7 +127,7 @@ class BettingConcurrencyIntegrationTest {
         eventRepository.saveAndFlush(event);
         runConcurrently(REQUEST_COUNT, () -> settlementService.settle(event.getId()));
 
-        assertThat(userRepository.findById(user.getId()).orElseThrow().getPoint()).isEqualTo(6_000L);
+        assertThat(userRepository.findById(user.getId()).orElseThrow().getPoint()).isEqualTo(4_900L);
         assertThat(transactionRepository.findByUserBetIdAndTransactionType(
                 userBet.getId(),
                 BetPointTransactionType.PAYOUT
