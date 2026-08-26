@@ -24,8 +24,10 @@
   않고 fail-closed로 발급을 막는다.
 - 요청 MySQL transaction에는 발급 요청, `user_coupon`, 결과 Outbox만 저장한다.
 - 요청 transaction에서 `coupon_event_item.success_count`를 증가시키지 않는다.
-- `success_count`는 5초 주기의 단일 스케줄러가 실제 `user_coupon` 수로 보정하는
-  비동기 집계값으로 바꾼다.
+- `success_count`는 5초 주기의 단일 스케줄러가 실제 `user_coupon` 수를 항목별
+  `GROUP BY` 한 번으로 집계하여 보정하는 비동기 집계값으로 바꾼다.
+- `user_coupon.coupon_event_item_id` 인덱스로 전체 항목 집계 시 테이블 본문 반복 조회와
+  항목별 N개 COUNT 쿼리를 피한다.
 - Redis 재고 초기화와 장애 복구는 `success_count`가 아니라 실제 `user_coupon` 수를
   사용한다.
 - Redis 복구는 재고와 당첨 사용자 집합뿐 아니라 발급 컨텍스트도 함께 재구축한다.
@@ -55,8 +57,8 @@
 - 발급 가능 여부에 대한 MySQL 단일 행 잠금이 사라진다.
 - `success_count`와 실제 쿠폰 수는 최대 집계 주기만큼 일시적으로 다를 수 있다.
 - 관리자 집계는 지연된 값임을 전제로 하며, 재고·복구 판단에는 사용하지 않는다.
-- 집계 작업은 항목별 실제 쿠폰 수를 조회하므로 항목 수가 크게 늘면 집계 쿼리를 묶는
-  후속 최적화가 필요하다.
+- 집계 작업은 인덱스를 한 번 순회하지만 전체 실제 쿠폰 수에 비례하므로 데이터가 더
+  커지면 증분 집계를 별도 ADR로 검토한다.
 
 ## Follow-up
 
