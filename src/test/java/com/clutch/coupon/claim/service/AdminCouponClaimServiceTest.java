@@ -109,6 +109,34 @@ class AdminCouponClaimServiceTest {
         assertThat(captor.getValue().eventNameKeyword()).isNull();
     }
 
+    @Test
+    void DB에_존재하는_취소_요청과_만료_쿠폰_상태를_응답한다() {
+        AdminCouponClaimRow row = row(30L);
+        row = new AdminCouponClaimRow(
+                row.claimRequestId(), row.requestedAt(), row.completedAt(),
+                row.couponEventId(), row.eventName(), row.triggerType(),
+                row.couponEventOccurrenceId(), row.userId(), row.userName(),
+                row.userEmail(), row.userPhoneNumber(), row.couponTypeId(),
+                row.couponName(), row.discountType(), row.discountValue(),
+                "CANCELLED", row.failureReason(), row.userCouponId(),
+                "EXPIRED"
+        );
+        when(queryRepository.findAll(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.eq(21)
+        )).thenReturn(List.of(row));
+
+        AdminCouponClaimListResponse response = service.findAll(
+                null, null, null, null, null, null,
+                null, null, null, 20
+        );
+
+        assertThat(response.claims().getFirst().requestStatus())
+                .isEqualTo(ClaimRequestStatus.CANCELLED);
+        assertThat(response.claims().getFirst().couponStatus())
+                .isEqualTo(UserCouponStatus.EXPIRED);
+    }
+
     private AdminCouponClaimRow row(Long claimRequestId) {
         LocalDateTime now = LocalDateTime.of(2026, 8, 21, 12, 0);
         return new AdminCouponClaimRow(

@@ -5,7 +5,6 @@ import com.clutch.coupon.event.repository.CouponEventItemRepository;
 import com.clutch.wallet.repository.CouponEventItemIssuedCount;
 import com.clutch.wallet.repository.UserCouponRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,13 +24,13 @@ public class CouponSuccessCountSynchronizer {
     private final CouponEventItemRepository couponEventItemRepository;
     private final UserCouponRepository userCouponRepository;
 
-    /** 실제 쿠폰 수로 성공 집계를 단일 스케줄러에서 보정한다. */
-    @Scheduled(
-            fixedDelayString =
-                    "${coupon.success-count-sync.interval-ms:5000}"
-    )
+    /**
+     * 실제 쿠폰 수로 성공 집계를 보정한다.
+     *
+     * @return 조회·갱신한 이벤트 항목 수
+     */
     @Transactional
-    public void synchronize() {
+    public CouponSuccessCountSynchronizationResult synchronize() {
         Map<Long, Long> issuedCounts = new HashMap<>();
         for (CouponEventItemIssuedCount count : userCouponRepository
                 .countIssuedCouponsGroupByEventItem()) {
@@ -41,7 +40,9 @@ public class CouponSuccessCountSynchronizer {
             );
         }
 
-        for (CouponEventItem item : couponEventItemRepository.findAll()) {
+        int updatedItemCount = 0;
+        var items = couponEventItemRepository.findAll();
+        for (CouponEventItem item : items) {
             long issuedCouponCount = issuedCounts.getOrDefault(
                     item.getId(),
                     0L
@@ -51,7 +52,13 @@ public class CouponSuccessCountSynchronizer {
                 item.synchronizeSuccessCount(
                         Math.toIntExact(issuedCouponCount)
                 );
+                updatedItemCount++;
             }
         }
+
+        return new CouponSuccessCountSynchronizationResult(
+                items.size(),
+                updatedItemCount
+        );
     }
 }

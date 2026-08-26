@@ -46,13 +46,16 @@ class CouponSuccessCountSynchronizerTest {
         when(couponEventItemRepository.findAll())
                 .thenReturn(List.of(issuedItem, emptyItem));
 
-        new CouponSuccessCountSynchronizer(
+        CouponSuccessCountSynchronizationResult result =
+                new CouponSuccessCountSynchronizer(
                 couponEventItemRepository,
                 userCouponRepository
         ).synchronize();
 
         assertThat(issuedItem.getSuccessCount()).isEqualTo(37);
         assertThat(emptyItem.getSuccessCount()).isZero();
+        assertThat(result.scannedItemCount()).isEqualTo(2);
+        assertThat(result.updatedItemCount()).isEqualTo(2);
         verify(userCouponRepository).countIssuedCouponsGroupByEventItem();
         verify(userCouponRepository, never())
                 .countByCouponEventItemId(anyLong());
