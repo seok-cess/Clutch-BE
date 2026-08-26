@@ -48,6 +48,7 @@ public class PollingScheduler {
     private final LiveStatsClient liveStats;
     private final DataCacheService cache;
     private final PentakillDetector pentakillDetector;
+    private final FirstBloodDetector firstBloodDetector;
     private final GamePersistService persistService;
     private final SetWinnerTracker setWinners;
     private final HistoricalGameService historical;
@@ -94,6 +95,7 @@ public class PollingScheduler {
                             LiveStatsClient liveStats,
                             DataCacheService cache,
                             PentakillDetector pentakillDetector,
+                            FirstBloodDetector firstBloodDetector,
                             GamePersistService persistService,
                             SetWinnerTracker setWinners,
                             HistoricalGameService historical,
@@ -103,6 +105,7 @@ public class PollingScheduler {
         this.liveStats = liveStats;
         this.cache = cache;
         this.pentakillDetector = pentakillDetector;
+        this.firstBloodDetector = firstBloodDetector;
         this.persistService = persistService;
         this.setWinners = setWinners;
         this.historical = historical;
@@ -115,6 +118,20 @@ public class PollingScheduler {
         this.metaBackoff = new Backoff(base, max);
     }
 
+    /** 첫 킬 감지기 없이 조립하는 기존 단위 테스트용 생성자. */
+    PollingScheduler(LolesportsApiClient api,
+                     LiveStatsClient liveStats,
+                     DataCacheService cache,
+                     PentakillDetector pentakillDetector,
+                     GamePersistService persistService,
+                     SetWinnerTracker setWinners,
+                     HistoricalGameService historical,
+                     LolesportsProperties props,
+                     ExternalSourceState sourceState) {
+        this(api, liveStats, cache, pentakillDetector, null, persistService,
+                setWinners, historical, props, sourceState);
+    }
+
     /** 기존 단위 테스트와 패키지 내부 조립을 위한 기본 REAL 상태 생성자. */
     PollingScheduler(LolesportsApiClient api,
                      LiveStatsClient liveStats,
@@ -124,7 +141,7 @@ public class PollingScheduler {
                      SetWinnerTracker setWinners,
                      HistoricalGameService historical,
                      LolesportsProperties props) {
-        this(api, liveStats, cache, pentakillDetector, persistService, setWinners, historical, props,
+        this(api, liveStats, cache, pentakillDetector, null, persistService, setWinners, historical, props,
                 new ExternalSourceState(new ExternalSourceProperties(
                         false, ExternalSourceMode.REAL, null, null)));
     }
@@ -137,7 +154,7 @@ public class PollingScheduler {
                      GamePersistService persistService,
                      SetWinnerTracker setWinners,
                      LolesportsProperties props) {
-        this(api, liveStats, cache, pentakillDetector, persistService, setWinners, null, props,
+        this(api, liveStats, cache, pentakillDetector, null, persistService, setWinners, null, props,
                 new ExternalSourceState(new ExternalSourceProperties(
                         false, ExternalSourceMode.REAL, null, null)));
     }
@@ -424,6 +441,9 @@ public class PollingScheduler {
             if (persisted) {
                 cache.evictGame(gameId);
                 pentakillDetector.clearGame(gameId);
+                if (firstBloodDetector != null) {
+                    firstBloodDetector.clearGame(gameId);
+                }
                 statsFailures.remove(gameId);
                 lastKnownMatches.remove(gameId);
                 log.info("게임 {} 적재 후 캐시 해제 (남은 버퍼 {}개)", gameId, cache.bufferedGameCount());
@@ -532,6 +552,11 @@ public class PollingScheduler {
                 pentakillDetector.onNewWindowFrame(
                         externalMatchId, gameId, frame, gameStart
                 );
+                if (firstBloodDetector != null) {
+                    firstBloodDetector.onNewWindowFrame(
+                            externalMatchId, gameId, frame, gameStart
+                    );
+                }
             }
             return true;
         } catch (WebClientResponseException.NotFound e) {
@@ -696,6 +721,9 @@ public class PollingScheduler {
         metaBackoff.reset();
         if (pentakillDetector != null) {
             pentakillDetector.clearAll();
+        }
+        if (firstBloodDetector != null) {
+            firstBloodDetector.clearAll();
         }
         if (setWinners != null) {
             setWinners.clearAll();

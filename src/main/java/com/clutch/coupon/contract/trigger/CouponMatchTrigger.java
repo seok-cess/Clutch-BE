@@ -9,6 +9,9 @@ package com.clutch.coupon.contract.trigger;
  */
 public enum CouponMatchTrigger {
 
+    /** 그 세트에서 처음으로 킬이 나왔을 때 */
+    FIRST_BLOOD,
+
     /** 한 선수가 짧은 시간 안에 5킬을 연속으로 처리했을 때 */
     PENTAKILL,
 
