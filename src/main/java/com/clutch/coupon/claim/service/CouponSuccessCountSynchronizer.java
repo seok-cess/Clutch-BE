@@ -2,11 +2,15 @@ package com.clutch.coupon.claim.service;
 
 import com.clutch.coupon.event.domain.CouponEventItem;
 import com.clutch.coupon.event.repository.CouponEventItemRepository;
+import com.clutch.wallet.repository.CouponEventItemIssuedCount;
 import com.clutch.wallet.repository.UserCouponRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * 실제 쿠폰 발급 결과를 성공 수량 집계에 반영한다.
@@ -28,9 +32,20 @@ public class CouponSuccessCountSynchronizer {
     )
     @Transactional
     public void synchronize() {
+        Map<Long, Long> issuedCounts = new HashMap<>();
+        for (CouponEventItemIssuedCount count : userCouponRepository
+                .countIssuedCouponsGroupByEventItem()) {
+            issuedCounts.put(
+                    count.getCouponEventItemId(),
+                    count.getIssuedCouponCount()
+            );
+        }
+
         for (CouponEventItem item : couponEventItemRepository.findAll()) {
-            long issuedCouponCount = userCouponRepository
-                    .countByCouponEventItemId(item.getId());
+            long issuedCouponCount = issuedCounts.getOrDefault(
+                    item.getId(),
+                    0L
+            );
 
             if (item.getSuccessCount() != issuedCouponCount) {
                 item.synchronizeSuccessCount(

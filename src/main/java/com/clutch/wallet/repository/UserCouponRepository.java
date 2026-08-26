@@ -34,6 +34,15 @@ public interface UserCouponRepository extends JpaRepository<UserCoupon, Long> {
     /** 쿠폰 이벤트 항목별 실제 발급 수량 */
     long countByCouponEventItemId(Long couponEventItemId);
 
+    /** 모든 쿠폰 이벤트 항목의 실제 발급 수량을 한 번에 집계한다. */
+    @Query("""
+            select coupon.couponEventItemId as couponEventItemId,
+                   count(coupon.id) as issuedCouponCount
+              from UserCoupon coupon
+             group by coupon.couponEventItemId
+            """)
+    List<CouponEventItemIssuedCount> countIssuedCouponsGroupByEventItem();
+
     /** 쿠폰 이벤트 회차별 실제 발급 사용자 목록 */
     @Query("""
             select coupon.userId
