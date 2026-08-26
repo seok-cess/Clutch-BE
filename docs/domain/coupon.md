@@ -51,6 +51,11 @@
 ## 데이터 정합성
 
 - 사용자와 이벤트 회차 조합의 중복 요청은 데이터베이스 unique key로도 제한한다.
+- 발급 요청 상태는 `PENDING`, `SUCCEEDED`, `FAILED`, `CANCELLED`를 사용한다.
+- 사용자 쿠폰 상태는 `ISSUED`, `USED`, `EXPIRED`, `CANCELLED`를 사용한다.
+- 현재 발급 경로는 요청을 `PENDING`으로 생성한 뒤 `SUCCEEDED` 또는 `FAILED`로
+  전이한다. `CANCELLED` 요청과 `EXPIRED` 쿠폰은 기존 데이터 조회와 관리자 필터에서
+  안전하게 처리하되, 새로운 상태 전이는 별도 도메인 결정 없이 추가하지 않는다.
 - 이벤트 항목의 `successCount`는 실제 발급 수를 비동기로 집계한 값이며 0 이상이고
   `quantity` 이하여야 한다. 재고 허용과 장애 복구 판단에는 사용하지 않는다.
 - 애플리케이션 검증만으로 동시성 정합성이 보장된다고 가정하지 않는다.
@@ -90,6 +95,8 @@
 - 기존 `coupon.claim.accepted` 소비 경로는 호환을 위해 유지하며 신규 발급 요청의 핵심 경로에서는 사용하지 않는다.
 - 상세 결정과 대안은 `docs/adr/001-synchronous-coupon-issuance.md`와
   `docs/adr/003-async-coupon-success-count.md`를 따른다.
+- 여러 애플리케이션 인스턴스가 실행되어도 성공 수량 집계는 MySQL named lock을
+  획득한 한 인스턴스만 수행한다. 잠금을 얻지 못한 인스턴스는 해당 주기를 건너뛴다.
 
 ## 실시간 잔여 재고
 

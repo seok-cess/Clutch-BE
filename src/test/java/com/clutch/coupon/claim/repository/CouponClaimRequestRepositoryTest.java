@@ -187,4 +187,31 @@ class CouponClaimRequestRepositoryTest {
         // then
         assertThat(exists).isTrue();
     }
+
+    @Test
+    void DB의_CANCELLED_상태를_JPA로_조회할_수_있다() {
+        CouponClaimRequest claimRequest = CouponClaimRequest.create(
+                COUPON_EVENT_ID,
+                COUPON_EVENT_OCCURRENCE_ID,
+                9_000_003L,
+                9_000_003L
+        );
+        CouponClaimRequest saved =
+                couponClaimRequestRepository.saveAndFlush(claimRequest);
+
+        jdbcTemplate.update(
+                """
+                UPDATE coupon_claim_request
+                   SET request_status = 'CANCELLED'
+                 WHERE coupon_claim_request_id = ?
+                """,
+                saved.getId()
+        );
+        entityManager.clear();
+
+        assertThat(couponClaimRequestRepository.findById(saved.getId()))
+                .get()
+                .extracting(CouponClaimRequest::getRequestStatus)
+                .isEqualTo(ClaimRequestStatus.CANCELLED);
+    }
 }

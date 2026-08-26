@@ -2,10 +2,12 @@ package com.clutch.wallet.repository;
 
 import com.clutch.wallet.domain.UserCoupon;
 import com.clutch.wallet.domain.UserCouponStatus;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -34,6 +36,9 @@ class UserCouponRepositoryTest {
 
     @Autowired
     private UserCouponRepository userCouponRepository;
+
+    @Autowired
+    private EntityManager entityManager;
 
     private UserCoupon newCoupon(long claimId){
         return new UserCoupon(
@@ -70,5 +75,26 @@ class UserCouponRepositoryTest {
         UserCoupon duplicate = newCoupon(CLAIM_BASE + 3);
         assertThrows(DataIntegrityViolationException.class,
                 () -> userCouponRepository.saveAndFlush(duplicate));
+    }
+
+    @Test
+    void EXPIRED_상태를_저장하고_조회할_수_있다() {
+        long claimId = CLAIM_BASE + 4;
+        UserCoupon coupon = newCoupon(claimId);
+        ReflectionTestUtils.setField(
+                coupon,
+                "status",
+                UserCouponStatus.EXPIRED
+        );
+
+        userCouponRepository.saveAndFlush(coupon);
+        entityManager.clear();
+
+        assertEquals(
+                UserCouponStatus.EXPIRED,
+                userCouponRepository.findByClaimId(claimId)
+                        .orElseThrow()
+                        .getStatus()
+        );
     }
 }
