@@ -79,6 +79,8 @@
 
 - Java `ClaimRequestStatus`에 `CANCELLED`, `UserCouponStatus`에 `EXPIRED`를 추가해
   기존 DB 상태를 JPA와 관리자 발급 내역 API에서 안전하게 조회하도록 했다.
+- 저장 상태가 `ISSUED`여도 만료 시각이 지나면 사용자·관리자 응답과 필터에서
+  `EXPIRED`로 계산하고, 만료 후 사용과 취소를 조건부 갱신에서 차단했다.
 - `user_coupon(coupon_event_item_id)` 인덱스를 Flyway V16으로 추가했다.
 - 이벤트 항목별 반복 COUNT를 단일 GROUP BY 집계로 변경했다.
 - MySQL 실행 계획에서 `idx_user_coupon_event_item`과 `Using index`를 확인했다.

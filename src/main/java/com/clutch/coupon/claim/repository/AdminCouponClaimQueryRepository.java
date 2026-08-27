@@ -1,5 +1,6 @@
 package com.clutch.coupon.claim.repository;
 
+import com.clutch.wallet.domain.UserCouponStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -46,7 +47,12 @@ public class AdminCouponClaimQueryRepository {
                    claim.request_status,
                    claim.failure_reason,
                    issued_coupon.user_coupon_id,
-                   issued_coupon.coupon_status
+                   CASE
+                       WHEN issued_coupon.coupon_status = 'ISSUED'
+                        AND issued_coupon.expires_at <= :statusReferenceTime
+                       THEN 'EXPIRED'
+                       ELSE issued_coupon.coupon_status
+                   END AS coupon_status
               FROM coupon_claim_request claim
               JOIN coupon_event event
                 ON event.coupon_event_id = claim.coupon_event_id
@@ -83,7 +89,11 @@ public class AdminCouponClaimQueryRepository {
                 + " AND claim.coupon_claim_request_id IN (:claimRequestIds)"
                 + " ORDER BY claim.coupon_claim_request_id DESC";
         MapSqlParameterSource parameters = new MapSqlParameterSource()
-                .addValue("claimRequestIds", claimRequestIds);
+                .addValue("claimRequestIds", claimRequestIds)
+                .addValue(
+                        "statusReferenceTime",
+                        condition.statusReferenceTime()
+                );
 
         return jdbcTemplate.query(query, parameters, this::mapRow);
     }
@@ -158,11 +168,18 @@ public class AdminCouponClaimQueryRepository {
             );
         }
         if (condition.couponStatus() != null) {
-            query.append(" AND filtered_coupon.coupon_status = :couponStatus");
+            appendCouponStatusCondition(query, condition.couponStatus());
             parameters.addValue(
-                    "couponStatus",
-                    condition.couponStatus().name()
+                    "statusReferenceTime",
+                    condition.statusReferenceTime()
             );
+            if (condition.couponStatus() != UserCouponStatus.ISSUED
+                    && condition.couponStatus() != UserCouponStatus.EXPIRED) {
+                parameters.addValue(
+                        "couponStatus",
+                        condition.couponStatus().name()
+                );
+            }
         }
         if (condition.couponTypeId() != null) {
             query.append(" AND filtered_item.coupon_type_id = :couponTypeId");
@@ -254,5 +271,31 @@ public class AdminCouponClaimQueryRepository {
                 .replace("!", "!!")
                 .replace("%", "!%")
                 .replace("_", "!_") + "%";
+    }
+
+    /**
+     * 저장 상태와 만료 시각을 함께 반영한 관리자 쿠폰 상태 필터를 추가한다.
+     *
+     * @param query 동적 ID 조회 쿼리
+     * @param status 요청된 유효 쿠폰 상태
+     */
+    private void appendCouponStatusCondition(
+            StringBuilder query,
+            UserCouponStatus status
+    ) {
+        if (status == UserCouponStatus.ISSUED) {
+            query.append(" AND filtered_coupon.coupon_status = 'ISSUED'")
+                    .append(" AND filtered_coupon.expires_at")
+                    .append(" > :statusReferenceTime");
+            return;
+        }
+        if (status == UserCouponStatus.EXPIRED) {
+            query.append(" AND (filtered_coupon.coupon_status = 'EXPIRED'")
+                    .append(" OR (filtered_coupon.coupon_status = 'ISSUED'")
+                    .append(" AND filtered_coupon.expires_at")
+                    .append(" <= :statusReferenceTime))");
+            return;
+        }
+        query.append(" AND filtered_coupon.coupon_status = :couponStatus");
     }
 }

@@ -64,9 +64,6 @@ user_coupon_audit AS (
             uc.coupon_status NOT IN ('ISSUED', 'USED', 'EXPIRED', 'CANCELLED')
         ), 0) AS invalid_status_count,
         COALESCE(SUM(
-            uc.coupon_status NOT IN ('ISSUED', 'USED', 'CANCELLED')
-        ), 0) AS java_unsupported_status_count,
-        COALESCE(SUM(
             uc.coupon_status = 'ISSUED'
             AND (uc.used_at IS NOT NULL OR uc.cancelled_at IS NOT NULL)
         ), 0) AS issued_timestamp_mismatch_count,
@@ -129,9 +126,6 @@ claim_audit AS (
         COALESCE(SUM(
             cr.request_status NOT IN ('PENDING', 'SUCCEEDED', 'FAILED', 'CANCELLED')
         ), 0) AS invalid_status_count,
-        COALESCE(SUM(
-            cr.request_status NOT IN ('PENDING', 'SUCCEEDED', 'FAILED')
-        ), 0) AS java_unsupported_status_count,
         COALESCE(SUM(
             cr.request_status = 'PENDING'
             AND (
@@ -294,11 +288,6 @@ checks AS (
            'DB 계약에 없는 쿠폰 상태 수'
     FROM user_coupon_audit
     UNION ALL
-    SELECT 'WARN', 'USER_COUPON_JAVA_UNSUPPORTED_STATUS',
-           java_unsupported_status_count,
-           '현재 Java enum이 읽을 수 없는 쿠폰 상태 수(EXPIRED 포함)'
-    FROM user_coupon_audit
-    UNION ALL
     SELECT 'FAIL', 'ISSUED_TIMESTAMP_MISMATCH', issued_timestamp_mismatch_count,
            'ISSUED인데 사용·취소 시각이 존재하는 쿠폰 수'
     FROM user_coupon_audit
@@ -315,8 +304,8 @@ checks AS (
            'EXPIRED 상태와 만료·사용·취소 정보가 맞지 않는 쿠폰 수'
     FROM user_coupon_audit
     UNION ALL
-    SELECT 'WARN', 'LOGICALLY_EXPIRED_BUT_ISSUED', logically_expired_issued_count,
-           '만료 시각이 지났지만 ISSUED로 남은 쿠폰 수'
+    SELECT 'INFO', 'LOGICALLY_EXPIRED_ISSUED', logically_expired_issued_count,
+           '저장 상태는 ISSUED지만 API에서 계산형 EXPIRED로 해석되는 쿠폰 수'
     FROM user_coupon_audit
     UNION ALL
     SELECT 'FAIL', 'INVALID_COUPON_VALIDITY_PERIOD', invalid_validity_period_count,
@@ -350,10 +339,6 @@ checks AS (
     UNION ALL
     SELECT 'FAIL', 'CLAIM_INVALID_STATUS', invalid_status_count,
            'DB 계약에 없는 발급 요청 상태 수'
-    FROM claim_audit
-    UNION ALL
-    SELECT 'WARN', 'CLAIM_JAVA_UNSUPPORTED_STATUS', java_unsupported_status_count,
-           '현재 Java enum이 읽을 수 없는 발급 요청 상태 수(CANCELLED 포함)'
     FROM claim_audit
     UNION ALL
     SELECT 'FAIL', 'PENDING_STATE_MISMATCH', pending_state_mismatch_count,

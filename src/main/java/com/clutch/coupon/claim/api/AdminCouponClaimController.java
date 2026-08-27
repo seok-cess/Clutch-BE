@@ -38,7 +38,7 @@ public class AdminCouponClaimController {
      * @param triggerKeyword 경기 트리거 문자열 검색어
      * @param userId 발급을 요청한 사용자 ID
      * @param requestStatus 발급 요청 처리 상태
-     * @param couponStatus 실제 발급 쿠폰의 현재 상태
+     * @param couponStatus 실제 발급 쿠폰의 유효 상태
      * @param couponTypeId 쿠폰 종류 ID
      * @param from 발급 요청 조회 시작 시각
      * @param to 발급 요청 조회 종료 시각
