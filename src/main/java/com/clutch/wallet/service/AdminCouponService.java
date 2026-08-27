@@ -7,10 +7,12 @@ import com.clutch.wallet.web.dto.CouponResponse;
 import com.clutch.wallet.web.exception.CouponAlreadyCancelledException;
 import com.clutch.wallet.web.exception.CouponAlreadyUsedException;
 import com.clutch.wallet.web.exception.CouponCancelFailedException;
+import com.clutch.wallet.web.exception.CouponExpiredException;
 import com.clutch.wallet.web.exception.CouponNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.Instant;
 
 /**
@@ -21,9 +23,14 @@ import java.time.Instant;
 public class AdminCouponService {
 
     private final UserCouponRepository userCouponRepository;
+    private final Clock clock;
 
-    public AdminCouponService(UserCouponRepository userCouponRepository){
+    public AdminCouponService(
+            UserCouponRepository userCouponRepository,
+            Clock clock
+    ){
         this.userCouponRepository = userCouponRepository;
+        this.clock = clock;
     }
 
     /**
@@ -34,32 +41,37 @@ public class AdminCouponService {
      * @return 취소된 쿠폰 정보
      */
     public CouponResponse cancel(Long couponId, String reason){
-        Instant now = Instant.now();
+        Instant now = clock.instant();
         int updated = userCouponRepository.cancel(couponId, now, reason);
 
         if(updated == 0){
-            handlerCancelFailure(couponId);
+            handlerCancelFailure(couponId, now);
         }
 
         UserCoupon coupon = userCouponRepository.findById(couponId)
                 .orElseThrow(CouponNotFoundException::new);
-        return CouponResponse.from(coupon);
+        return CouponResponse.from(coupon, now);
     }
 
     /**
      * 취소 실패 원인을 조회해 상태에 맞는 예외를 던진다.
      *
      * @param couponId 취소를 시도한 사용자 쿠폰 ID
+     * @param now 취소 실패 상태를 판단할 UTC 기준 시각
      */
-    private void handlerCancelFailure(Long couponId){
+    private void handlerCancelFailure(Long couponId, Instant now){
         UserCoupon coupon = userCouponRepository.findById(couponId)
                 .orElseThrow(CouponNotFoundException::new);
 
-        if(coupon.getStatus() == UserCouponStatus.USED){
+        UserCouponStatus effectiveStatus = coupon.getEffectiveStatus(now);
+        if(effectiveStatus == UserCouponStatus.USED){
             throw new CouponAlreadyUsedException();
         }
-        if(coupon.getStatus() == UserCouponStatus.CANCELLED){
+        if(effectiveStatus == UserCouponStatus.CANCELLED){
             throw new CouponAlreadyCancelledException();
+        }
+        if(effectiveStatus == UserCouponStatus.EXPIRED){
+            throw new CouponExpiredException();
         }
         throw new CouponCancelFailedException();
     }

@@ -111,4 +111,22 @@ public class UserCoupon {
     public String getCancelReason() { return cancelReason; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
+
+    /**
+     * 저장된 상태와 만료 시각을 함께 반영한 외부 노출 상태를 반환한다.
+     *
+     * <p>사용 및 취소처럼 명시적으로 종료된 상태는 그대로 유지한다.
+     * 발급 상태인 쿠폰만 기준 시각에 만료됐으면 {@link UserCouponStatus#EXPIRED}로
+     * 해석하며, 이 계산을 위해 DB 상태를 일괄 갱신하지 않는다.</p>
+     *
+     * @param referenceTime 만료 여부를 판단할 UTC 기준 시각
+     * @return 기준 시각에 유효한 쿠폰 상태
+     */
+    public UserCouponStatus getEffectiveStatus(Instant referenceTime) {
+        if (status == UserCouponStatus.ISSUED
+                && !expiresAt.isAfter(referenceTime)) {
+            return UserCouponStatus.EXPIRED;
+        }
+        return status;
+    }
 }

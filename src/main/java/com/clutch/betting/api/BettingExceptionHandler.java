@@ -1,6 +1,6 @@
 package com.clutch.betting.api;
 
-import com.clutch.betting.dto.response.BettingErrorResponse;
+import com.clutch.betting.api.response.BettingErrorResponse;
 import com.clutch.betting.exception.BettingErrorCode;
 import com.clutch.betting.exception.BettingException;
 import com.clutch.wallet.web.exception.MissingUserIdHeaderException;
@@ -13,10 +13,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 /** 배팅 API에서 발생한 도메인·요청 검증 예외를 공통 응답으로 변환한다. */
-@RestControllerAdvice(assignableTypes = {
-        BettingController.class,
-        BettingAdminController.class
-})
+@RestControllerAdvice(assignableTypes = BettingController.class)
 public class BettingExceptionHandler {
 
     /**

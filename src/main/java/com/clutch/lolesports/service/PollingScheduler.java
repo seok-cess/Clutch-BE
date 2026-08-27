@@ -30,7 +30,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 폴링 스케줄러.
- *  - 라이브 감시: REAL은 getLive 60초, STUB replay는 1초 간격 → 진행중 매치의 gameId 를 활성 게임으로 등록
+ *  - 라이브 감시: REAL은 getLive 60초, STUB replay는 0.25초 간격 → 진행중 매치의 gameId 를 활성 게임으로 등록
  *  - 인게임: 활성 게임이 있을 때만 window/details 1초 간격
  *  - 메타(일정/순위): 앱 시작 직후 1회 + 5분 간격
  *
@@ -48,6 +48,7 @@ public class PollingScheduler {
     private final LiveStatsClient liveStats;
     private final DataCacheService cache;
     private final PentakillDetector pentakillDetector;
+    private final FirstBloodDetector firstBloodDetector;
     private final GamePersistService persistService;
     private final SetWinnerTracker setWinners;
     private final HistoricalGameService historical;
@@ -94,6 +95,7 @@ public class PollingScheduler {
                             LiveStatsClient liveStats,
                             DataCacheService cache,
                             PentakillDetector pentakillDetector,
+                            FirstBloodDetector firstBloodDetector,
                             GamePersistService persistService,
                             SetWinnerTracker setWinners,
                             HistoricalGameService historical,
@@ -103,6 +105,7 @@ public class PollingScheduler {
         this.liveStats = liveStats;
         this.cache = cache;
         this.pentakillDetector = pentakillDetector;
+        this.firstBloodDetector = firstBloodDetector;
         this.persistService = persistService;
         this.setWinners = setWinners;
         this.historical = historical;
@@ -115,6 +118,20 @@ public class PollingScheduler {
         this.metaBackoff = new Backoff(base, max);
     }
 
+    /** 첫 킬 감지기 없이 조립하는 기존 단위 테스트용 생성자. */
+    PollingScheduler(LolesportsApiClient api,
+                     LiveStatsClient liveStats,
+                     DataCacheService cache,
+                     PentakillDetector pentakillDetector,
+                     GamePersistService persistService,
+                     SetWinnerTracker setWinners,
+                     HistoricalGameService historical,
+                     LolesportsProperties props,
+                     ExternalSourceState sourceState) {
+        this(api, liveStats, cache, pentakillDetector, null, persistService,
+                setWinners, historical, props, sourceState);
+    }
+
     /** 기존 단위 테스트와 패키지 내부 조립을 위한 기본 REAL 상태 생성자. */
     PollingScheduler(LolesportsApiClient api,
                      LiveStatsClient liveStats,
@@ -124,7 +141,7 @@ public class PollingScheduler {
                      SetWinnerTracker setWinners,
                      HistoricalGameService historical,
                      LolesportsProperties props) {
-        this(api, liveStats, cache, pentakillDetector, persistService, setWinners, historical, props,
+        this(api, liveStats, cache, pentakillDetector, null, persistService, setWinners, historical, props,
                 new ExternalSourceState(new ExternalSourceProperties(
                         false, ExternalSourceMode.REAL, null, null)));
     }
@@ -137,7 +154,7 @@ public class PollingScheduler {
                      GamePersistService persistService,
                      SetWinnerTracker setWinners,
                      LolesportsProperties props) {
-        this(api, liveStats, cache, pentakillDetector, persistService, setWinners, null, props,
+        this(api, liveStats, cache, pentakillDetector, null, persistService, setWinners, null, props,
                 new ExternalSourceState(new ExternalSourceProperties(
                         false, ExternalSourceMode.REAL, null, null)));
     }
@@ -157,10 +174,10 @@ public class PollingScheduler {
     }
 
     /**
-     * replay는 시간축을 최대 20배까지 압축하므로, 상태 전환도 1초마다 읽어야 한다.
-     * 60초 주기를 그대로 쓰면 한 번의 조회 사이에 세트 시작·종료를 모두 건너뛴다.
+     * replay는 시간축을 최대 20배까지 압축하므로, 상태 전환도 0.25초마다 읽어야 한다.
+     * 1초 주기면 20배속에서 한 번에 재생 시간 20초를 건너뛴다.
      */
-    @Scheduled(fixedDelay = 1000)
+    @Scheduled(fixedDelay = 250)
     public void pollStubLiveMatches() {
         if (sourceState.mode() == ExternalSourceMode.STUB) {
             pollLiveMatches();
@@ -424,6 +441,9 @@ public class PollingScheduler {
             if (persisted) {
                 cache.evictGame(gameId);
                 pentakillDetector.clearGame(gameId);
+                if (firstBloodDetector != null) {
+                    firstBloodDetector.clearGame(gameId);
+                }
                 statsFailures.remove(gameId);
                 lastKnownMatches.remove(gameId);
                 log.info("게임 {} 적재 후 캐시 해제 (남은 버퍼 {}개)", gameId, cache.bufferedGameCount());
@@ -524,8 +544,19 @@ public class PollingScheduler {
                     cache.addWindowFrames(gameId, window.gameMetadata(), window.frames());
             clearStatsUnavailable(gameId);
             resolveGameStart(gameId);
+            // 감지기는 어느 경기의 세트인지 알아야 그 경기에 걸린 쿠폰 이벤트만 연다
+            DataCacheService.LiveMatch owner = lastKnownMatches.get(gameId);
+            String externalMatchId = owner != null ? owner.matchId() : null;
+            Instant gameStart = cache.getGameStart(gameId);
             for (WindowResponse.Frame frame : added) {
-                pentakillDetector.onNewWindowFrame(gameId, frame);
+                pentakillDetector.onNewWindowFrame(
+                        externalMatchId, gameId, frame, gameStart
+                );
+                if (firstBloodDetector != null) {
+                    firstBloodDetector.onNewWindowFrame(
+                            externalMatchId, gameId, frame, gameStart
+                    );
+                }
             }
             return true;
         } catch (WebClientResponseException.NotFound e) {
@@ -690,6 +721,9 @@ public class PollingScheduler {
         metaBackoff.reset();
         if (pentakillDetector != null) {
             pentakillDetector.clearAll();
+        }
+        if (firstBloodDetector != null) {
+            firstBloodDetector.clearAll();
         }
         if (setWinners != null) {
             setWinners.clearAll();

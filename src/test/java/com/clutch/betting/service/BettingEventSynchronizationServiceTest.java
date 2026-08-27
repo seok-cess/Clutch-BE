@@ -3,8 +3,8 @@ package com.clutch.betting.service;
 import com.clutch.betting.config.BettingProperties;
 import com.clutch.betting.domain.BettingEvent;
 import com.clutch.betting.domain.BettingEventStatus;
-import com.clutch.betting.live.LiveBettingDataProvider.LiveMatchSnapshot;
-import com.clutch.betting.live.LiveBettingDataProvider.SetSnapshot;
+import com.clutch.betting.live.BettingLiveStateReader.LiveMatchSnapshot;
+import com.clutch.betting.live.BettingLiveStateReader.SetSnapshot;
 import com.clutch.betting.repository.BettingEventRepository;
 import com.clutch.lolesports.entity.EsportsMatch;
 import com.clutch.lolesports.repository.EsportsMatchRepository;
@@ -508,8 +508,7 @@ class BettingEventSynchronizationServiceTest {
                 new BettingProperties(
                         Duration.ofMinutes(20),
                         Duration.ofMinutes(1),
-                        Duration.ofMinutes(20),
-                        Duration.ofSeconds(1)
+                        Duration.ofMinutes(20)
                 ),
                 Clock.fixed(Instant.parse(instant), ZoneOffset.UTC)
         );

@@ -12,6 +12,7 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -23,6 +24,9 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class AdminCouponClaimQueryRepositoryTest {
+
+    private static final LocalDateTime STATUS_REFERENCE_TIME =
+            LocalDateTime.of(2026, 8, 21, 12, 0);
 
     @Mock
     private NamedParameterJdbcTemplate jdbcTemplate;
@@ -82,10 +86,15 @@ class AdminCouponClaimQueryRepositoryTest {
         assertThat(detailQueryCaptor.getValue())
                 .contains("JOIN coupon_event event")
                 .contains("JOIN coupon_event_item item")
+                .contains("issued_coupon.expires_at <= :statusReferenceTime")
+                .contains("THEN 'EXPIRED'")
                 .contains("IN (:claimRequestIds)");
         assertThat(detailParametersCaptor.getValue()
                 .getValue("claimRequestIds"))
                 .isEqualTo(List.of(30L, 29L));
+        assertThat(detailParametersCaptor.getValue()
+                .getValue("statusReferenceTime"))
+                .isEqualTo(STATUS_REFERENCE_TIME);
     }
 
     @Test
@@ -106,7 +115,8 @@ class AdminCouponClaimQueryRepositoryTest {
                         10L,
                         null,
                         null,
-                        null
+                        null,
+                        STATUS_REFERENCE_TIME
                 );
 
         repository.findAll(condition, 21);
@@ -126,7 +136,8 @@ class AdminCouponClaimQueryRepositoryTest {
                 .contains("JOIN coupon_event_item filtered_item")
                 .contains("event.event_name LIKE :eventNameKeyword")
                 .contains("event.trigger_type LIKE :triggerKeyword")
-                .contains("filtered_coupon.coupon_status = :couponStatus")
+                .contains("filtered_coupon.coupon_status = 'ISSUED'")
+                .contains("filtered_coupon.expires_at > :statusReferenceTime")
                 .contains("filtered_item.coupon_type_id = :couponTypeId");
         assertThat(parametersCaptor.getValue().getValue("eventNameKeyword"))
                 .isEqualTo("%펜타킬%");
@@ -134,8 +145,39 @@ class AdminCouponClaimQueryRepositoryTest {
                 .isEqualTo("%PENTA%");
         assertThat(parametersCaptor.getValue().getValue("requestStatus"))
                 .isEqualTo("FAILED");
-        assertThat(parametersCaptor.getValue().getValue("couponStatus"))
-                .isEqualTo("ISSUED");
+        assertThat(parametersCaptor.getValue()
+                .getValue("statusReferenceTime"))
+                .isEqualTo(STATUS_REFERENCE_TIME);
+    }
+
+    @Test
+    void EXPIRED_필터는_저장된_만료와_시간상_만료를_함께_조회한다() {
+        when(jdbcTemplate.queryForList(
+                anyString(),
+                any(MapSqlParameterSource.class),
+                eq(Long.class)
+        )).thenReturn(List.of());
+        AdminCouponClaimSearchCondition condition =
+                new AdminCouponClaimSearchCondition(
+                        null, null, null, null, null,
+                        UserCouponStatus.EXPIRED,
+                        null, null, null, null,
+                        STATUS_REFERENCE_TIME
+                );
+
+        repository.findAll(condition, 21);
+
+        ArgumentCaptor<String> queryCaptor =
+                ArgumentCaptor.forClass(String.class);
+        verify(jdbcTemplate).queryForList(
+                queryCaptor.capture(),
+                any(MapSqlParameterSource.class),
+                eq(Long.class)
+        );
+        assertThat(queryCaptor.getValue())
+                .contains("filtered_coupon.coupon_status = 'EXPIRED'")
+                .contains("filtered_coupon.coupon_status = 'ISSUED'")
+                .contains("filtered_coupon.expires_at <= :statusReferenceTime");
     }
 
     private AdminCouponClaimSearchCondition emptyCondition() {
@@ -149,7 +191,8 @@ class AdminCouponClaimQueryRepositoryTest {
                 null,
                 null,
                 null,
-                null
+                null,
+                STATUS_REFERENCE_TIME
         );
     }
 }

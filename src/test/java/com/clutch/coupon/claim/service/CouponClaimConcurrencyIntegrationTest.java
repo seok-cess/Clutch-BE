@@ -36,7 +36,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @SpringBootTest(
         properties = {
                 "spring.datasource.hikari.maximum-pool-size=30",
-                "wallet.outbox.enabled=false"
+                "wallet.outbox.enabled=false",
+                "coupon.success-count-sync.interval-ms=3600000"
         }
 )
 class CouponClaimConcurrencyIntegrationTest {

@@ -37,6 +37,10 @@ public class CouponEventOccurrence {
     @Column(name = "source_event_key", length = 100)
     private String sourceEventKey;
 
+    /** 경기 트리거로 열렸을 때 그 사건이 일어난 게임 내 시각(초) */
+    @Column(name = "game_time_seconds")
+    private Integer gameTimeSeconds;
+
     @Column(name = "detected_at", nullable = false)
     private LocalDateTime detectedAt;
 
@@ -71,6 +75,49 @@ public class CouponEventOccurrence {
     }
 
     /** 경기 트리거 없이 테스트용 쿠폰 이벤트 회차를 생성한다. */
+    /**
+     * 경기 트리거로 회차를 연다.
+     *
+     * sourceEventKey 에 트리거 종류와 발생 시점을 함께 남긴다. 같은 경기에서
+     * 같은 사건이 두 번 감지돼도 키가 같아 유니크 제약이 중복 오픈을 막는다.
+     *
+     * @param gameTimeSeconds 경기 내 발생 시각(초). 중복 방지 키에 포함된다
+     */
+    public static CouponEventOccurrence triggeredOpen(
+            Long couponEventId,
+            CouponEventTrigger trigger,
+            String externalGameId,
+            Integer gameTimeSeconds,
+            LocalDateTime openedAt,
+            int claimWindowSeconds
+    ) {
+        if (couponEventId == null || couponEventId <= 0) {
+            throw new IllegalArgumentException("쿠폰 이벤트 ID는 필수입니다.");
+        }
+        if (trigger == null) {
+            throw new IllegalArgumentException("트리거 종류는 필수입니다.");
+        }
+        if (openedAt == null) {
+            throw new IllegalArgumentException("오픈 시각은 필수입니다.");
+        }
+        if (claimWindowSeconds <= 0) {
+            throw new IllegalArgumentException("신청 가능 시간은 1초 이상이어야 합니다.");
+        }
+
+        String sourceKey = trigger.name()
+                + ":" + (externalGameId == null ? "-" : externalGameId)
+                + ":" + (gameTimeSeconds == null ? "-" : gameTimeSeconds);
+
+        CouponEventOccurrence occurrence = new CouponEventOccurrence(
+                couponEventId,
+                sourceKey,
+                openedAt,
+                openedAt.plusSeconds(claimWindowSeconds)
+        );
+        occurrence.gameTimeSeconds = gameTimeSeconds;
+        return occurrence;
+    }
+
     public static CouponEventOccurrence manualOpen(
             Long couponEventId,
             LocalDateTime openedAt,

@@ -55,6 +55,8 @@ test('rebuilds wait, set duration and opening gold without changing game result 
     ));
     await fsp.writeFile(path.join(source, 'eventDetails.jsonl'), line('2026-01-01T00:01:40.000Z', eventDetails));
     await fsp.writeFile(path.join(source, 'window.jsonl'), [
+      // 대기 화면의 더 낮은 골드는 시작 골드 기준으로 쓰면 안 된다.
+      line('2026-01-01T00:00:10.000Z', { frames: [{ rfc460Timestamp: '2026-01-01T00:00:10.000Z', gameState: 'paused', blueTeam: team(1, 400), redTeam: team(6, 400) }] }, gameId),
       line(start, { frames: [{ rfc460Timestamp: start, gameState: 'in_game', blueTeam: team(1, 900), redTeam: team(6, 900) }] }, gameId),
       line(finish, { frames: [{ rfc460Timestamp: finish, gameState: 'finished', blueTeam: team(1, 1400), redTeam: team(6, 1400) }] }, gameId),
     ].join(''));
@@ -67,8 +69,9 @@ test('rebuilds wait, set duration and opening gold without changing game result 
 
     const windows = (await fsp.readFile(path.join(output, 'window.jsonl'), 'utf8'))
       .trim().split('\n').map(JSON.parse);
-    const firstFrame = windows[0].body.frames[0];
-    const lastFrame = windows[1].body.frames[0];
+    const frames = windows.flatMap((window) => window.body.frames);
+    const firstFrame = frames.find((frame) => frame.gameState === 'in_game');
+    const lastFrame = frames.find((frame) => frame.gameState === 'finished');
     assert.equal(firstFrame.rfc460Timestamp, '2026-01-01T00:10:00.000Z');
     assert.equal(lastFrame.rfc460Timestamp, '2026-01-01T00:35:00.000Z');
     assert.equal(firstFrame.blueTeam.totalGold, 2500);

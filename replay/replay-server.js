@@ -49,6 +49,7 @@ function printUsage() {
 const LAZY_LOAD_THRESHOLD_BYTES = 64 * 1024 * 1024;
 const JSONL_INDEX_PREFIX_BYTES = 1024;
 const JSONL_INDEX_BUFFER_BYTES = 1024 * 1024;
+const RESOURCE_INTERPOLATION_MIN_GAP_MS = 10 * 1000;
 
 /** eager/lazy fixture를 같은 방식으로 순회·조회하는 시계열 래퍼. */
 class FixtureSeries {
@@ -289,6 +290,79 @@ function mergeUnservedFrameEntries(series, mappedMs, lastServedIndex) {
   return { entry: latest, body, lastServedIndex: latestIndex };
 }
 
+/** mappedMs 뒤의 가장 이른 실제 window 프레임을 찾는다. */
+function findNextWindowFrame(series, mappedMs) {
+  // 한 JSONL 응답에 과거·미래 프레임이 함께 담길 수 있다. 현재 응답도 다시 살펴야
+  // 같은 응답 안의 다음 실제 프레임을 놓치지 않는다.
+  const firstIndex = Math.max(0, indexAtOrBefore(series, mappedMs));
+  for (let index = firstIndex; index < series.length; index++) {
+    let candidate = null;
+    for (const frame of series.entryAt(index).body?.frames || []) {
+      const timestamp = Date.parse(frame?.rfc460Timestamp);
+      if (!Number.isNaN(timestamp) && timestamp > mappedMs
+        && (candidate == null || timestamp < Date.parse(candidate.rfc460Timestamp))) {
+        candidate = frame;
+      }
+    }
+    if (candidate != null) return candidate;
+  }
+  return null;
+}
+
+function interpolateInteger(previous, next, ratio, round = Math.round) {
+  if (!Number.isFinite(previous) || !Number.isFinite(next)) return previous;
+  return round(previous + (next - previous) * ratio);
+}
+
+/** 숫자로 관측되는 자원만 보간한다. 킬·오브젝트 같은 사건 데이터는 미래 값을 앞당기지 않는다. */
+function interpolateTeamResources(previousTeam, nextTeam, ratio) {
+  if (!Array.isArray(previousTeam?.participants) || !Array.isArray(nextTeam?.participants)) return;
+  const nextByParticipantId = new Map(nextTeam.participants.map((participant) => [participant.participantId, participant]));
+  for (const participant of previousTeam.participants) {
+    const nextParticipant = nextByParticipantId.get(participant.participantId);
+    if (nextParticipant == null) continue;
+    participant.totalGold = interpolateInteger(participant.totalGold, nextParticipant.totalGold, ratio);
+    participant.creepScore = interpolateInteger(
+      participant.creepScore,
+      nextParticipant.creepScore,
+      ratio,
+      Math.floor,
+    );
+  }
+  const totalGold = previousTeam.participants.reduce((total, participant) => total + (participant.totalGold ?? 0), 0);
+  if (Number.isFinite(totalGold)) previousTeam.totalGold = totalGold;
+}
+
+/**
+ * 녹화에 긴 시작 구간이 비어 있으면 다음 실제 관측값까지 gold/CS를 선형 보간한다.
+ * 원본 프레임의 킬·사망·오브젝트는 유지하므로, 아직 일어나지 않은 경기 사건을 노출하지 않는다.
+ */
+function appendInterpolatedWindowFrame(body, series, mappedMs) {
+  if (!Array.isArray(body?.frames) || body.frames.length === 0) return body;
+  const previous = body.frames
+    .filter((frame) => Date.parse(frame?.rfc460Timestamp) <= mappedMs)
+    .at(-1);
+  const previousMs = Date.parse(previous?.rfc460Timestamp);
+  const next = findNextWindowFrame(series, mappedMs);
+  const nextMs = Date.parse(next?.rfc460Timestamp);
+  if (Number.isNaN(previousMs) || Number.isNaN(nextMs)
+    || nextMs - previousMs < RESOURCE_INTERPOLATION_MIN_GAP_MS) {
+    return body;
+  }
+
+  const ratio = (mappedMs - previousMs) / (nextMs - previousMs);
+  if (ratio <= 0 || ratio >= 1) return body;
+
+  const out = cloneJson(body);
+  const interpolated = cloneJson(previous);
+  interpolated.rfc460Timestamp = new Date(mappedMs).toISOString();
+  interpolateTeamResources(interpolated.blueTeam, next.blueTeam, ratio);
+  interpolateTeamResources(interpolated.redTeam, next.redTeam, ratio);
+  out.frames.push(interpolated);
+  out.frames.sort((left, right) => Date.parse(left.rfc460Timestamp) - Date.parse(right.rfc460Timestamp));
+  return out;
+}
+
 /**
  * 녹화된 절대 시각(originMs 기준)을 "이번 재생이 지금 시작했다면 몇 시일지"로 옮긴다.
  *
@@ -320,6 +394,50 @@ function shiftScheduleBody(body, timelineMs, wallMs, speed) {
   return shifted;
 }
 
+/** fixture 변환 전 대기 프레임을 기준으로 생긴 공통 +500G 오프셋을 제거한다. */
+function correctLegacyOpeningGold(body, run, originalGameId) {
+  if (!Array.isArray(body?.frames)) return body;
+  // 아래 timestamp 이동은 body를 수정하므로, 보정 대상이 아닌 프레임도 fixture 원본을
+  // 오염시키지 않도록 항상 복제한다.
+  const corrected = cloneJson(body);
+  const offset = run.openingGoldOffsetByOriginalId?.get(originalGameId);
+  if (!Number.isFinite(offset) || offset <= 0) return corrected;
+  for (const frame of corrected.frames) {
+    const teams = [frame.blueTeam, frame.redTeam].filter(Boolean);
+    if (teams.length > 0) {
+      const participants = teams.flatMap((team) => team.participants || []);
+      // 진짜 시작 프레임의 500G는 보존한다.
+      const isOpeningFrame = participants.length > 0
+        && participants.every((participant) => participant.totalGold === 500 && participant.creepScore === 0);
+      if (isOpeningFrame) continue;
+      for (const team of teams) {
+        for (const participant of team.participants || []) {
+          if (Number.isFinite(participant.totalGold)) {
+            participant.totalGold = Math.max(0, participant.totalGold - offset);
+          }
+        }
+        const totalGold = (team.participants || []).reduce(
+          (total, participant) => total + (participant.totalGold ?? 0),
+          0,
+        );
+        if (Number.isFinite(totalGold)) team.totalGold = totalGold;
+      }
+      continue;
+    }
+
+    const participants = frame.participants || [];
+    const isOpeningFrame = participants.length > 0
+      && participants.every((participant) => participant.totalGoldEarned === 500);
+    if (isOpeningFrame) continue;
+    for (const participant of participants) {
+      if (Number.isFinite(participant.totalGoldEarned)) {
+        participant.totalGoldEarned = Math.max(0, participant.totalGoldEarned - offset);
+      }
+    }
+  }
+  return corrected;
+}
+
 /**
  * window/details 프레임의 rfc460Timestamp를 재생 시간축의 실제 벽시계로 바꾼다.
  *
@@ -329,7 +447,7 @@ function shiftScheduleBody(body, timelineMs, wallMs, speed) {
  */
 function shiftFramesBody(body, run, originalGameId) {
   if (!Array.isArray(body?.frames)) return body;
-  const shifted = JSON.parse(JSON.stringify(body));
+  const shifted = correctLegacyOpeningGold(body, run, originalGameId);
   const gameStartMs = run.gameStartMsByOriginalId.get(originalGameId);
   for (const frame of shifted.frames) {
     if (typeof frame.rfc460Timestamp === 'string') {
@@ -444,6 +562,9 @@ function createReplayRun(fixtures, speed) {
     gameIdMap,
     originalGameIdByReplayId,
     gameStartMsByOriginalId: fixtures.gameStartMsByOriginalId,
+    gameFinishMsByOriginalId: fixtures.gameFinishMsByOriginalId,
+    openingGoldOffsetByOriginalId: fixtures.openingGoldOffsetByOriginalId,
+    gameResultWinsByOriginalId: fixtures.gameResultWinsByOriginalId,
     // endpoint/game 별 마지막으로 백엔드에 전달한 JSONL 인덱스.
     // 새 테스트 시작 시 run 자체가 새로 만들어지므로 커서도 항상 초기화된다.
     lastServedFrameIndex: new Map(),
@@ -524,6 +645,9 @@ function loadFixtures(dir) {
     window,
     details: loadJsonlByGameId(path.join(dir, 'details.jsonl')),
     gameStartMsByOriginalId: findGameStartMsByOriginalId(window),
+    gameFinishMsByOriginalId: findGameFinishMsByOriginalId(window),
+    openingGoldOffsetByOriginalId: findOpeningGoldOffsetsByOriginalId(window),
+    gameResultWinsByOriginalId: findGameResultWinsByOriginalId(eventDetails),
   };
 }
 
@@ -545,6 +669,128 @@ function findGameStartMsByOriginalId(windowByGameId) {
     }
   }
   return starts;
+}
+
+/** 게임별 최초 finished 프레임 시각. 세트 사이 대기 구간을 판별할 때 쓴다. */
+function findGameFinishMsByOriginalId(windowByGameId) {
+  const finishes = new Map();
+  for (const [gameId, series] of windowByGameId) {
+    let earliestFinishedFrameMs = Number.POSITIVE_INFINITY;
+    for (let index = 0; index < series.length; index++) {
+      for (const frame of series.entryAt(index).body?.frames || []) {
+        const timestamp = Date.parse(frame?.rfc460Timestamp);
+        if (!Number.isNaN(timestamp) && String(frame?.gameState).toLowerCase() === 'finished') {
+          earliestFinishedFrameMs = Math.min(earliestFinishedFrameMs, timestamp);
+        }
+      }
+    }
+    if (Number.isFinite(earliestFinishedFrameMs)) {
+      finishes.set(gameId, earliestFinishedFrameMs);
+    }
+  }
+  return finishes;
+}
+
+/**
+ * 기존 reshape 결과 중 일부는 paused 프레임을 골드 기준점으로 사용해, 시작 직후 전원에게
+ * +500G가 한 번 더 붙었다. 시작 1분 내 500G → 전원 1,000G·CS 0 패턴만 보정 대상으로 잡는다.
+ */
+function findOpeningGoldOffsetsByOriginalId(windowByGameId) {
+  const offsets = new Map();
+  for (const [gameId, series] of windowByGameId) {
+    const frames = [];
+    for (let index = 0; index < series.length; index++) {
+      frames.push(...(series.entryAt(index).body?.frames || []));
+    }
+    frames.sort((left, right) => Date.parse(left.rfc460Timestamp) - Date.parse(right.rfc460Timestamp));
+    const start = frames.find((frame) => String(frame?.gameState).toLowerCase() === 'in_game');
+    const startMs = Date.parse(start?.rfc460Timestamp);
+    const openingParticipants = [start?.blueTeam, start?.redTeam]
+      .flatMap((team) => team?.participants || []);
+    const startsAtFiveHundred = openingParticipants.length > 0
+      && openingParticipants.every((participant) => participant.totalGold === 500 && participant.creepScore === 0);
+    const hasDuplicatedGrant = frames.some((frame) => {
+      const timestamp = Date.parse(frame?.rfc460Timestamp);
+      const participants = [frame?.blueTeam, frame?.redTeam].flatMap((team) => team?.participants || []);
+      return Number.isFinite(timestamp) && timestamp > startMs && timestamp <= startMs + 60 * 1000
+        && participants.length === openingParticipants.length
+        && participants.every((participant) => participant.totalGold === 1000 && participant.creepScore === 0);
+    });
+    if (startsAtFiveHundred && hasDuplicatedGrant) {
+      offsets.set(gameId, 500);
+    }
+  }
+  return offsets;
+}
+
+/** 세트가 completed로 처음 관측된 공식 팀 승수를 gameId별로 기록한다. */
+function findGameResultWinsByOriginalId(series) {
+  const winsByGameId = new Map();
+  for (let index = 0; index < series.length; index++) {
+    const match = series.entryAt(index).body?.data?.event?.match;
+    const wins = new Map((match?.teams || [])
+      .filter((team) => team?.id != null && Number.isFinite(team.result?.gameWins))
+      .map((team) => [team.id, team.result.gameWins]));
+    if (wins.size === 0) continue;
+    for (const game of match?.games || []) {
+      if (game?.id != null && !winsByGameId.has(game.id)
+        && String(game.state).toLowerCase() === 'completed') {
+        winsByGameId.set(game.id, wins);
+      }
+    }
+  }
+  return winsByGameId;
+}
+
+/**
+ * eventDetails/getLive 녹화본은 세트 상태 변경이 window 프레임보다 일찍 캡처될 수 있다.
+ * 재생에서는 window의 실제 시작·종료 시각을 기준으로 상태를 다시 맞춰, 세트 사이
+ * 대기 구간에 다음 세트가 활성 게임으로 선택되지 않게 한다.
+ */
+function synchronizeGameStatesWithReplayTimeline(body, run, mappedMs) {
+  const normalized = cloneJson(body);
+  const synchronizeMatch = (match) => {
+    const games = match?.games;
+    if (!Array.isArray(games)) return;
+    let latestCompletedGame = null;
+    for (const game of games) {
+      const startMs = run.gameStartMsByOriginalId.get(game?.id);
+      if (!Number.isFinite(startMs)) continue;
+      const finishMs = run.gameFinishMsByOriginalId.get(game.id);
+      if (mappedMs < startMs) {
+        game.state = 'unstarted';
+      } else if (Number.isFinite(finishMs) && mappedMs >= finishMs) {
+        game.state = 'completed';
+        if (latestCompletedGame == null
+          || finishMs > run.gameFinishMsByOriginalId.get(latestCompletedGame.id)) {
+          latestCompletedGame = game;
+        }
+      } else {
+        game.state = 'inProgress';
+      }
+    }
+
+    // 공식 승수 응답은 종종 다음 세트 시작 또는 매치 종료 뒤에야 온다. 그 지연을
+    // 화면·정산까지 전파하지 않도록, 각 세트가 끝난 window 시점에 그 세트의 공식 승수를 적용한다.
+    const officialWins = latestCompletedGame == null
+      ? null : run.gameResultWinsByOriginalId.get(latestCompletedGame.id);
+    if (officialWins == null || !Array.isArray(match.teams)) return;
+    for (const team of match.teams) {
+      const gameWins = officialWins.get(team?.id);
+      if (Number.isFinite(gameWins)) {
+        team.result = { ...(team.result || {}), gameWins };
+      }
+    }
+  };
+
+  const events = normalized?.data?.schedule?.events;
+  if (Array.isArray(events)) {
+    for (const event of events) {
+      synchronizeMatch(event?.match);
+    }
+  }
+  synchronizeMatch(normalized?.data?.event?.match);
+  return normalized;
 }
 
 /** 아직 어느 세트도 시작하지 않은 eventDetails만 시작 전 메타데이터로 재사용한다. */
@@ -648,9 +894,15 @@ function main() {
 
     // getLive/getSchedule 의 startTime 은 실제 지금과 비교되므로 재생 시작 시각 기준으로 옮겨서 돌려준다.
     const transform = (body) => replaceReplayIds(body, run);
-    const shiftSchedule = (body) => transform(shiftScheduleBody(body, mappedMs, Date.now(), run.speed));
-    const shiftFrames = (body, originalGameId, advanceClock = false) => {
-      const shifted = shiftFramesBody(body, run, originalGameId);
+    const synchronizeGameStates = (body) => synchronizeGameStatesWithReplayTimeline(body, run, mappedMs);
+    const shiftSchedule = (body) => transform(synchronizeGameStates(
+      shiftScheduleBody(body, mappedMs, Date.now(), run.speed),
+    ));
+    const shiftFrames = (body, originalGameId, advanceClock = false, series = null) => {
+      const replayFrameBody = advanceClock && series != null
+        ? appendInterpolatedWindowFrame(body, series, mappedMs)
+        : body;
+      const shifted = shiftFramesBody(replayFrameBody, run, originalGameId);
       if (advanceClock) {
         advanceLatestFrameToReplayClock(shifted, run, originalGameId, mappedMs, true);
       }
@@ -677,7 +929,7 @@ function main() {
     if (pathname === '/getEventDetails') {
       const entry = pickAtOrBefore(fixtures.eventDetails, mappedMs)
         || fixtures.preMatchEventDetails;
-      return respondPicked(res, pathname, entry, transform);
+      return respondPicked(res, pathname, entry, (body) => transform(synchronizeGameStates(body)));
     }
     if (pathname === '/getSchedule') {
       if (!fixtures.getSchedule) return sendJson(res, 200, EMPTY_SCHEDULE_BODY);
@@ -710,7 +962,9 @@ function main() {
         );
       }
       return respondMergedFrames(res, pathname, 'window', originalGameId, series, mappedMs,
-        (body) => isGameStartProbe ? shiftGameStartFrames(body, originalGameId) : shiftFrames(body, originalGameId, true));
+        (body) => isGameStartProbe
+          ? shiftGameStartFrames(body, originalGameId)
+          : shiftFrames(body, originalGameId, true, series));
     }
     if ((match = pathname.match(/^\/details\/(.+)$/))) {
       const replayGameId = decodeURIComponent(match[1]);
