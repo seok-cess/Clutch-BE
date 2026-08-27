@@ -259,18 +259,19 @@ public class CouponEventActivationService {
             return List.of();
         }
 
-        Map<Long, Integer> remainingByItemId = couponEventItemRepository
+        Map<Long, CouponEventItem> itemsById = couponEventItemRepository
                 .findAllByCouponEventId(couponEventId)
                 .stream()
                 .collect(java.util.stream.Collectors.toMap(
                         CouponEventItem::getId,
-                        CouponEventItem::remainingStock
+                        java.util.function.Function.identity()
                 ));
 
         List<CouponEventActivationResponse.Phase> result =
                 new ArrayList<>(eventPhases.size());
         for (CouponEventPhase phase : eventPhases) {
             Long itemId = phase.getCouponEventItemId();
+            CouponEventItem item = itemsById.get(itemId);
             benefitSnapshotRepository
                     .findByCouponEventItemId(itemId)
                     .ifPresent(benefit -> result.add(
@@ -279,8 +280,8 @@ public class CouponEventActivationService {
                                     phase.getOpenOffsetSeconds(),
                                     benefit.discountType(),
                                     benefit.discountValue(),
-                                    remainingByItemId
-                                            .getOrDefault(itemId, 0)
+                                    item == null ? 0L : item.remainingStock(),
+                                    item == null ? 0L : item.getQuantity()
                             )
                     ));
         }

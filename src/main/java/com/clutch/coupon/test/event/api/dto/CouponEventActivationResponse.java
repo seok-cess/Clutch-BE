@@ -32,13 +32,16 @@ public record CouponEventActivationResponse(
      * @param discountType 할인 유형 (RATE · AMOUNT)
      * @param discountValue 할인 값
      * @param remainingStock 이 단계의 남은 수량 — 단계마다 재고가 분리돼 있다
+     * @param totalStock 이 단계의 전체 수량. 화면이 소진 정도를 비율로 그리려면
+     *                   남은 수량만으로는 부족해 기준값이 함께 필요하다
      */
     public record Phase(
             Long couponEventItemId,
             int openOffsetSeconds,
             String discountType,
             BigDecimal discountValue,
-            long remainingStock
+            long remainingStock,
+            long totalStock
     ) {
     }
 }
