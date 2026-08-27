@@ -44,7 +44,12 @@ const finalVerificationTimeoutSeconds = phase === 'verify'
   )
   : null;
 const claimRequestTimeout = __ENV.CLAIM_REQUEST_TIMEOUT || '1m';
-const scenarioMaxDuration = __ENV.SCENARIO_MAX_DURATION || '12m';
+const rampUpSeconds = phase === 'load'
+  ? positiveInteger(__ENV.RAMP_UP_SECONDS, 60, 'RAMP_UP_SECONDS')
+  : null;
+const holdSeconds = phase === 'load'
+  ? positiveInteger(__ENV.HOLD_SECONDS, 30, 'HOLD_SECONDS')
+  : null;
 const verifyIndividualPersistence = phase === 'load'
   ? booleanValue(
     __ENV.VERIFY_INDIVIDUAL_PERSISTENCE,
@@ -98,12 +103,14 @@ export const options = phase === 'load'
   ? {
     scenarios: {
       claimers: {
-        executor: 'per-vu-iterations',
+        executor: 'ramping-vus',
         exec: 'claimCoupon',
-        vus: virtualUsers,
-        iterations: 1,
-        maxDuration: scenarioMaxDuration,
-        gracefulStop: '30s',
+        startVUs: 0,
+        stages: [
+          { duration: `${rampUpSeconds}s`, target: virtualUsers },
+          { duration: `${holdSeconds}s`, target: virtualUsers },
+        ],
+        gracefulRampDown: '30s',
         tags: { flow: 'coupon-claimer' },
       },
     },
@@ -122,7 +129,7 @@ export function setup() {
     console.log(
       `공유 회차 부하 시작: event=${sharedEvent.couponEventId}, `
         + `occurrence=${sharedEvent.couponEventOccurrenceId}, users=${virtualUsers}, `
-        + `expectedClaims=${expectedClaimCount}`,
+        + `expectedClaims=${expectedClaimCount}, rampUp=${rampUpSeconds}s`,
     );
     return sharedEvent;
   }
@@ -136,7 +143,14 @@ export default function () {
 }
 
 export function claimCoupon(data) {
-  const userId = userIdStart + exec.scenario.iterationInTest;
+  // ramping-vus는 같은 VU가 함수를 반복 호출하므로 각 VU의 첫 요청만 전송한다.
+  if (exec.vu.iterationInScenario > 0) {
+    sleep(rampUpSeconds + holdSeconds + 30);
+    return;
+  }
+
+  // idInTest는 execution segment가 적용된 두 실행기 전체에서 중복되지 않는다.
+  const userId = userIdStart + exec.vu.idInTest - 1;
   const response = http.post(
     `${baseUrl}/api/v1/coupon-events/${data.couponEventId}`
       + `/occurrences/${data.couponEventOccurrenceId}/claims`,
