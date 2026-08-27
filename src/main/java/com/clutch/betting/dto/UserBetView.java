@@ -1,5 +1,6 @@
 package com.clutch.betting.dto;
 
+import com.clutch.betting.domain.UserBet;
 import com.clutch.betting.domain.UserBetStatus;
 
 /**
@@ -22,4 +23,17 @@ public record UserBetView(
         UserBetStatus status,
         long currentPoint
 ) {
+
+    /** 사용자 배팅과 조회 시점 포인트를 상세 조회 모델로 변환한다. */
+    public static UserBetView from(UserBet userBet, long currentPoint) {
+        return new UserBetView(
+                userBet.getId(),
+                userBet.getUserId(),
+                userBet.getBettingEventId(),
+                userBet.getSelectedExternalTeamId(),
+                userBet.getAmount(),
+                userBet.getStatus(),
+                currentPoint
+        );
+    }
 }

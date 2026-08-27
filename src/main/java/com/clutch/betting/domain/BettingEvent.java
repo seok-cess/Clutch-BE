@@ -276,6 +276,7 @@ public class BettingEvent {
         status = BettingEventStatus.CANCELLED;
     }
 
+    /** 정산 또는 취소돼 더 이상 결과·기간을 변경할 수 없는 상태인지 확인한다. */
     private boolean isTerminal() {
         return status == BettingEventStatus.SETTLED
                 || status == BettingEventStatus.CANCELLED;

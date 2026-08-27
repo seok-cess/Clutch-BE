@@ -1,5 +1,6 @@
 package com.clutch.coupon.event.domain;
 
+import com.clutch.coupon.contract.trigger.CouponTestMatch;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -151,7 +152,10 @@ public class CouponEvent {
             String triggerType,
             int claimWindowSeconds
     ) {
-        if (esportsMatchId == null || esportsMatchId <= 0) {
+        // 예약된 테스트 경기 ID(음수)는 실제 경기 없이 시연하기 위한 값이라 허용한다
+        if (esportsMatchId == null
+                || (esportsMatchId <= 0
+                    && !CouponTestMatch.isSample(esportsMatchId))) {
             throw new IllegalArgumentException("경기 ID는 필수입니다.");
         }
         if (eventName == null || eventName.isBlank()

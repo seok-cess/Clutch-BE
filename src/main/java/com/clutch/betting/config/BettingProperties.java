@@ -5,25 +5,22 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import java.time.Duration;
 
 /**
- * 배팅 마감 시간과 라이브 동기화 주기를 관리한다.
+ * 배팅 마감 시간을 관리한다.
  *
  * @param firstSetOpenBeforeStart 첫 세트 공식 시작 전 배팅 오픈 간격
  * @param firstSetCloseAfterStart 모든 세트의 실제 시작 후 배팅 마감 유예 간격
  * @param nextSetBettingDuration 다음 세트 시작 시각을 아직 받지 못했을 때의 안전 마감 간격
- * @param synchronizationInterval 라이브 동기화 실행 간격
  */
 @ConfigurationProperties(prefix = "betting")
 public record BettingProperties(
         Duration firstSetOpenBeforeStart,
         Duration firstSetCloseAfterStart,
-        Duration nextSetBettingDuration,
-        Duration synchronizationInterval
+        Duration nextSetBettingDuration
 ) {
 
     private static final Duration DEFAULT_FIRST_SET_OPEN_BEFORE_START = Duration.ofMinutes(20);
     private static final Duration DEFAULT_FIRST_SET_CLOSE_AFTER_START = Duration.ofMinutes(1);
     private static final Duration DEFAULT_NEXT_SET_BETTING_DURATION = Duration.ofMinutes(20);
-    private static final Duration DEFAULT_SYNCHRONIZATION_INTERVAL = Duration.ofSeconds(1);
 
     /**
      * 누락되거나 양수가 아닌 설정을 운영 기본값으로 정규화한다.
@@ -31,7 +28,6 @@ public record BettingProperties(
      * @param firstSetOpenBeforeStart 첫 세트 공식 시작 전 배팅 오픈 간격
      * @param firstSetCloseAfterStart 모든 세트의 실제 시작 후 배팅 마감 유예 간격
      * @param nextSetBettingDuration 다음 세트 시작 시각을 아직 받지 못했을 때의 안전 마감 간격
-     * @param synchronizationInterval 라이브 동기화 실행 간격
      */
     public BettingProperties {
         firstSetOpenBeforeStart = positiveOrDefault(
@@ -45,10 +41,6 @@ public record BettingProperties(
         nextSetBettingDuration = positiveOrDefault(
                 nextSetBettingDuration,
                 DEFAULT_NEXT_SET_BETTING_DURATION
-        );
-        synchronizationInterval = positiveOrDefault(
-                synchronizationInterval,
-                DEFAULT_SYNCHRONIZATION_INTERVAL
         );
     }
 

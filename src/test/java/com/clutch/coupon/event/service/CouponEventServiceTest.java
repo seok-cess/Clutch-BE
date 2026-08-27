@@ -11,6 +11,7 @@ import com.clutch.coupon.event.domain.CouponEvent;
 import com.clutch.coupon.event.domain.CouponEventItem;
 import com.clutch.coupon.event.domain.CouponEventPhase;
 import com.clutch.coupon.event.domain.CouponEventStatus;
+import com.clutch.coupon.contract.trigger.CouponTestMatch;
 import com.clutch.coupon.event.domain.CouponIssueMode;
 import com.clutch.coupon.event.exception.CouponEventErrorCode;
 import com.clutch.coupon.event.exception.CouponEventException;
@@ -186,6 +187,48 @@ class CouponEventServiceTest {
                 316L,
                 expectedTriggerType
         );
+    }
+
+
+    @Test
+    void 테스트_이벤트는_예약된_경기_ID로_등록한다() {
+        // replay 는 실행마다 경기 ID 가 달라져 실제 경기로는 미리 등록할 수 없다.
+        // 예약 ID(음수)가 양수 검사에 막히면 테스트 이벤트를 만들 수 없다
+        CouponEventCreateRequest request = new CouponEventCreateRequest(
+                CouponTestMatch.SAMPLE_MATCH_ID,
+                "펜타킬 테스트 이벤트",
+                CouponIssueMode.SINGLE_FIRST_COME,
+                "PENTAKILL",
+                60,
+                List.of(new CouponEventItemCreateRequest(1L, 100, 0))
+        );
+        when(couponEventRepository.save(any(CouponEvent.class)))
+                .thenAnswer(invocation -> withId(invocation.getArgument(0), 1L));
+        when(couponEventItemRepository.save(any(CouponEventItem.class)))
+                .thenAnswer(invocation -> withId(invocation.getArgument(0), 10L));
+        when(couponEventPhaseRepository.save(any(CouponEventPhase.class)))
+                .thenAnswer(invocation -> withId(invocation.getArgument(0), 20L));
+
+        CouponEventCreateResponse response = couponEventService.create(request);
+
+        assertThat(response.esportsMatchId())
+                .isEqualTo(CouponTestMatch.SAMPLE_MATCH_ID);
+        assertThat(response.triggerType()).isEqualTo("PENTAKILL");
+    }
+
+    @Test
+    void 예약되지_않은_음수_경기_ID는_등록할_수_없다() {
+        CouponEventCreateRequest request = new CouponEventCreateRequest(
+                -999L,
+                "잘못된 경기 이벤트",
+                CouponIssueMode.SINGLE_FIRST_COME,
+                "PENTAKILL",
+                60,
+                List.of(new CouponEventItemCreateRequest(1L, 100, 0))
+        );
+
+        assertThatThrownBy(() -> couponEventService.create(request))
+                .isInstanceOf(CouponEventException.class);
     }
 
     @Test

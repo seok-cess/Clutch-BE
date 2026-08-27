@@ -195,6 +195,187 @@ test('exposes only unstarted event details early so first-set betting can resolv
   }
 });
 
+test('keeps the next set unstarted during the replay fixture intermission', async () => {
+  const fixtureDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'clutch-replay-intermission-'));
+  const firstGameId = 'recorded-game-1';
+  const secondGameId = 'recorded-game-2';
+  const origin = '2026-01-01T00:00:00.000Z';
+  const firstFinishedAt = '2026-01-01T00:00:20.000Z';
+  const secondStartedAt = '2026-01-01T00:00:40.000Z';
+  const port = await reservePort();
+  let child;
+
+  try {
+    fs.writeFileSync(
+      path.join(fixtureDirectory, 'getSchedule.jsonl'),
+      `${jsonLine(origin, { data: { schedule: { events: [] } } })}\n`,
+    );
+    fs.writeFileSync(
+      path.join(fixtureDirectory, 'eventDetails.jsonl'), [
+        jsonLine(origin, { data: { event: { match: { games: [
+          { id: firstGameId, state: 'inProgress' },
+          { id: secondGameId, state: 'unstarted' },
+        ] } } } }),
+        // 녹화 당시 다음 세트 상태가 너무 일찍 inProgress가 된 응답을 재현한다.
+        jsonLine(firstFinishedAt, { data: { event: { match: { games: [
+          { id: firstGameId, state: 'completed' },
+          { id: secondGameId, state: 'inProgress' },
+        ] } } } }),
+      ].join('\n') + '\n',
+    );
+    fs.writeFileSync(
+      path.join(fixtureDirectory, 'window.jsonl'), [
+        jsonLine(origin, { frames: [{ rfc460Timestamp: origin, gameState: 'in_game' }] }, firstGameId),
+        jsonLine(firstFinishedAt, {
+          frames: [{ rfc460Timestamp: firstFinishedAt, gameState: 'finished' }],
+        }, firstGameId),
+        jsonLine(secondStartedAt, {
+          frames: [{ rfc460Timestamp: secondStartedAt, gameState: 'in_game' }],
+        }, secondGameId),
+      ].join('\n') + '\n',
+    );
+
+    child = await startReplayServer(fixtureDirectory, port, 20);
+    await new Promise((resolve) => setTimeout(resolve, 1_100));
+
+    const intermission = JSON.parse((await get(port, '/getEventDetails')).body).data.event.match.games;
+    assert.equal(intermission[0].state, 'completed');
+    assert.equal(intermission[1].state, 'unstarted');
+
+    await new Promise((resolve) => setTimeout(resolve, 1_100));
+    const secondSet = JSON.parse((await get(port, '/getEventDetails')).body).data.event.match.games;
+    assert.equal(secondSet[1].state, 'inProgress');
+  } finally {
+    if (child && !child.killed) {
+      child.kill();
+      await once(child, 'exit');
+    }
+    fs.rmSync(fixtureDirectory, { recursive: true, force: true });
+  }
+});
+
+test('applies each completed set’s official game score at its window finish', async () => {
+  const fixtureDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'clutch-replay-score-'));
+  const teamA = 'team-a';
+  const teamB = 'team-b';
+  const gameIds = ['recorded-game-1', 'recorded-game-2', 'recorded-game-3'];
+  const origin = '2026-01-01T00:00:00.000Z';
+  const at = (seconds) => new Date(Date.parse(origin) + seconds * 1000).toISOString();
+  const match = (wins, states) => ({
+    data: { event: { match: {
+      teams: [
+        { id: teamA, result: { gameWins: wins[0] } },
+        { id: teamB, result: { gameWins: wins[1] } },
+      ],
+      games: gameIds.map((id, index) => ({ id, state: states[index] })),
+    } } },
+  });
+  const port = await reservePort();
+  let child;
+
+  try {
+    fs.writeFileSync(
+      path.join(fixtureDirectory, 'getSchedule.jsonl'),
+      `${jsonLine(origin, { data: { schedule: { events: [] } } })}\n`,
+    );
+    fs.writeFileSync(path.join(fixtureDirectory, 'eventDetails.jsonl'), [
+      jsonLine(origin, match([0, 0], ['inProgress', 'unstarted', 'unstarted'])),
+      jsonLine(at(20), match([1, 0], ['completed', 'inProgress', 'unstarted'])),
+      jsonLine(at(40), match([1, 1], ['completed', 'completed', 'inProgress'])),
+      // 실제 녹화에서는 최종 공식 응답이 늦게 와도, 세트 종료 시점에 이 결과를 적용한다.
+      jsonLine(at(100), match([2, 1], ['completed', 'completed', 'completed'])),
+    ].join('\n') + '\n');
+    fs.writeFileSync(path.join(fixtureDirectory, 'window.jsonl'), [
+      jsonLine(origin, { frames: [{ rfc460Timestamp: origin, gameState: 'in_game' }] }, gameIds[0]),
+      jsonLine(at(20), { frames: [{ rfc460Timestamp: at(20), gameState: 'finished' }] }, gameIds[0]),
+      jsonLine(at(25), { frames: [{ rfc460Timestamp: at(25), gameState: 'in_game' }] }, gameIds[1]),
+      jsonLine(at(40), { frames: [{ rfc460Timestamp: at(40), gameState: 'finished' }] }, gameIds[1]),
+      jsonLine(at(45), { frames: [{ rfc460Timestamp: at(45), gameState: 'in_game' }] }, gameIds[2]),
+      jsonLine(at(60), { frames: [{ rfc460Timestamp: at(60), gameState: 'finished' }] }, gameIds[2]),
+    ].join('\n') + '\n');
+
+    child = await startReplayServer(fixtureDirectory, port, 20);
+    await new Promise((resolve) => setTimeout(resolve, 1_100));
+    let response = await get(port, '/getEventDetails');
+    assert.deepEqual(JSON.parse(response.body).data.event.match.teams
+      .map((team) => team.result.gameWins), [1, 0]);
+
+    await new Promise((resolve) => setTimeout(resolve, 1_100));
+    response = await get(port, '/getEventDetails');
+    assert.deepEqual(JSON.parse(response.body).data.event.match.teams
+      .map((team) => team.result.gameWins), [1, 1]);
+
+    await new Promise((resolve) => setTimeout(resolve, 1_100));
+    response = await get(port, '/getEventDetails');
+    assert.deepEqual(JSON.parse(response.body).data.event.match.teams
+      .map((team) => team.result.gameWins), [2, 1]);
+  } finally {
+    if (child && !child.killed) {
+      child.kill();
+      await once(child, 'exit');
+    }
+    fs.rmSync(fixtureDirectory, { recursive: true, force: true });
+  }
+});
+
+test('interpolates only gold and CS across a long opening telemetry gap', async () => {
+  const fixtureDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'clutch-replay-resources-'));
+  const gameId = 'recorded-game-1';
+  const origin = '2026-01-01T00:00:00.000Z';
+  const later = '2026-01-01T00:02:00.000Z';
+  const resourceTeam = (participantStartId, gold, creepScore) => ({
+    totalGold: gold * 5,
+    participants: Array.from({ length: 5 }, (_, index) => ({
+      participantId: participantStartId + index,
+      totalGold: gold,
+      creepScore,
+      kills: 0,
+    })),
+  });
+  const port = await reservePort();
+  let child;
+
+  try {
+    fs.writeFileSync(
+      path.join(fixtureDirectory, 'getSchedule.jsonl'),
+      `${jsonLine(origin, { data: { schedule: { events: [] } } })}\n`,
+    );
+    fs.writeFileSync(path.join(fixtureDirectory, 'window.jsonl'), [
+      jsonLine(origin, { frames: [{
+        rfc460Timestamp: origin,
+        gameState: 'in_game',
+        blueTeam: resourceTeam(1, 500, 0),
+        redTeam: resourceTeam(6, 500, 0),
+      }] }, gameId),
+      jsonLine(later, { frames: [{
+        rfc460Timestamp: later,
+        gameState: 'in_game',
+        blueTeam: resourceTeam(1, 1700, 20),
+        redTeam: resourceTeam(6, 1700, 20),
+      }] }, gameId),
+    ].join('\n') + '\n');
+
+    child = await startReplayServer(fixtureDirectory, port, 20);
+    const replayGameId = JSON.parse((await get(port, '/__replay/status')).body).gameIds[0];
+    await new Promise((resolve) => setTimeout(resolve, 450));
+    const response = await get(port, `/window/${replayGameId}?startingTime=now`);
+    const frame = JSON.parse(response.body).frames.at(-1);
+
+    assert.ok(frame.blueTeam.participants[0].totalGold > 500);
+    assert.ok(frame.blueTeam.participants[0].totalGold < 1700);
+    assert.ok(frame.blueTeam.participants[0].creepScore > 0);
+    assert.ok(frame.blueTeam.participants[0].creepScore < 20);
+    assert.equal(frame.blueTeam.participants[0].kills, 0,
+      '미래 프레임의 전투 사건은 보간하지 않아야 한다');
+  } finally {
+    if (child && !child.killed) {
+      child.kill();
+      await once(child, 'exit');
+    }
+    fs.rmSync(fixtureDirectory, { recursive: true, force: true });
+  }
+});
+
 test('reports replay game time at one second per wall-clock second at 1x', async () => {
   const fixtureDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'clutch-replay-timer-'));
   const gameId = 'recorded-game-1';

@@ -21,13 +21,7 @@ import java.time.LocalDateTime;
 /** 배팅으로 발생한 포인트 차감·지급·환불 이력을 중복 없이 기록한다. */
 @Getter
 @Entity
-@Table(
-        name = "bet_point_transaction",
-        uniqueConstraints = @UniqueConstraint(
-                name = "uk_bet_point_transaction_bet_type",
-                columnNames = {"user_bet_id", "transaction_type"}
-        )
-)
+@Table
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class BetPointTransaction {
 

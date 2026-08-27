@@ -16,6 +16,7 @@ import com.clutch.coupon.event.domain.CouponEventItem;
 import com.clutch.coupon.event.domain.CouponEventOccurrence;
 import com.clutch.coupon.event.domain.CouponEventPhase;
 import com.clutch.coupon.event.domain.CouponEventStatus;
+import com.clutch.coupon.contract.trigger.CouponTestMatch;
 import com.clutch.coupon.event.domain.CouponIssueMode;
 import com.clutch.coupon.event.exception.CouponEventErrorCode;
 import com.clutch.coupon.event.exception.CouponEventException;
@@ -518,8 +519,11 @@ public class CouponEventService {
     }
 
     private void validateTrigger(CouponEventCreateRequest request) {
+        // 예약된 테스트 경기 ID 는 실제 경기가 없어도 허용한다.
+        // replay 재생은 실행마다 경기 ID 가 달라져 미리 걸어둘 수 없기 때문이다
         if (request.esportsMatchId() == null
-                || request.esportsMatchId() <= 0) {
+                || (request.esportsMatchId() <= 0
+                    && !CouponTestMatch.isSample(request.esportsMatchId()))) {
             invalid("쿠폰 이벤트에는 경기 ID가 필요합니다.");
         }
         if (request.triggerType() == null

@@ -4,6 +4,8 @@ import com.clutch.betting.domain.BetPointTransaction;
 import com.clutch.betting.domain.BetPointTransactionType;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 /** 배팅 포인트 거래의 멱등성 확인과 원장 조회를 담당한다. */
@@ -32,4 +34,13 @@ public interface BetPointTransactionRepository extends JpaRepository<BetPointTra
             Long userBetId,
             BetPointTransactionType transactionType
     );
+
+    /**
+     * 여러 사용자 배팅의 포인트 원장을 한 번에 조회한다.
+     *
+     * @param userBetIds 조회할 사용자 배팅 식별자 목록
+     * @return 해당 배팅의 포인트 원장 목록
+     */
+    List<BetPointTransaction> findAllByUserBetIdIn(Collection<Long> userBetIds);
+
 }

@@ -8,6 +8,8 @@ public enum UserCouponStatus {
     ISSUED,
     /** 사용이 완료된 상태. */
     USED,
+    /** 저장됐거나 ISSUED 상태에서 유효 기간이 지나 계산된 만료 상태. */
+    EXPIRED,
     /** 취소된 상태. */
     CANCELLED
 }

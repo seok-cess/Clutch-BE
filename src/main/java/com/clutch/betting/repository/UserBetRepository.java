@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 
 import jakarta.persistence.LockModeType;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -39,6 +40,16 @@ public interface UserBetRepository extends JpaRepository<UserBet, Long> {
      * @return 최신 배팅이 먼저 정렬된 사용자 배팅 목록
      */
     List<UserBet> findAllByUserIdOrderByCreatedAtDescIdDesc(Long userId);
+
+    /**
+     * 여러 이벤트에 참여한 전체 배팅을 조회한다.
+     *
+     * <p>진행 중인 내 배팅의 예상 풀 배당을 계산할 때 사용한다.</p>
+     *
+     * @param bettingEventIds 조회할 배팅 이벤트 식별자 목록
+     * @return 이벤트별 전체 사용자 배팅 목록
+     */
+    List<UserBet> findAllByBettingEventIdIn(Collection<Long> bettingEventIds);
 
     /**
      * 정산·환불 교착을 줄이도록 사용자와 ID 순서로 배팅 행을 잠가 조회한다.

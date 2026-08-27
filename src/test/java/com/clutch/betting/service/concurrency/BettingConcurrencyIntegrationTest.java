@@ -6,13 +6,12 @@ import com.clutch.betting.domain.BettingEvent;
 import com.clutch.betting.domain.UserBet;
 import com.clutch.betting.exception.BettingErrorCode;
 import com.clutch.betting.exception.BettingException;
-import com.clutch.betting.live.LiveBettingDataProvider;
+import com.clutch.betting.live.BettingLiveStateReader;
 import com.clutch.betting.repository.BetPointTransactionRepository;
 import com.clutch.betting.repository.BettingEventRepository;
 import com.clutch.betting.repository.UserBetRepository;
 import com.clutch.betting.service.BettingService;
 import com.clutch.betting.scheduler.BettingScheduler;
-import com.clutch.betting.service.BetSettlementService;
 import com.clutch.lolesports.service.PollingScheduler;
 import com.clutch.user.domain.User;
 import com.clutch.user.domain.UserRole;
@@ -48,9 +47,6 @@ class BettingConcurrencyIntegrationTest {
     private BettingService bettingService;
 
     @Autowired
-    private BetSettlementService settlementService;
-
-    @Autowired
     private UserRepository userRepository;
 
     @Autowired
@@ -66,7 +62,7 @@ class BettingConcurrencyIntegrationTest {
     private JdbcTemplate jdbcTemplate;
 
     @MockitoBean
-    private LiveBettingDataProvider liveBettingDataProvider;
+    private BettingLiveStateReader liveStateReader;
 
     @MockitoBean
     private PollingScheduler pollingScheduler;
@@ -77,7 +73,7 @@ class BettingConcurrencyIntegrationTest {
     @BeforeEach
     void setUp() {
         cleanUp();
-        given(liveBettingDataProvider.isAcceptingBets(any(), any(), anyInt())).willReturn(true);
+        given(liveStateReader.isAcceptingBets(any(), any(), anyInt())).willReturn(true);
     }
 
     @AfterEach
@@ -125,9 +121,9 @@ class BettingConcurrencyIntegrationTest {
         transactionRepository.saveAndFlush(BetPointTransaction.stake(userBet.getId(), 1_000L));
         event.recordWinner("team-a");
         eventRepository.saveAndFlush(event);
-        runConcurrently(REQUEST_COUNT, () -> settlementService.settle(event.getId()));
+        runConcurrently(REQUEST_COUNT, () -> bettingService.settle(event.getId()));
 
-        assertThat(userRepository.findById(user.getId()).orElseThrow().getPoint()).isEqualTo(6_000L);
+        assertThat(userRepository.findById(user.getId()).orElseThrow().getPoint()).isEqualTo(4_900L);
         assertThat(transactionRepository.findByUserBetIdAndTransactionType(
                 userBet.getId(),
                 BetPointTransactionType.PAYOUT

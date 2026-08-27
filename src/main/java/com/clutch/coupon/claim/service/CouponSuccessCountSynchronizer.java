@@ -2,11 +2,14 @@ package com.clutch.coupon.claim.service;
 
 import com.clutch.coupon.event.domain.CouponEventItem;
 import com.clutch.coupon.event.repository.CouponEventItemRepository;
+import com.clutch.wallet.repository.CouponEventItemIssuedCount;
 import com.clutch.wallet.repository.UserCouponRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * 실제 쿠폰 발급 결과를 성공 수량 집계에 반영한다.
@@ -21,22 +24,41 @@ public class CouponSuccessCountSynchronizer {
     private final CouponEventItemRepository couponEventItemRepository;
     private final UserCouponRepository userCouponRepository;
 
-    /** 실제 쿠폰 수로 성공 집계를 단일 스케줄러에서 보정한다. */
-    @Scheduled(
-            fixedDelayString =
-                    "${coupon.success-count-sync.interval-ms:5000}"
-    )
+    /**
+     * 실제 쿠폰 수로 성공 집계를 보정한다.
+     *
+     * @return 조회·갱신한 이벤트 항목 수
+     */
     @Transactional
-    public void synchronize() {
-        for (CouponEventItem item : couponEventItemRepository.findAll()) {
-            long issuedCouponCount = userCouponRepository
-                    .countByCouponEventItemId(item.getId());
+    public CouponSuccessCountSynchronizationResult synchronize() {
+        Map<Long, Long> issuedCounts = new HashMap<>();
+        for (CouponEventItemIssuedCount count : userCouponRepository
+                .countIssuedCouponsGroupByEventItem()) {
+            issuedCounts.put(
+                    count.getCouponEventItemId(),
+                    count.getIssuedCouponCount()
+            );
+        }
+
+        int updatedItemCount = 0;
+        var items = couponEventItemRepository.findAll();
+        for (CouponEventItem item : items) {
+            long issuedCouponCount = issuedCounts.getOrDefault(
+                    item.getId(),
+                    0L
+            );
 
             if (item.getSuccessCount() != issuedCouponCount) {
                 item.synchronizeSuccessCount(
                         Math.toIntExact(issuedCouponCount)
                 );
+                updatedItemCount++;
             }
         }
+
+        return new CouponSuccessCountSynchronizationResult(
+                items.size(),
+                updatedItemCount
+        );
     }
 }
