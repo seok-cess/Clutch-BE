@@ -10,6 +10,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import static org.mockito.Mockito.when;
@@ -37,7 +38,8 @@ class CouponEventControllerTest {
                         LocalDateTime.of(2026, 8, 18, 12, 1),
                         CouponEventOccurrenceStatus.OPEN,
                         99L,
-                        true
+                        true,
+                        List.of()
                 )
         ));
 

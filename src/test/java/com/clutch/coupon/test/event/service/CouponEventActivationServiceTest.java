@@ -1,11 +1,13 @@
 package com.clutch.coupon.test.event.service;
 
+import com.clutch.coupon.claim.outbox.CouponBenefitSnapshotRepository;
 import com.clutch.coupon.claim.redis.CouponStockInitializer;
 import com.clutch.coupon.claim.recovery.CouponStockRecoveryStateManager;
 import com.clutch.coupon.event.domain.CouponEventItem;
 import com.clutch.coupon.event.domain.CouponEventOccurrenceStatus;
 import com.clutch.coupon.event.domain.CouponEventStatus;
 import com.clutch.coupon.event.repository.CouponEventItemRepository;
+import com.clutch.coupon.event.repository.CouponEventPhaseRepository;
 import com.clutch.coupon.test.event.api.dto.CouponEventActivationResponse;
 import com.clutch.coupon.test.event.domain.CouponEvent;
 import com.clutch.coupon.test.event.domain.CouponEventOccurrence;
@@ -59,6 +61,12 @@ class CouponEventActivationServiceTest {
     private CouponEventOccurrenceRepository occurrenceRepository;
 
     @Mock
+    private CouponEventPhaseRepository couponEventPhaseRepository;
+
+    @Mock
+    private CouponBenefitSnapshotRepository benefitSnapshotRepository;
+
+    @Mock
     private CouponStockInitializer couponStockInitializer;
 
     @Mock
@@ -71,6 +79,8 @@ class CouponEventActivationServiceTest {
         activationService = new CouponEventActivationService(
                 couponEventRepository,
                 couponEventItemRepository,
+                couponEventPhaseRepository,
+                benefitSnapshotRepository,
                 occurrenceRepository,
                 couponStockInitializer,
                 recoveryStateManager,
