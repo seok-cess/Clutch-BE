@@ -212,7 +212,7 @@ SMOKE_VUS=20 SMOKE_DURATION=30s docker compose run --rm k6
 
 ### 쿠폰 선착순 100명 테스트
 
-`k6/coupon-burst.js`는 `setup` 단계에서 테스트 이벤트를 생성하고 즉시 수동 오픈합니다. 오픈이 성공하면 반환된 이벤트 ID와 회차 ID를 사용자 VU에 전달하고, 모든 사용자가 쿠폰을 한 번씩 신청합니다. 관리자 페이지에서 이벤트를 미리 만들거나 열 필요가 없습니다. 기본 쿠폰 수량은 사용자 수의 절반인 50개입니다.
+`k6/coupon-burst.js`는 `setup` 단계에서 테스트 이벤트를 생성하고 즉시 수동 오픈합니다. 오픈이 성공하면 반환된 이벤트 ID와 회차 ID를 사용자 VU에 전달하고, 설정한 램프업 시간 동안 사용자를 늘리면서 모든 사용자가 쿠폰을 한 번씩 신청합니다. 관리자 페이지에서 이벤트를 미리 만들거나 열 필요가 없습니다. 기본 쿠폰 수량은 사용자 수의 절반인 50개입니다.
 
 준비 단계와 사용자 부하 단계는 별도 파일이 아니라 하나의 스크립트 안에서 분리합니다. 별도 k6 프로세스는 이벤트 ID와 회차 ID를 자동으로 공유할 수 없지만, 한 파일에서는 `setup` 반환값을 모든 VU에 안전하게 전달할 수 있습니다. 또한 이벤트 생성이나 오픈에 실패하면 사용자 부하가 시작되기 전에 전체 테스트를 중단할 수 있습니다.
 
@@ -226,13 +226,10 @@ SMOKE_VUS=20 SMOKE_DURATION=30s docker compose run --rm k6
 PowerShell에서 기본 테스트를 실행합니다.
 
 ```powershell
-docker compose run --rm `
-  -e BASE_URL=http://100.101.76.93:8080 `
-  -e COUPON_VUS=100 `
-  -e COUPON_QUANTITY=50 `
-  -e USER_ID_START=900001 `
-  -e CLAIM_WINDOW_SECONDS=600 `
-  k6 run /scripts/coupon-burst.js
+.\k6\run-coupon-ramp.ps1 `
+  -TotalVus 100 `
+  -CouponQuantity 50 `
+  -RampUpSeconds 60
 ```
 
 ### 부하 테스트 모니터링
@@ -240,35 +237,20 @@ docker compose run --rm `
 부하 테스트 지표는 별도 모니터링 컴퓨터에서 실행 중인 Prometheus와 Grafana를 사용합니다. 백엔드 서버가 `100.101.76.93`, 모니터링 서버가 `100.105.168.7`인 경우에는 다음 명령을 사용합니다.
 
 ```powershell
-$CouponVus = 20000
-$CouponQuantity = [int]($CouponVus / 2)
-$TestId = "$(Get-Date -Format 'yyyyMMdd-HHmmss')-coupon-${CouponVus}vus"
-
-New-Item -ItemType Directory -Force ".\k6\logs" | Out-Null
-
-docker compose run --rm `
-  -e BASE_URL=http://100.101.76.93:8080 `
-  -e COUPON_VUS=$CouponVus `
-  -e COUPON_QUANTITY=$CouponQuantity `
-  -e USER_ID_START=90001 `
-  -e CLAIM_WINDOW_SECONDS=900 `
-  -e CLAIM_REQUEST_TIMEOUT=10m `
-  -e SCENARIO_MAX_DURATION=12m `
-  -e VERIFY_INDIVIDUAL_PERSISTENCE=false `
-  -e K6_PROMETHEUS_RW_SERVER_URL=http://100.105.168.7:9090/api/v1/write `
-  -e K6_PROMETHEUS_RW_PUSH_INTERVAL=10s `
-  -e K6_PROMETHEUS_RW_TREND_STATS="p(50),p(95),p(99),p(99.9),avg,min,max" `
-  k6 run `
-  --quiet `
-  -o experimental-prometheus-rw `
-  --tag testid=$TestId `
-  /scripts/coupon-burst.js 2>&1 |
-  Tee-Object -FilePath ".\k6\logs\$TestId.log"
+.\k6\run-coupon-ramp.ps1 `
+  -BaseUrl "http://100.101.76.93:8080" `
+  -PrometheusUrl "http://100.105.168.7:9090/api/v1/write" `
+  -TotalVus 20000 `
+  -CouponQuantity 10000 `
+  -RampUpSeconds 60 `
+  -PreAllocatedVus 5000
 ```
+
+실행 스크립트는 `coupon-ramp.js`를 사용해 20,000명의 요청 시작 시각을 60초에 고르게 분산한다. 부하 발생기는 5,000 VU를 미리 준비하고 응답 지연에 따라 최대 20,000 VU까지 사용한다. 예약한 요청을 시작하지 못한 `dropped_iterations`가 있거나 전체 실행 횟수가 20,000건이 아니면 테스트를 실패 처리한다. 실행할 때 `TestId`를 생략하면 실행 시각을 포함한 값이 자동 생성된다. 터미널 출력 전체는 `k6/logs/<TestId>.log`에 저장된다.
 
 이 경우 Grafana는 테스트 PC에서 `http://100.105.168.7:3000`으로 접속합니다. 모니터링 서버 방화벽에서는 테스트 PC가 사용하는 주소에만 3000번과 9090번 포트를 허용합니다.
 
-테스트는 쿠폰 요청 성공 50건, 재고 소진 50건, 예상하지 않은 오류 0건을 합격 기준으로 사용합니다. `VERIFY_INDIVIDUAL_PERSISTENCE=true`가 기본값이며 성공한 사용자는 `내 쿠폰` API를 반복 조회하여 사용자 쿠폰이 실제 저장됐는지도 확인합니다. 대규모 신청 부하에서는 위 명령처럼 값을 `false`로 지정하여 개별 조회를 끄고, 신청이 끝난 뒤 `teardown`에서 최종 발급 수량을 한 번 확인합니다. 신청 요청 제한 시간은 기본 10분이고 전체 시나리오 제한 시간은 기본 12분입니다. 같은 날 다시 실행해도 수동 테스트 트리거에는 새로운 순번이 자동으로 부여되지만, 이벤트와 발급 데이터는 데이터베이스에 계속 남습니다.
+테스트는 설정한 재고만큼의 발급 성공, 나머지 사용자의 정상 품절, 예상하지 않은 오류 0건을 합격 기준으로 사용합니다. `VERIFY_INDIVIDUAL_PERSISTENCE=false`가 기본값이며 대규모 신청 부하에서는 개별 조회를 실행하지 않습니다. 개별 저장까지 확인하는 소규모 정합성 테스트에서만 값을 `true`로 지정합니다. 신청이 끝난 뒤 `teardown`은 비동기 발급 집계가 완료될 때까지 기본 120초 동안 재조회합니다. 같은 날 다시 실행해도 수동 테스트 트리거에는 새로운 순번이 자동으로 부여되지만, 이벤트와 발급 데이터는 데이터베이스에 계속 남습니다.
 
 ## 기본 접속 정보
 

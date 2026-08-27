@@ -83,37 +83,59 @@ $dockerArgs = @(
     "/scripts/coupon-ramp.js"
 )
 
-$transcriptStarted = $false
 $exitCode = 1
 
-try {
-    Start-Transcript -LiteralPath $logFile | Out-Null
-    $transcriptStarted = $true
+# Start-Transcript는 Docker 같은 네이티브 프로그램의 출력을 일부 누락할 수 있다.
+# 모든 안내 문구와 k6 표준 출력/오류를 같은 UTF-8 파일에 직접 기록한다.
+Set-Content -LiteralPath $logFile -Value "" -Encoding UTF8
+function Write-RunLog {
+    param([string]$Message)
+    Write-Host $Message
+    Add-Content -LiteralPath $logFile -Value $Message -Encoding UTF8
+}
 
-    Write-Host "백엔드 연결을 확인합니다: $BaseUrl"
+try {
+    Write-RunLog "TEST_START timestamp=$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss K')"
+    Write-RunLog "백엔드 연결을 확인합니다: $BaseUrl"
     Invoke-RestMethod -Method Get -Uri "$BaseUrl/actuator/health" | Out-Null
 
-    Write-Host "단일 노트북 쿠폰 부하 테스트를 시작합니다." -ForegroundColor Green
-    Write-Host "TestId=$TestId, users=$TotalVus, stock=$CouponQuantity, rampUp=${RampUpSeconds}s, preAllocatedVUs=$PreAllocatedVus, maxVUs=$MaxVus"
-    Write-Host "로그 파일: $logFile"
+    Write-RunLog "단일 노트북 쿠폰 부하 테스트를 시작합니다."
+    Write-RunLog "TEST_CONFIG testId=$TestId users=$TotalVus stock=$CouponQuantity rampUp=${RampUpSeconds}s preAllocatedVUs=$PreAllocatedVus maxVUs=$MaxVus"
+    Write-RunLog "로그 파일: $logFile"
 
     Push-Location $repoRoot
     try {
-        & $dockerCommand.Source @dockerArgs
-        $exitCode = $LASTEXITCODE
+        # Windows PowerShell 5.1은 Docker Compose가 stderr로 출력하는 정상 상태
+        # 메시지(Container ... Creating 등)도 NativeCommandError로 변환한다.
+        # 이 구간에서만 비종료 오류로 받아 실제 성공 여부는 종료 코드로 판정한다.
+        $previousErrorActionPreference = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        try {
+            & $dockerCommand.Source @dockerArgs 2>&1 | ForEach-Object {
+                $line = $_.ToString()
+                Write-Host $line
+                Add-Content -LiteralPath $logFile -Value $line -Encoding UTF8
+            }
+            $exitCode = $LASTEXITCODE
+        } finally {
+            $ErrorActionPreference = $previousErrorActionPreference
+        }
     } finally {
         Pop-Location
     }
 
     if ($exitCode -ne 0) {
+        Write-RunLog "TEST_RESULT result=FAIL exitCode=$exitCode"
         throw "k6 실행이 실패했습니다. 종료 코드: $exitCode"
     }
 
-    Write-Host "테스트와 최종 발급 수량 검증이 완료되었습니다." -ForegroundColor Green
-    Write-Host "Grafana Test ID: $TestId"
+    Write-RunLog "TEST_RESULT result=PASS exitCode=0"
+    Write-RunLog "테스트와 최종 발급 수량 검증이 완료되었습니다."
+    Write-RunLog "Grafana Test ID: $TestId"
+} catch {
+    Write-RunLog "ERROR message=$($_.Exception.Message)"
+    throw
 } finally {
-    if ($transcriptStarted) {
-        Stop-Transcript | Out-Null
-    }
+    Write-RunLog "TEST_END timestamp=$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss K')"
     Write-Host "로그 파일: $logFile"
 }

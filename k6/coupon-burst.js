@@ -6,7 +6,7 @@ import { Counter, Rate, Trend } from 'k6/metrics';
 // =============================================================================
 // 테스트 구조
 // 1. setup(): 단 한 번 실행되어 이벤트를 생성하고 즉시 연다.
-// 2. claimCoupon(): setup이 끝난 뒤 COUPON_VUS 수만큼 동시에 한 번씩 신청한다.
+// 2. claimCoupon(): setup이 끝난 뒤 COUPON_VUS까지 VU를 늘리며 한 번씩 신청한다.
 // 3. teardown(): 모든 신청이 끝난 뒤 최종 발급 수량을 한 번 확인한다.
 //
 // 준비와 부하를 별도 파일로 나누지 않은 이유:
@@ -37,11 +37,17 @@ const persistenceTimeoutSeconds = positiveNumber(
   600,
   'PERSISTENCE_TIMEOUT_SECONDS',
 );
-const claimRequestTimeout = __ENV.CLAIM_REQUEST_TIMEOUT || '10m';
-const scenarioMaxDuration = __ENV.SCENARIO_MAX_DURATION || '12m';
+const finalVerificationTimeoutSeconds = positiveNumber(
+  __ENV.FINAL_VERIFICATION_TIMEOUT_SECONDS,
+  120,
+  'FINAL_VERIFICATION_TIMEOUT_SECONDS',
+);
+const claimRequestTimeout = __ENV.CLAIM_REQUEST_TIMEOUT || '1m';
+const rampUpSeconds = positiveInteger(__ENV.RAMP_UP_SECONDS, 60, 'RAMP_UP_SECONDS');
+const holdSeconds = positiveInteger(__ENV.HOLD_SECONDS, 30, 'HOLD_SECONDS');
 const verifyIndividualPersistence = booleanValue(
   __ENV.VERIFY_INDIVIDUAL_PERSISTENCE,
-  true,
+  false,
   'VERIFY_INDIVIDUAL_PERSISTENCE',
 );
 const couponName = __ENV.COUPON_NAME || '[K6] 10%';
@@ -58,18 +64,22 @@ const expectedClaimResults = new Rate('coupon_claim_expected');
 const persistedCoupons = new Counter('coupon_persisted_total');
 const persistenceFailures = new Counter('coupon_persistence_failed_total');
 const claimFailures = new Counter('coupon_claim_failure');
+const claimTransportFailures = new Counter('coupon_claim_transport_failure_total');
 const claimDuration = new Trend('coupon_claim_duration', true);
+const finalVerificationSuccesses = new Counter('coupon_final_verification_success_total');
 
 // 3) 부하 단계 설정과 테스트 합격 기준
 // setup은 scenarios보다 먼저 한 번 실행되므로 claimers에는 관리자 VU가 섞이지 않는다.
-const thresholds = {
+export const thresholds = {
   checks: ['rate>0.99'],
   http_req_failed: ['rate<0.01'],
-  'http_req_duration{endpoint:claim}': ['p(95)<5000'],
+  'http_req_duration{endpoint:claim,expected_response:true}': ['p(95)<5000'],
   coupon_claim_expected: ['rate>0.99'],
   coupon_claim_success_total: [`count==${couponQuantity}`],
   coupon_claim_sold_out_total: [`count==${virtualUsers - couponQuantity}`],
   coupon_claim_unexpected_total: ['count==0'],
+  coupon_claim_transport_failure_total: ['count==0'],
+  coupon_final_verification_success_total: ['count==1'],
 };
 
 // 대규모 신청 부하에서는 개별 저장 조회를 끌 수 있다.
@@ -82,16 +92,19 @@ if (verifyIndividualPersistence) {
 export const options = {
   scenarios: {
     claimers: {
-      executor: 'per-vu-iterations',
+      executor: 'ramping-vus',
       exec: 'claimCoupon',
-      vus: virtualUsers,
-      iterations: 1,
-      maxDuration: scenarioMaxDuration,
-      gracefulStop: '30s',
+      startVUs: 0,
+      stages: [
+        { duration: `${rampUpSeconds}s`, target: virtualUsers },
+        { duration: `${holdSeconds}s`, target: virtualUsers },
+      ],
+      gracefulRampDown: '30s',
       tags: { flow: 'coupon-claimer' },
     },
   },
   thresholds,
+  teardownTimeout: `${Math.ceil(finalVerificationTimeoutSeconds) + 10}s`,
 };
 
 /**
@@ -137,7 +150,7 @@ export function setup() {
   console.log(
     `준비 완료: event=${couponEventId}, occurrence=${occurrence.couponEventOccurrenceId}, `
       + `users=${virtualUsers}, stock=${couponQuantity}, couponType=${couponType.couponTypeId}, `
-      + `claimTimeout=${claimRequestTimeout}, `
+      + `rampUp=${rampUpSeconds}s, claimTimeout=${claimRequestTimeout}, `
       + `individualPersistence=${verifyIndividualPersistence}`,
   );
 
@@ -156,7 +169,18 @@ export function setup() {
  * 켜고 끌 수 있으며, 끈 경우 신청 부하와 분리해 teardown에서 최종 수량만 확인한다.
  */
 export function claimCoupon(data) {
-  const userId = userIdStart + exec.scenario.iterationInTest;
+  // ramping-vus는 같은 VU를 반복 실행하므로 각 VU의 첫 번째 요청만 전송한다.
+  if (exec.vu.iterationInScenario > 0) {
+    sleep(rampUpSeconds + holdSeconds + 30);
+    return;
+  }
+
+  const userId = userIdStart + exec.vu.idInTest - 1;
+  claimCouponForUser(data, userId);
+}
+
+/** 지정한 가상 사용자 ID로 쿠폰을 한 번 신청한다. */
+export function claimCouponForUser(data, userId) {
   const response = http.post(
     `${baseUrl}/api/v1/coupon-events/${data.couponEventId}`
       + `/occurrences/${data.couponEventOccurrenceId}/claims`,
@@ -172,7 +196,11 @@ export function claimCoupon(data) {
     },
   );
 
-  claimDuration.add(response.timings.duration);
+  const transportFailure = response.status === 0;
+  claimTransportFailures.add(transportFailure ? 1 : 0);
+  if (!transportFailure) {
+    claimDuration.add(response.timings.duration);
+  }
   const code = jsonValue(response, 'code');
   if (response.status >= 500) {
     claimFailures.add(1, {
@@ -206,7 +234,7 @@ export function claimCoupon(data) {
     persistedCoupons.add(persisted ? 1 : 0);
     persistenceFailures.add(persisted ? 0 : 1);
     check(persisted, {
-      'issued coupon is persisted after Kafka processing': (value) => value,
+      'issued coupon is persisted': (value) => value,
     });
   }
 }
@@ -247,18 +275,33 @@ function openCouponEvent(couponEventId) {
  * 모든 사용자 실행이 끝난 뒤 실제 발급 수량이 설정 재고와 같은지 확인한다.
  */
 export function teardown(data) {
-  const response = http.get(
-    `${baseUrl}/api/v1/admin/coupon-events/${data.couponEventId}`,
-    jsonParams('GET /admin/coupon-events/:id', 'final-event-detail'),
-  );
-  const issuedQuantity = Number(jsonValue(response, 'issuedQuantity'));
+  const deadline = Date.now() + finalVerificationTimeoutSeconds * 1000;
+  let response;
+  let issuedQuantity = 0;
 
+  do {
+    response = http.get(
+      `${baseUrl}/api/v1/admin/coupon-events/${data.couponEventId}`,
+      jsonParams('GET /admin/coupon-events/:id', 'final-event-detail'),
+    );
+    issuedQuantity = Number(jsonValue(response, 'issuedQuantity'));
+    if (response.status === 200 && issuedQuantity === couponQuantity) {
+      break;
+    }
+    sleep(1);
+  } while (Date.now() < deadline);
+
+  const finalVerificationSucceeded = response.status === 200
+    && issuedQuantity === couponQuantity;
+  finalVerificationSuccesses.add(finalVerificationSucceeded ? 1 : 0);
   check(response, {
     'final event detail is returned': (res) => res.status === 200,
     'final issued quantity equals stock': () => issuedQuantity === couponQuantity,
   });
   console.log(
-    `최종 확인: event=${data.couponEventId}, issued=${issuedQuantity}/${couponQuantity}`,
+    `FINAL_VERIFICATION event=${data.couponEventId} `
+      + `issued=${issuedQuantity} expected=${couponQuantity} `
+      + `result=${finalVerificationSucceeded ? 'PASS' : 'FAIL'}`,
   );
 }
 
