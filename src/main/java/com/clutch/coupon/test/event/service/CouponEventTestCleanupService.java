@@ -50,6 +50,25 @@ public class CouponEventTestCleanupService {
         // 다시 시연할 때 "이미 받았다" 로 막힌다
         clearRedis(couponEventId, params);
 
+        // Outbox는 claimId만 값으로 들고 FK가 없어 발급 요청보다 먼저 명시적으로
+        // 지우지 않으면 테스트 초기화 뒤 고아 데이터로 남는다.
+        deleted.put("walletOutbox", jdbcTemplate.update("""
+                DELETE FROM wallet_outbox
+                 WHERE aggregate_id IN (
+                    SELECT coupon_claim_request_id
+                      FROM coupon_claim_request
+                     WHERE coupon_event_id = :eventId
+                 )
+                """, params));
+        deleted.put("claimOutbox", jdbcTemplate.update("""
+                DELETE FROM coupon_claim_outbox
+                 WHERE aggregate_id IN (
+                    SELECT coupon_claim_request_id
+                      FROM coupon_claim_request
+                     WHERE coupon_event_id = :eventId
+                 )
+                """, params));
+
         // 발급된 쿠폰 → 발급 요청 → 회차 순. FK 가 이 방향으로 걸려 있다
         deleted.put("userCoupon", jdbcTemplate.update("""
                 DELETE FROM user_coupon WHERE coupon_event_id = :eventId
@@ -88,7 +107,9 @@ public class CouponEventTestCleanupService {
                 """, params, Long.class);
 
         itemIds.forEach(id -> redisTemplate.delete(CouponClaimRedisKeys.stock(id)));
-        occurrenceIds.forEach(id ->
-                redisTemplate.delete(CouponClaimRedisKeys.claimedUsers(id)));
+        occurrenceIds.forEach(id -> {
+            redisTemplate.delete(CouponClaimRedisKeys.claimedUsers(id));
+            redisTemplate.delete(CouponClaimRedisKeys.context(id));
+        });
     }
 }
