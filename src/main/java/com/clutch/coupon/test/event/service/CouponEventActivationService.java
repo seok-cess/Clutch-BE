@@ -1,11 +1,14 @@
 package com.clutch.coupon.test.event.service;
 
+import com.clutch.coupon.claim.outbox.CouponBenefitSnapshotRepository;
 import com.clutch.coupon.claim.redis.CouponStockInitializer;
 import com.clutch.coupon.claim.recovery.CouponStockRecoveryStateManager;
 import com.clutch.coupon.event.domain.CouponEventItem;
 import com.clutch.coupon.event.domain.CouponEventOccurrenceStatus;
 import com.clutch.coupon.event.domain.CouponEventStatus;
+import com.clutch.coupon.event.domain.CouponEventPhase;
 import com.clutch.coupon.event.repository.CouponEventItemRepository;
+import com.clutch.coupon.event.repository.CouponEventPhaseRepository;
 import com.clutch.coupon.test.event.api.dto.CouponEventActivationResponse;
 import com.clutch.coupon.test.event.domain.CouponEvent;
 import com.clutch.coupon.test.event.domain.CouponEventOccurrence;
@@ -25,7 +28,9 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /** 관리자 수동 쿠폰 오픈과 사용자 테스트용 활성 회차 조회를 처리한다. */
@@ -36,6 +41,8 @@ public class CouponEventActivationService {
 
     private final CouponEventRepository couponEventRepository;
     private final CouponEventItemRepository couponEventItemRepository;
+    private final CouponEventPhaseRepository couponEventPhaseRepository;
+    private final CouponBenefitSnapshotRepository benefitSnapshotRepository;
     private final CouponEventOccurrenceRepository occurrenceRepository;
     private final CouponStockInitializer couponStockInitializer;
     private final CouponStockRecoveryStateManager recoveryStateManager;
@@ -225,8 +232,60 @@ public class CouponEventActivationService {
                 occurrence.getExpiresAt(),
                 occurrence.getOccurrenceStatus(),
                 remainingQuantity,
-                claimable
+                claimable,
+                phases(event.getId())
         );
+    }
+
+    /**
+     * 발급 단계 목록을 오픈 시간 순으로 만든다.
+     *
+     * <p>화면은 이 목록으로 "지금 무엇을 받는지"와 "언제 혜택이 바뀌는지"를 그린다.
+     * 단계 선택 규칙은 {@code CouponClaimContext.findActivePhase} 와 같다 —
+     * {@code openOffsetSeconds <= 경과초} 중 가장 큰 단계 하나만 활성이다.</p>
+     *
+     * <p>혜택 스냅샷이 없는 단계는 목록에서 뺀다. 여기서 예외를 던지면 화면이
+     * 통째로 열리지 않는데, 발급 자체는 Redis 컨텍스트로 동작하므로
+     * 표시 정보 하나 때문에 이벤트를 막을 이유가 없다.</p>
+     */
+    private List<CouponEventActivationResponse.Phase> phases(
+            Long couponEventId
+    ) {
+        List<CouponEventPhase> eventPhases = couponEventPhaseRepository
+                .findAllByCouponEventIdOrderByOpenOffsetSecondsAsc(
+                        couponEventId
+                );
+        if (eventPhases.isEmpty()) {
+            return List.of();
+        }
+
+        Map<Long, CouponEventItem> itemsById = couponEventItemRepository
+                .findAllByCouponEventId(couponEventId)
+                .stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        CouponEventItem::getId,
+                        java.util.function.Function.identity()
+                ));
+
+        List<CouponEventActivationResponse.Phase> result =
+                new ArrayList<>(eventPhases.size());
+        for (CouponEventPhase phase : eventPhases) {
+            Long itemId = phase.getCouponEventItemId();
+            CouponEventItem item = itemsById.get(itemId);
+            benefitSnapshotRepository
+                    .findByCouponEventItemId(itemId)
+                    .ifPresent(benefit -> result.add(
+                            new CouponEventActivationResponse.Phase(
+                                    itemId,
+                                    phase.getOpenOffsetSeconds(),
+                                    benefit.discountType(),
+                                    benefit.discountValue(),
+                                    item == null ? 0L : item.remainingStock(),
+                                    item == null ? 0L : item.getQuantity()
+                            )
+                    ));
+        }
+        return List.copyOf(result);
     }
 
     /**
