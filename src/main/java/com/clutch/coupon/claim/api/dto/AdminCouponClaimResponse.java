@@ -28,7 +28,7 @@ import java.time.LocalDateTime;
  * @param requestStatus 발급 요청 처리 상태
  * @param failureReason 발급 실패 사유
  * @param userCouponId 실제 발급 쿠폰 ID
- * @param couponStatus 발급 쿠폰의 현재 상태
+ * @param couponStatus 저장 상태와 만료 시각을 반영한 발급 쿠폰의 현재 상태
  */
 public record AdminCouponClaimResponse(
         Long claimRequestId,

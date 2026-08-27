@@ -15,7 +15,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -24,6 +27,9 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class AdminCouponClaimServiceTest {
+
+    private static final Instant REFERENCE_TIME =
+            Instant.parse("2026-08-21T12:00:00Z");
 
     @Mock
     private AdminCouponClaimQueryRepository queryRepository;
@@ -34,7 +40,8 @@ class AdminCouponClaimServiceTest {
     void setUp() {
         service = new AdminCouponClaimService(
                 queryRepository,
-                new PersonalDataMasker()
+                new PersonalDataMasker(),
+                Clock.fixed(REFERENCE_TIME, ZoneOffset.UTC)
         );
     }
 
@@ -77,6 +84,11 @@ class AdminCouponClaimServiceTest {
         assertThat(captor.getValue().eventNameKeyword())
                 .isEqualTo("펜타킬 이벤트");
         assertThat(captor.getValue().triggerKeyword()).isEqualTo("PENTA");
+        assertThat(captor.getValue().statusReferenceTime())
+                .isEqualTo(LocalDateTime.ofInstant(
+                        REFERENCE_TIME,
+                        ZoneOffset.UTC
+                ));
     }
 
     @Test

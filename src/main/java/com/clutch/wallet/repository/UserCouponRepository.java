@@ -60,7 +60,8 @@ public interface UserCouponRepository extends JpaRepository<UserCoupon, Long> {
      * 상태와 커서 조건으로 사용자 쿠폰 목록을 만료일 오름차순으로 조회한다.
      *
      * @param userId 조회할 사용자 ID
-     * @param status 조회할 쿠폰 상태, 전체 조회 시 {@code null}
+     * @param status 조회할 유효 쿠폰 상태, 전체 조회 시 {@code null}
+     * @param referenceTime 만료 상태를 계산할 UTC 기준 시각
      * @param cursorExpiresAt 이전 페이지 마지막 항목의 만료 시각, 첫 조회 시 {@code null}
      * @param cursorId 이전 페이지 마지막 항목의 ID, 첫 조회 시 {@code null}
      * @param pageable 조회 개수 제한
@@ -69,7 +70,31 @@ public interface UserCouponRepository extends JpaRepository<UserCoupon, Long> {
     @Query("""
         SELECT c FROM UserCoupon c
         WHERE c.userId = :userId
-                AND (:status IS NULL OR c.status = :status)
+                AND (
+                    :status IS NULL
+                    OR (
+                        :status = com.clutch.wallet.domain.UserCouponStatus.ISSUED
+                        AND c.status = com.clutch.wallet.domain.UserCouponStatus.ISSUED
+                        AND c.expiresAt > :referenceTime
+                    )
+                    OR (
+                        :status = com.clutch.wallet.domain.UserCouponStatus.EXPIRED
+                        AND (
+                            c.status = com.clutch.wallet.domain.UserCouponStatus.EXPIRED
+                            OR (
+                                c.status = com.clutch.wallet.domain.UserCouponStatus.ISSUED
+                                AND c.expiresAt <= :referenceTime
+                            )
+                        )
+                    )
+                    OR (
+                        :status NOT IN (
+                            com.clutch.wallet.domain.UserCouponStatus.ISSUED,
+                            com.clutch.wallet.domain.UserCouponStatus.EXPIRED
+                        )
+                        AND c.status = :status
+                    )
+                )
                 AND (:cursorExpiresAt IS NULL
                         OR c.expiresAt > :cursorExpiresAt
                         OR (c.expiresAt = :cursorExpiresAt
@@ -78,6 +103,7 @@ public interface UserCouponRepository extends JpaRepository<UserCoupon, Long> {
                 """)
     List<UserCoupon> findPage(@Param("userId") Long userId,
                               @Param("status") UserCouponStatus status,
+                              @Param("referenceTime") Instant referenceTime,
                               @Param("cursorExpiresAt")Instant cursorExpiresAt,
                               @Param("cursorId") Long cursorId,
                               Pageable pageable
@@ -105,7 +131,7 @@ public interface UserCouponRepository extends JpaRepository<UserCoupon, Long> {
                    @Param("usedAt") Instant usedAt);
 
     /**
-     * 발급 상태의 쿠폰을 취소 상태로 변경한다.
+     * 만료되지 않은 발급 상태의 쿠폰을 취소 상태로 변경한다.
      *
      * @param id 취소할 사용자 쿠폰 ID
      * @param cancelledAt 취소 처리 시각
@@ -120,6 +146,7 @@ public interface UserCouponRepository extends JpaRepository<UserCoupon, Long> {
             c.cancelReason = :reason
         WHERE c.id = :id
         AND c.status = com.clutch.wallet.domain.UserCouponStatus.ISSUED
+        AND c.expiresAt > :cancelledAt
 """)
 int cancel(@Param("id") Long id,
            @Param("cancelledAt") Instant cancelledAt,

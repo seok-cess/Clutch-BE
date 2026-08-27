@@ -12,7 +12,7 @@ import java.time.Instant;
  * @param id 사용자 쿠폰 ID
  * @param couponEventId 발급 근거가 된 쿠폰 이벤트 ID
  * @param couponCode 쿠폰 코드
- * @param status 쿠폰 상태
+ * @param status 저장 상태와 만료 시각을 반영한 유효 쿠폰 상태
  * @param discountType 할인 유형
  * @param discountValue 할인 값
  * @param expiresAt 만료 시각
@@ -34,14 +34,18 @@ public record CouponResponse(
      * 엔티티로부터 응답 DTO를 생성한다.
      *
      * @param coupon 변환할 사용자 쿠폰
+     * @param referenceTime 만료 상태를 계산할 UTC 기준 시각
      * @return 변환된 응답
      */
-    public static CouponResponse from(UserCoupon coupon){
+    public static CouponResponse from(
+            UserCoupon coupon,
+            Instant referenceTime
+    ){
         return new CouponResponse(
                 coupon.getId(),
                 coupon.getCouponEventId(),
                 coupon.getCouponCode(),
-                coupon.getStatus(),
+                coupon.getEffectiveStatus(referenceTime),
                 coupon.getDiscountType(),
                 coupon.getDiscountValue(),
                 coupon.getExpiresAt(),

@@ -110,12 +110,13 @@
   <section class="cover">
     <div class="eyebrow">CLUTCH BACKEND · IMPLEMENTATION REPORT</div>
     <h1>쿠폰 성공 수량 집계<br>안정성 개선 보고서</h1>
-    <p class="subtitle">상태 계약 · 테스트 격리 · 운영 메트릭 · 다중 인스턴스 제어</p>
+    <p class="subtitle">상태 계약 · 계산형 만료 · 테스트 격리 · 운영 메트릭 · 다중 인스턴스 제어</p>
     <div class="meta">
       <div><strong>작성일</strong> 2026-08-26 (Asia/Seoul)</div>
+      <div><strong>최종 재검증</strong> 2026-08-27 (Asia/Seoul)</div>
       <div><strong>작업 브랜치</strong> feat/CLUTCH-268</div>
-      <div><strong>기준 커밋</strong> 3249ee3</div>
-      <div><strong>검증</strong> Gradle clean build · 474 tests passed</div>
+      <div><strong>기준 dev</strong> 5b81ad0</div>
+      <div><strong>검증</strong> Gradle clean build · 507 tests passed</div>
       <div><strong>제외 범위</strong> k6 스크립트는 요청에 따라 수정하지 않음</div>
     </div>
   </section>
@@ -135,7 +136,7 @@
       </div>
       <div class="card">
         <strong>반복 가능한 테스트</strong>
-        고정 claim ID를 UUID 기반 값으로 바꾸고 테스트 커넥션 풀과 자동 집계를 격리했다.
+        테스트 claim ID 충돌을 방지하고 테스트 커넥션 풀과 자동 집계를 격리했다.
       </div>
       <div class="card">
         <strong>운영 메트릭</strong>
@@ -183,11 +184,14 @@
       <li><code>UserCouponStatus</code>에 <code>EXPIRED</code> 추가</li>
       <li>관리자 발급 내역의 문자열 변환이 두 상태를 정상 응답하도록 테스트 추가</li>
       <li>JPA가 DB의 <code>CANCELLED</code> 요청과 <code>EXPIRED</code> 쿠폰을 역직렬화하는 통합 테스트 추가</li>
+      <li><code>ISSUED</code> 쿠폰은 기준 시각이 <code>expiresAt</code> 이상이면 사용자·관리자 응답에서 <code>EXPIRED</code>로 계산</li>
+      <li><code>ISSUED</code>/<code>EXPIRED</code> 필터도 저장 상태와 만료 시각을 함께 사용하도록 통일</li>
+      <li>쿠폰 사용과 관리자 취소를 모두 만료 시각 이전의 <code>ISSUED</code> 상태에서만 조건부 갱신</li>
     </ul>
     <div class="callout warning">
-      <strong>범위 통제:</strong> 이번 작업은 이미 존재하는 DB 값을 안전하게 읽는 호환성 개선이다.
-      신규 취소 요청 생성이나 쿠폰 만료 배치 등 새로운 상태 전이 기능은 확정된 도메인 규칙이
-      없으므로 추가하지 않았다.
+      <strong>범위 통제:</strong> 발급 요청 <code>CANCELLED</code>는 기존 DB 값을 안전하게 읽는
+      호환성 범위로 유지한다. 쿠폰 <code>EXPIRED</code>는 배치로 대량 갱신하지 않고
+      <code>expiresAt</code>을 기준으로 계산해 배치 지연 없이 같은 결과를 반환한다.
     </div>
 
     <h3>3.2 상태 계약</h3>
@@ -202,14 +206,14 @@
         <tr>
           <td>user_coupon</td>
           <td>ISSUED, USED, EXPIRED, CANCELLED</td>
-          <td>ISSUED → USED 또는 CANCELLED</td>
+          <td>ISSUED → USED 또는 CANCELLED, 만료 시각부터 유효 상태 EXPIRED</td>
         </tr>
       </tbody>
     </table>
 
     <h2>4. 테스트 격리 개선</h2>
     <ul>
-      <li><code>UserCouponRepositoryTest</code>의 claim ID와 쿠폰 코드를 UUID 기반으로 생성</li>
+      <li><code>UserCouponRepositoryTest</code>는 최신 <code>dev</code>의 충돌 방지용 <code>CLAIM_BASE</code> 대역을 유지</li>
       <li><code>CouponIssuanceServiceFailureTest</code>의 claim ID를 UUID 기반으로 생성</li>
       <li>테스트 설정에서 성공 수량 자동 스케줄러를 비활성화하고 테스트가 필요한 경우 서비스를 직접 호출</li>
       <li>일반 테스트 Hikari 풀을 4개로 제한해 Spring context 누적으로 MySQL 151 연결 한도를 넘지 않도록 조정</li>
@@ -270,9 +274,9 @@
     <table>
       <thead><tr><th>검증</th><th>결과</th></tr></thead>
       <tbody>
-        <tr><td>변경 관련 테스트 7개 클래스</td><td class="check">17 tests · 0 failures</td></tr>
-        <tr><td><code>gradlew.bat clean build</code></td><td class="check">474 tests · 0 failures · 0 errors · 0 skipped</td></tr>
-        <tr><td>컴파일·bootJar·check·build</td><td class="check">BUILD SUCCESSFUL (2m 7s)</td></tr>
+        <tr><td>상태 정책 관련 테스트 6개 클래스</td><td class="check">16 tests · 0 failures</td></tr>
+        <tr><td><code>gradlew.bat clean build</code></td><td class="check">507 tests · 0 failures · 0 errors · 0 skipped</td></tr>
+        <tr><td>컴파일·bootJar·check·build</td><td class="check">BUILD SUCCESSFUL (1m 57s)</td></tr>
         <tr><td>Flyway / Hibernate validate</td><td class="check">MySQL 8.4에서 통과</td></tr>
       </tbody>
     </table>
@@ -293,6 +297,9 @@
     <h3>7.3 관련 테스트 구성</h3>
     <ul class="small">
       <li>상태 JPA 호환: CouponClaimRequestRepositoryTest, UserCouponRepositoryTest</li>
+      <li>계산형 만료 경계: UserCouponTest, CouponQueryServiceTest</li>
+      <li>만료 후 취소 차단: AdminCouponServiceTest, UserCouponRepositoryTest</li>
+      <li>유효 상태 필터: UserCouponRepositoryTest, AdminCouponClaimQueryRepositoryTest</li>
       <li>관리자 응답 호환: AdminCouponClaimServiceTest</li>
       <li>집계 결과: CouponSuccessCountSynchronizerTest</li>
       <li>메트릭 세 경로: CouponSuccessCountSynchronizationSchedulerTest</li>
@@ -308,6 +315,11 @@
       <tbody>
         <tr><td>ClaimRequestStatus.java</td><td>CANCELLED 조회 호환 상태 추가</td></tr>
         <tr><td>UserCouponStatus.java</td><td>EXPIRED 조회 호환 상태 추가</td></tr>
+        <tr><td>UserCoupon.java / CouponResponse.java</td><td>저장 상태와 만료 시각을 반영한 유효 상태 계산</td></tr>
+        <tr><td>UserCouponRepository.java</td><td>유효 상태 목록 필터와 만료 후 취소 차단</td></tr>
+        <tr><td>CouponQueryService.java</td><td>한 기준 시각으로 목록·단건 응답 상태 계산</td></tr>
+        <tr><td>CouponUseService.java / AdminCouponService.java</td><td>사용·취소 실패 사유를 동일한 유효 상태로 판정</td></tr>
+        <tr><td>AdminCouponClaimQueryRepository.java</td><td>관리자 응답·필터에 계산형 EXPIRED 적용</td></tr>
         <tr><td>CouponSuccessCountSynchronizer.java</td><td>스케줄 책임 분리, 처리 결과 반환</td></tr>
         <tr><td>CouponSuccessCountSynchronizationResult.java</td><td>비교·갱신 항목 수 결과 계약</td></tr>
         <tr><td>CouponSuccessCountSynchronizationScheduler.java</td><td>스케줄, 잠금, Micrometer 메트릭</td></tr>
@@ -315,8 +327,9 @@
         <tr><td>MySqlCouponSuccessCountSynchronizationLock.java</td><td>GET_LOCK/RELEASE_LOCK 구현</td></tr>
         <tr><td>application.example.yaml</td><td>COUPON_SUCCESS_COUNT_SYNC_ENABLED 설정 추가</td></tr>
         <tr><td>src/test/resources/application.properties</td><td>자동 집계 비활성화, 테스트 풀 4개 제한</td></tr>
-        <tr><td>관련 테스트 7개 클래스</td><td>상태, 잠금, 메트릭, 고정 ID 충돌 검증</td></tr>
+        <tr><td>관련 테스트</td><td>상태 경계·필터·취소, 잠금, 메트릭, 고정 ID 충돌 검증</td></tr>
         <tr><td>docs/domain/coupon.md</td><td>상태 계약과 단일 집계 규칙 확정</td></tr>
+        <tr><td>docs/verification/coupon-integrity.sql / README.md</td><td>현재 enum 계약 반영, 계산형 만료 건수를 INFO로 분류</td></tr>
         <tr><td>docs/adr/003-async-coupon-success-count.md</td><td>락·메트릭 결정과 결과 기록</td></tr>
         <tr><td>쿠폰 정합성 결과 문서</td><td>기존 WARN 후속 조치 완료 기록</td></tr>
       </tbody>
