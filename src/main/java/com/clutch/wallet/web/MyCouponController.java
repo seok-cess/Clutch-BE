@@ -28,7 +28,7 @@ public class MyCouponController {
      * 내 쿠폰 목록을 커서 기반으로 조회한다.
      *
      * @param userId 요청한 사용자 ID
-     * @param status 조회할 쿠폰 상태, 전체 조회 시 {@code null}
+     * @param status 조회할 유효 쿠폰 상태, 전체 조회 시 {@code null}
      * @param cursor 이전 페이지의 마지막 커서, 첫 조회 시 {@code null}
      * @param size 한 번에 조회할 쿠폰 수
      * @return 쿠폰 목록과 다음 커서 정보

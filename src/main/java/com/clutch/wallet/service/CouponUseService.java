@@ -8,6 +8,7 @@ import com.clutch.wallet.web.exception.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.Instant;
 
 /**
@@ -18,9 +19,14 @@ import java.time.Instant;
 public class CouponUseService {
 
     private final UserCouponRepository userCouponRepository;
+    private final Clock clock;
 
-    public CouponUseService(UserCouponRepository userCouponRepository){
+    public CouponUseService(
+            UserCouponRepository userCouponRepository,
+            Clock clock
+    ){
         this.userCouponRepository = userCouponRepository;
+        this.clock = clock;
     }
 
     /**
@@ -31,7 +37,7 @@ public class CouponUseService {
      * @return 사용 처리된 쿠폰 정보
      */
     public CouponResponse use(Long userId, Long couponId){
-        Instant now = Instant.now();
+        Instant now = clock.instant();
         int updated = userCouponRepository.markAsUsed(couponId, userId, now);
 
         if(updated == 0){
@@ -40,7 +46,7 @@ public class CouponUseService {
 
         UserCoupon coupon = userCouponRepository.findByIdAndUserId(couponId, userId)
                 .orElseThrow(CouponNotFoundException::new);
-        return CouponResponse.from(coupon);
+        return CouponResponse.from(coupon, now);
     }
 
     /**
@@ -54,13 +60,14 @@ public class CouponUseService {
         UserCoupon coupon = userCouponRepository.findByIdAndUserId(couponId, userId)
                 .orElseThrow(CouponNotFoundException::new);
 
-        if(coupon.getStatus() == UserCouponStatus.USED){
+        UserCouponStatus effectiveStatus = coupon.getEffectiveStatus(now);
+        if(effectiveStatus == UserCouponStatus.USED){
             throw new CouponAlreadyUsedException();
         }
-        if(coupon.getStatus() == UserCouponStatus.CANCELLED){
+        if(effectiveStatus == UserCouponStatus.CANCELLED){
             throw new CouponAlreadyCancelledException();
         }
-        if(!coupon.getExpiresAt().isAfter(now)){
+        if(effectiveStatus == UserCouponStatus.EXPIRED){
             throw new CouponExpiredException();
         }
         throw new CouponUseFailedException();

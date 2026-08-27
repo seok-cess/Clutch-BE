@@ -15,7 +15,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -24,6 +27,9 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class AdminCouponClaimServiceTest {
+
+    private static final Instant REFERENCE_TIME =
+            Instant.parse("2026-08-21T12:00:00Z");
 
     @Mock
     private AdminCouponClaimQueryRepository queryRepository;
@@ -34,7 +40,8 @@ class AdminCouponClaimServiceTest {
     void setUp() {
         service = new AdminCouponClaimService(
                 queryRepository,
-                new PersonalDataMasker()
+                new PersonalDataMasker(),
+                Clock.fixed(REFERENCE_TIME, ZoneOffset.UTC)
         );
     }
 
@@ -77,6 +84,11 @@ class AdminCouponClaimServiceTest {
         assertThat(captor.getValue().eventNameKeyword())
                 .isEqualTo("펜타킬 이벤트");
         assertThat(captor.getValue().triggerKeyword()).isEqualTo("PENTA");
+        assertThat(captor.getValue().statusReferenceTime())
+                .isEqualTo(LocalDateTime.ofInstant(
+                        REFERENCE_TIME,
+                        ZoneOffset.UTC
+                ));
     }
 
     @Test
@@ -107,6 +119,34 @@ class AdminCouponClaimServiceTest {
                 org.mockito.ArgumentMatchers.eq(21));
         assertThat(captor.getValue().eventIdKeyword()).isEqualTo(123L);
         assertThat(captor.getValue().eventNameKeyword()).isNull();
+    }
+
+    @Test
+    void DB에_존재하는_취소_요청과_만료_쿠폰_상태를_응답한다() {
+        AdminCouponClaimRow row = row(30L);
+        row = new AdminCouponClaimRow(
+                row.claimRequestId(), row.requestedAt(), row.completedAt(),
+                row.couponEventId(), row.eventName(), row.triggerType(),
+                row.couponEventOccurrenceId(), row.userId(), row.userName(),
+                row.userEmail(), row.userPhoneNumber(), row.couponTypeId(),
+                row.couponName(), row.discountType(), row.discountValue(),
+                "CANCELLED", row.failureReason(), row.userCouponId(),
+                "EXPIRED"
+        );
+        when(queryRepository.findAll(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.eq(21)
+        )).thenReturn(List.of(row));
+
+        AdminCouponClaimListResponse response = service.findAll(
+                null, null, null, null, null, null,
+                null, null, null, 20
+        );
+
+        assertThat(response.claims().getFirst().requestStatus())
+                .isEqualTo(ClaimRequestStatus.CANCELLED);
+        assertThat(response.claims().getFirst().couponStatus())
+                .isEqualTo(UserCouponStatus.EXPIRED);
     }
 
     private AdminCouponClaimRow row(Long claimRequestId) {

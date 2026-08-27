@@ -14,7 +14,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 
 import static com.clutch.coupon.claim.exception.CouponClaimErrorCode.INVALID_ADMIN_CLAIM_QUERY;
@@ -30,6 +32,7 @@ public class AdminCouponClaimService {
 
     private final AdminCouponClaimQueryRepository queryRepository;
     private final PersonalDataMasker personalDataMasker;
+    private final Clock clock;
 
     /**
      * 관리자 발급 내역을 필터 조합과 ID 커서 기준으로 조회한다.
@@ -41,7 +44,7 @@ public class AdminCouponClaimService {
      * @param triggerKeyword 경기 트리거 문자열 검색어
      * @param userId 발급을 요청한 사용자 ID
      * @param requestStatus 발급 요청 처리 상태
-     * @param couponStatus 실제 발급 쿠폰의 현재 상태
+     * @param couponStatus 실제 발급 쿠폰의 유효 상태
      * @param couponTypeId 쿠폰 종류 ID
      * @param from 발급 요청 조회 시작 시각
      * @param to 발급 요청 조회 종료 시각
@@ -88,7 +91,8 @@ public class AdminCouponClaimService {
                         couponTypeId,
                         from,
                         to,
-                        cursor
+                        cursor,
+                        LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC)
                 );
 
         List<AdminCouponClaimRow> rows = queryRepository.findAll(

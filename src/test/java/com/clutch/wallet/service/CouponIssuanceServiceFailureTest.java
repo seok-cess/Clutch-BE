@@ -10,6 +10,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
+import java.util.UUID;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
@@ -21,7 +23,8 @@ class CouponIssuanceServiceFailureTest {
 
     @Test
     void recordIssueFailure는_FAILED_상태의_outbox를_남긴다() throws Exception {
-        Long claimId = 8001L;
+        Long claimId = UUID.randomUUID().getMostSignificantBits()
+                & Long.MAX_VALUE;
         couponIssuanceService.recordIssueFailure(claimId, "테스트 실패 사유");
 
         WalletOutbox outbox = walletOutboxRepository.findAll().stream()
