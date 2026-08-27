@@ -1,0 +1,57 @@
+# 실행할 컨테이너 목록
+services:
+
+  # Prometheus 컨테이너 설정
+  prometheus:
+
+    # 사용할 Prometheus Docker 이미지
+    image: prom/prometheus:latest
+
+    # Prometheus 실행 옵션
+    command:
+
+      # 아래에 연결한 prometheus.yml을 설정 파일로 사용
+      - --config.file=/etc/prometheus/prometheus.yml
+
+      # k6가 테스트 결과를 Prometheus로 전송할 수 있도록 허용
+      - --web.enable-remote-write-receiver
+
+    # 모니터링 PC의 9090 포트를 Prometheus에 연결
+    ports:
+      - "9090:9090"
+
+    # 설정 파일과 데이터 저장 공간 연결
+    volumes:
+
+      # 현재 폴더의 설정 파일을 컨테이너에 읽기 전용으로 연결
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+
+      # Prometheus 데이터를 Docker 볼륨에 저장
+      - prometheus-data:/prometheus
+
+  # Grafana 컨테이너 설정
+  grafana:
+
+    # 사용할 Grafana Docker 이미지
+    image: grafana/grafana:latest
+
+    # 모니터링 PC의 3000 포트를 Grafana에 연결
+    ports:
+      - "3000:3000"
+
+    # Grafana 설정과 대시보드를 Docker 볼륨에 저장
+    volumes:
+      - grafana-data:/var/lib/grafana
+
+    # Prometheus 컨테이너가 먼저 시작되도록 설정
+    depends_on:
+      - prometheus
+
+# 컨테이너를 삭제해도 데이터를 유지할 Docker 볼륨
+volumes:
+
+  # Prometheus 지표 저장 공간
+  prometheus-data:
+
+  # Grafana 설정과 대시보드 저장 공간
+  grafana-data:
