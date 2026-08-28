@@ -1,4 +1,4 @@
-# CLUTCH 기술 문서
+2# CLUTCH 기술 문서
 
 이 디렉터리는 실제 코드 구현에 영향을 주는 확정된 기술 규칙과 결정을 관리한다.
 
@@ -6,11 +6,13 @@
 
 | 위치 | 역할 |
 |---|---|
-| `architecture/` | 시스템 구조, 패키지 구조와 계층 책임 |
-| `domain/` | 도메인 용어, 불변식과 핵심 처리 규칙 |
-| `conventions/` | Git, 데이터베이스 등 반복 적용되는 개발 규칙 |
-| `adr/` | 중요한 기술 선택의 배경, 대안과 결과 |
-| `learning/` | 구현 내용을 학습하고 발표하기 위한 쉬운 설명 |
+| `01-api/` | HTTP 경로, 요청·응답, 오류와 스트림 계약 |
+| `02-domain/` | 도메인 용어, 불변식과 핵심 처리 규칙 |
+| `03-decisions/` | 중요한 기술 선택의 배경, 대안과 결과 |
+| `04-conventions/` | Git, 데이터베이스 등 반복 적용되는 개발 규칙 |
+| `05-operations/` | 운영 절차와 복구 가이드 |
+| `06-verification/` | 정합성 검증 SQL과 실행 결과 |
+| `07-troubleshooting/` | 장애·경쟁 조건의 원인과 대응 기록 |
 
 ## 다른 협업 도구와의 관계
 
@@ -30,18 +32,19 @@ Notion에서 논의한 내용이 실제 구현을 제약하는 기술 결정으�
 
 ## 주요 문서
 
-- 패키지 구조: `architecture/package-structure.md`
-- 쿠폰 발급 규칙: `domain/coupon.md`
-- 쿠폰 실시간 잔여 재고 API: `api/coupon-stock.md`
-- 쿠폰 300만 건 정합성 검증: `verification/README.md`
-- 쿠폰 300만 건 정합성 검증 결과: `verification/results/2026-08-26-coupon-integrity.md`
-- 쿠폰 집계 안정성 개선 보고서: `verification/results/2026-08-26-coupon-reliability-improvements.pdf`
-- Redis 쿠폰 재고 복구 결정: `adr/002-redis-coupon-stock-recovery.md`
-- Redis 쿠폰 재고 복구 학습: `learning/coupon-redis-recovery.md`
-- 새 쿠폰 회차 첫 발급 실패 트러블슈팅: `learning/coupon-first-claim-initialization-troubleshooting.md`
-- 시청 세션과 포인트 지급 규칙: `domain/watch-session.md`
-- 승패 배팅 규칙: `domain/betting.md`
-- Git, 커밋과 Pull Request: `conventions/git-convention.md`
-- Jira–GitHub 자동화: `conventions/jira-github-workflow.md`
-- 데이터베이스: `conventions/database-convention.md`
-- 파일 인코딩과 줄바꿈: `conventions/file-convention.md`
+- API 색인: [`01-api/README.md`](01-api/README.md)
+- 도메인 색인: [`02-domain/README.md`](02-domain/README.md)
+- 쿠폰 발급 규칙: [`02-domain/coupon.md`](02-domain/coupon.md)
+- 쿠폰 API(발급·재고·SSE·복구): [`01-api/coupon.md`](01-api/coupon.md)
+- 쿠폰 300만 건 정합성 검증: [`06-verification/README.md`](06-verification/README.md)
+- 쿠폰 300만 건 정합성 검증 결과: [`06-verification/results/2026-08-26-coupon-integrity.md`](06-verification/results/2026-08-26-coupon-integrity.md)
+- 쿠폰 집계 안정성 개선 보고서: [`06-verification/results/2026-08-26-coupon-reliability-improvements.pdf`](06-verification/results/2026-08-26-coupon-reliability-improvements.pdf)
+- Redis 쿠폰 재고 복구 결정: [`03-decisions/002-redis-coupon-stock-recovery.md`](03-decisions/002-redis-coupon-stock-recovery.md)
+- Redis 쿠폰 재고 복구 운영 가이드: [`05-operations/coupon-redis-recovery.md`](05-operations/coupon-redis-recovery.md)
+- 새 쿠폰 회차 첫 발급 실패 트러블슈팅: [`07-troubleshooting/coupon-first-claim-initialization-troubleshooting.md`](07-troubleshooting/coupon-first-claim-initialization-troubleshooting.md)
+- 시청 세션과 포인트 지급 규칙: [`02-domain/watch.md`](02-domain/watch.md)
+- 승패 배팅 규칙: [`02-domain/betting.md`](02-domain/betting.md)
+- Git, 커밋과 Pull Request: [`04-conventions/git-convention.md`](04-conventions/git-convention.md)
+- Jira–GitHub 자동화: [`04-conventions/jira-github-workflow.md`](04-conventions/jira-github-workflow.md)
+- 데이터베이스: [`04-conventions/database-convention.md`](04-conventions/database-convention.md)
+- 파일 인코딩과 줄바꿈: [`04-conventions/file-convention.md`](04-conventions/file-convention.md)
