@@ -185,4 +185,4 @@ Redis는 빠른 재고 제어에 사용하지만 최종 발급 사실의 기준�
 - [기술 결정 기록](../03-decisions/README.md)
 - [패키지 구조](../04-conventions/package-structure.md)
 - [데이터베이스 규칙](../04-conventions/database-convention.md)
-- [Redis 쿠폰 재고 장애 복구](../05-operations/coupon-redis-recovery.md)
+- [Redis 쿠폰 재고 장애 복구](../06-operations/coupon-redis-recovery.md)
