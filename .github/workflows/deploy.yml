@@ -22,6 +22,18 @@ jobs:
         with:
           ref: dev
 
+      - name: Add Docker to PATH
+        shell: powershell
+        run: |
+          "C:\Users\student\AppData\Local\Programs\DockerDesktop\resources\bin" |
+            Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Check Docker
+        shell: powershell
+        run: |
+          docker --version
+          docker compose version
+
       - name: Prepare application config
         shell: powershell
         run: |
