@@ -31,6 +31,9 @@ jobs:
       - name: Check Docker
         shell: powershell
         run: |
+          $dockerDir = "C:\Users\student\AppData\Local\Programs\DockerDesktop\resources\bin"
+          $env:Path = "$dockerDir;$env:Path"
+
           docker --version
           docker compose version
 
@@ -44,6 +47,9 @@ jobs:
       - name: Deploy
         shell: powershell
         run: |
+          $dockerDir = "C:\Users\student\AppData\Local\Programs\DockerDesktop\resources\bin"
+          $env:Path = "$dockerDir;$env:Path"
+
           docker compose up -d --wait mysql redis kafka replay
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
