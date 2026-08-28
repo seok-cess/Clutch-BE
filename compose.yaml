@@ -184,7 +184,7 @@ services:
       - ./k6:/scripts:ro
     extra_hosts:
       - host.docker.internal:host-gateway
-    command: [run, /scripts/smoke.js]
+    command: [run, /scripts/smoke/smoke.js]
 
 volumes:
   mysql-data:
