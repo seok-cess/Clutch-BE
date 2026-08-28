@@ -96,6 +96,10 @@
 - Redis와 Lua script는 동시 요청의 재고 차감과 동일 회차 중복 당첨 방지에 사용한다.
 - JPA와 MySQL transaction은 발급 요청, 실제 사용자 쿠폰과 발급 결과 Outbox의 원자적 저장에 사용한다.
 - Kafka는 실제 쿠폰 생성을 결정하는 핵심 경로가 아니라 발급 결과 후속 전달에 사용한다.
+- 발급 결과 Consumer는 `messageId` 기준으로 이벤트별 성공·실패 통계를 멱등 집계하고,
+  재시도 소진 후 `-dlt`에 도달한 메시지는 Kafka 처리 오류 통계로 기록한다.
+- 관리자 발급 통계는 Kafka 전달 시점까지의 비동기 값이며 재고와 장애 복구 판단에는
+  사용하지 않는다. 상세 결정은 `docs/adr/004-kafka-coupon-issue-statistics.md`를 따른다.
 - 기존 `coupon.claim.accepted` 소비 경로는 호환을 위해 유지하며 신규 발급 요청의 핵심 경로에서는 사용하지 않는다.
 - 상세 결정과 대안은 `docs/adr/001-synchronous-coupon-issuance.md`와
   `docs/adr/003-async-coupon-success-count.md`를 따른다.

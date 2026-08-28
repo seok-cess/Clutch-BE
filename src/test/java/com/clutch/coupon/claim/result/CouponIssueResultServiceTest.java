@@ -5,6 +5,7 @@ import com.clutch.coupon.claim.exception.CouponClaimException;
 import com.clutch.coupon.claim.repository.CouponClaimRequestRepository;
 import com.clutch.coupon.contract.kafka.CouponIssueResultEvent;
 import com.clutch.coupon.contract.kafka.CouponIssueResultStatus;
+import com.clutch.coupon.statistics.service.CouponIssueStatisticsService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -39,6 +40,9 @@ class CouponIssueResultServiceTest {
 
     @Mock
     private CouponClaimRequest claimRequest;
+
+    @Mock
+    private CouponIssueStatisticsService statisticsService;
 
     @InjectMocks
     private CouponIssueResultService issueResultService;
@@ -75,6 +79,7 @@ class CouponIssueResultServiceTest {
                         any(),
                         any(LocalDateTime.class)
                 );
+        verify(statisticsService).recordResult(event, claimRequest);
     }
 
     /**
@@ -109,6 +114,7 @@ class CouponIssueResultServiceTest {
         );
         verify(claimRequest, never())
                 .succeed(any(LocalDateTime.class));
+        verify(statisticsService).recordResult(event, claimRequest);
     }
 
     /**
@@ -138,6 +144,7 @@ class CouponIssueResultServiceTest {
                         any(),
                         any(LocalDateTime.class)
                 );
+        verify(statisticsService).recordResult(event, claimRequest);
     }
 
     /**
@@ -159,6 +166,8 @@ class CouponIssueResultServiceTest {
         assertThatThrownBy(() ->
                 issueResultService.handle(event)
         ).isInstanceOf(CouponClaimException.class);
+
+        verifyNoInteractions(statisticsService);
     }
 
     /**
@@ -184,6 +193,7 @@ class CouponIssueResultServiceTest {
         ).isInstanceOf(IllegalArgumentException.class);
 
         verifyNoInteractions(claimRequestRepository);
+        verifyNoInteractions(statisticsService);
     }
 
     private CouponIssueResultEvent resultEvent(

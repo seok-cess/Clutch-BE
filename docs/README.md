@@ -33,10 +33,12 @@ Notion에서 논의한 내용이 실제 구현을 제약하는 기술 결정으�
 - 패키지 구조: `architecture/package-structure.md`
 - 쿠폰 발급 규칙: `domain/coupon.md`
 - 쿠폰 실시간 잔여 재고 API: `api/coupon-stock.md`
+- 관리자 쿠폰 발급 통계 API: `api/coupon-issue-statistics.md`
 - 쿠폰 300만 건 정합성 검증: `verification/README.md`
 - 쿠폰 300만 건 정합성 검증 결과: `verification/results/2026-08-26-coupon-integrity.md`
 - 쿠폰 집계 안정성 개선 보고서: `verification/results/2026-08-26-coupon-reliability-improvements.pdf`
 - Redis 쿠폰 재고 복구 결정: `adr/002-redis-coupon-stock-recovery.md`
+- Kafka 발급 결과 통계 결정: `adr/004-kafka-coupon-issue-statistics.md`
 - Redis 쿠폰 재고 복구 학습: `learning/coupon-redis-recovery.md`
 - 새 쿠폰 회차 첫 발급 실패 트러블슈팅: `learning/coupon-first-claim-initialization-troubleshooting.md`
 - 시청 세션과 포인트 지급 규칙: `domain/watch-session.md`
