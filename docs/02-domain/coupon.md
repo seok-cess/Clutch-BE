@@ -109,7 +109,7 @@
 - 재고 소진은 정상 상태로 `0`을 전달하고 Redis 키 누락 또는 조회 장애와 구분한다.
 - 발급에 따른 SSE 알림은 실제 쿠폰 발급 transaction이 commit된 뒤 전송한다.
 - SSE 재연결 시 Redis의 최신 스냅샷을 즉시 전달하여 연결 단절 중 놓친 상태를 복구한다.
-- 상세 HTTP와 SSE 계약은 `docs/02-domain/api/coupon-stock.md`를 따른다.
+- 상세 HTTP와 SSE 계약은 [`../01-api/coupon.md`](../01-api/coupon.md)를 따른다.
 
 ## Redis 재고 장애 복구
 
