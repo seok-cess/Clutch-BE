@@ -1,0 +1,198 @@
+package com.clutch.coupon.admin.dashboard.repository;
+
+import com.clutch.coupon.event.domain.CouponEventStatus;
+import lombok.RequiredArgsConstructor;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
+import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.time.LocalDateTime;
+import java.util.List;
+
+/**
+ * 관리자 페이지 운영 홈에 필요한 쿠폰 통계와 이벤트 표를 전용 SQL로 조회한다.
+ *
+ * <p>목록 API의 커서 페이지를 반복 호출하지 않고 운영 홈에 필요한 전체 집계를
+ * 데이터베이스에서 직접 계산한다.</p>
+ */
+@Repository
+@RequiredArgsConstructor
+public class AdminCouponDashboardQueryRepository {
+
+    private final NamedParameterJdbcTemplate jdbcTemplate;
+
+    /** 관리자 운영 홈에 표시할 전체 진행 중 쿠폰 이벤트 수를 조회한다. */
+    @Transactional(readOnly = true)
+    public long countOpenEvents() {
+        Long count = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                  FROM coupon_event
+                 WHERE event_status = 'OPEN'
+                """, new MapSqlParameterSource(), Long.class);
+        return count == null ? 0L : count;
+    }
+
+    /** 관리자 운영 홈의 지정 UTC 범위 발급 요청 상태를 한 번에 집계한다. */
+    @Transactional(readOnly = true)
+    public CouponDashboardAggregateRow findAggregate(
+            LocalDateTime startUtc,
+            LocalDateTime endUtc
+    ) {
+        MapSqlParameterSource parameters = rangeParameters(startUtc, endUtc);
+        return jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) AS request_count,
+                       COALESCE(SUM(CASE
+                           WHEN request_status = 'SUCCEEDED' THEN 1 ELSE 0
+                       END), 0) AS issued_count,
+                       COALESCE(SUM(CASE
+                           WHEN request_status = 'FAILED' THEN 1 ELSE 0
+                       END), 0) AS failed_count,
+                       COALESCE(SUM(CASE
+                           WHEN request_status = 'PENDING' THEN 1 ELSE 0
+                       END), 0) AS pending_count
+                  FROM coupon_claim_request
+                 WHERE created_at >= :startUtc
+                   AND created_at < :endUtc
+                """, parameters, this::mapAggregateRow);
+    }
+
+    /** 관리자 운영 홈 차트의 KST 날짜별 성공·실패 발급 수를 조회한다. */
+    @Transactional(readOnly = true)
+    public List<DailyIssuanceRow> findDailyIssuance(
+            LocalDateTime startUtc,
+            LocalDateTime endUtc
+    ) {
+        return jdbcTemplate.query("""
+                SELECT DATE(DATE_ADD(created_at, INTERVAL 9 HOUR))
+                           AS issuance_date,
+                       COALESCE(SUM(CASE
+                           WHEN request_status = 'SUCCEEDED' THEN 1 ELSE 0
+                       END), 0) AS issued_count,
+                       COALESCE(SUM(CASE
+                           WHEN request_status = 'FAILED' THEN 1 ELSE 0
+                       END), 0) AS failed_count
+                  FROM coupon_claim_request
+                 WHERE created_at >= :startUtc
+                   AND created_at < :endUtc
+                 GROUP BY issuance_date
+                 ORDER BY issuance_date
+                """, rangeParameters(startUtc, endUtc), this::mapDailyRow);
+    }
+
+    /** 관리자 운영 홈의 재고 소진 판정을 위해 진행 중 이벤트 항목을 조회한다. */
+    @Transactional(readOnly = true)
+    public List<OpenEventItemRow> findOpenEventItems() {
+        return jdbcTemplate.query("""
+                SELECT event.coupon_event_id,
+                       item.coupon_event_item_id
+                  FROM coupon_event event
+                  JOIN coupon_event_item item
+                    ON item.coupon_event_id = event.coupon_event_id
+                 WHERE event.event_status = 'OPEN'
+                 ORDER BY event.coupon_event_id,
+                          item.coupon_event_item_id
+                """, new MapSqlParameterSource(), (resultSet, rowNumber) ->
+                new OpenEventItemRow(
+                        resultSet.getLong("coupon_event_id"),
+                        resultSet.getLong("coupon_event_item_id")
+                ));
+    }
+
+    /**
+     * 관리자 운영 홈의 이벤트 표에 표시할 이벤트를 진행 중 우선·최신순으로 조회한다.
+     */
+    @Transactional(readOnly = true)
+    public List<AdminDashboardEventRow> findDashboardEvents(int size) {
+        return jdbcTemplate.query("""
+                SELECT event.coupon_event_id,
+                       event.event_name,
+                       event.event_status,
+                       matches.scheduled_at,
+                       MAX(CASE WHEN team.display_order = 1
+                           THEN COALESCE(team.team_name, team.team_code)
+                       END) AS first_team_name,
+                       MAX(CASE WHEN team.display_order = 2
+                           THEN COALESCE(team.team_name, team.team_code)
+                       END) AS second_team_name,
+                       COALESCE(item_total.total_quantity, 0)
+                           AS total_quantity,
+                       COALESCE(item_total.issued_quantity, 0)
+                           AS issued_quantity
+                  FROM coupon_event event
+                  JOIN esports_match matches
+                    ON matches.esports_match_id = event.esports_match_id
+                  LEFT JOIN match_team team
+                    ON team.match_id = matches.esports_match_id
+                  LEFT JOIN (
+                      SELECT coupon_event_id,
+                             SUM(quantity) AS total_quantity,
+                             SUM(success_count) AS issued_quantity
+                        FROM coupon_event_item
+                       GROUP BY coupon_event_id
+                  ) item_total
+                    ON item_total.coupon_event_id = event.coupon_event_id
+                 GROUP BY event.coupon_event_id,
+                          event.event_name,
+                          event.event_status,
+                          matches.scheduled_at,
+                          item_total.total_quantity,
+                          item_total.issued_quantity
+                 ORDER BY CASE WHEN event.event_status = 'OPEN' THEN 0 ELSE 1 END,
+                          event.coupon_event_id DESC
+                 LIMIT :size
+                """, new MapSqlParameterSource("size", size), this::mapEventRow);
+    }
+
+    private MapSqlParameterSource rangeParameters(
+            LocalDateTime startUtc,
+            LocalDateTime endUtc
+    ) {
+        return new MapSqlParameterSource()
+                .addValue("startUtc", startUtc)
+                .addValue("endUtc", endUtc);
+    }
+
+    private CouponDashboardAggregateRow mapAggregateRow(
+            ResultSet resultSet,
+            int rowNumber
+    ) throws SQLException {
+        return new CouponDashboardAggregateRow(
+                resultSet.getLong("request_count"),
+                resultSet.getLong("issued_count"),
+                resultSet.getLong("failed_count"),
+                resultSet.getLong("pending_count")
+        );
+    }
+
+    private DailyIssuanceRow mapDailyRow(
+            ResultSet resultSet,
+            int rowNumber
+    ) throws SQLException {
+        return new DailyIssuanceRow(
+                resultSet.getDate("issuance_date").toLocalDate(),
+                resultSet.getLong("issued_count"),
+                resultSet.getLong("failed_count")
+        );
+    }
+
+    private AdminDashboardEventRow mapEventRow(
+            ResultSet resultSet,
+            int rowNumber
+    ) throws SQLException {
+        Timestamp scheduledAt = resultSet.getTimestamp("scheduled_at");
+        return new AdminDashboardEventRow(
+                resultSet.getLong("coupon_event_id"),
+                resultSet.getString("event_name"),
+                CouponEventStatus.valueOf(resultSet.getString("event_status")),
+                scheduledAt == null ? null : scheduledAt.toLocalDateTime(),
+                resultSet.getString("first_team_name"),
+                resultSet.getString("second_team_name"),
+                resultSet.getLong("total_quantity"),
+                resultSet.getLong("issued_quantity")
+        );
+    }
+}
