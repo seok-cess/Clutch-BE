@@ -22,20 +22,16 @@ jobs:
         with:
           ref: dev
 
-      - name: Add Docker to PATH
-        shell: powershell
-        run: |
-          "C:\Users\student\AppData\Local\Programs\DockerDesktop\resources\bin" |
-            Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-
       - name: Check Docker
         shell: powershell
         run: |
-          $dockerDir = "C:\Users\student\AppData\Local\Programs\DockerDesktop\resources\bin"
-          $env:Path = "$dockerDir;$env:Path"
+          $dockerExe = "C:\Users\student\AppData\Local\Programs\DockerDesktop\resources\bin\docker.exe"
 
-          docker --version
-          docker compose version
+          whoami
+          Write-Host "Docker exists: $(Test-Path -LiteralPath $dockerExe)"
+
+          & $dockerExe --version
+          & $dockerExe compose version
 
       - name: Prepare application config
         shell: powershell
@@ -47,16 +43,15 @@ jobs:
       - name: Deploy
         shell: powershell
         run: |
-          $dockerDir = "C:\Users\student\AppData\Local\Programs\DockerDesktop\resources\bin"
-          $env:Path = "$dockerDir;$env:Path"
+          $dockerExe = "C:\Users\student\AppData\Local\Programs\DockerDesktop\resources\bin\docker.exe"
 
-          docker compose up -d --wait mysql redis kafka replay
+          & $dockerExe compose up -d --wait mysql redis kafka replay
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-          docker compose up -d --force-recreate mysql-exporter redis-exporter
+          & $dockerExe compose up -d --force-recreate mysql-exporter redis-exporter
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-          docker compose --profile app up -d --build --force-recreate --no-deps --wait app
+          & $dockerExe compose --profile app up -d --build --force-recreate --no-deps --wait app
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-          docker compose --profile app ps
+          & $dockerExe compose --profile app ps
