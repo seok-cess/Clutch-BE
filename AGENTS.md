@@ -30,16 +30,16 @@ Notion의 논의가 구현 결정으로 확정되면 관련 코드와 함께 `do
 
 ## 문서 안내
 
-- 패키지와 계층 책임: `docs/architecture/package-structure.md`
-- 쿠폰 발급 도메인 규칙: `docs/domain/coupon.md`
-- 시청 세션과 포인트 지급 규칙: `docs/domain/watch-session.md`
-- 승패 배팅 규칙: `docs/domain/betting.md`
-- 매치·세트 상태와 결과 데이터 계약: `docs/domain/match-set-result.md`
-- 데이터베이스 규칙: `docs/conventions/database-convention.md`
-- 파일 인코딩과 줄바꿈 규칙: `docs/conventions/file-convention.md`
-- Git과 브랜치 규칙: `docs/conventions/git-convention.md`
-- Jira 이슈와 브랜치 자동화: `docs/conventions/jira-github-workflow.md`
-- 기술 결정 기록 방법: `docs/adr/README.md`
+- 패키지와 계층 책임: `docs/04-conventions/package-structure.md`
+- 쿠폰 발급 도메인 규칙: `docs/02-domain/coupon.md`
+- 시청 세션과 포인트 지급 규칙: `docs/02-domain/watch-session.md`
+- 승패 배팅 규칙: `docs/02-domain/betting.md`
+- 매치·세트 상태와 결과 데이터 계약: `docs/02-domain/match-set-result.md`
+- 데이터베이스 규칙: `docs/04-conventions/database-convention.md`
+- 파일 인코딩과 줄바꿈 규칙: `docs/04-conventions/file-convention.md`
+- Git과 브랜치 규칙: `docs/04-conventions/git-convention.md`
+- Jira 이슈와 브랜치 자동화: `docs/04-conventions/jira-github-workflow.md`
+- 기술 결정 기록 방법: `docs/03-decisions/README.md`
 
 ## 아키텍처 규칙
 
@@ -68,7 +68,7 @@ Notion의 논의가 구현 결정으로 확정되면 관련 코드와 함께 `do
 - 총 풀에서 운영 수수료 10%를 제외한 배당 풀을 적중자의 배팅 금액 비율로 정산하고,
   실패 시 배팅 포인트를 몰수한다.
 
-상세 규칙은 `docs/domain/watch-session.md`와 `docs/domain/betting.md`를 따른다.
+상세 규칙은 `docs/02-domain/watch-session.md`와 `docs/02-domain/betting.md`를 따른다.
 
 ## 파일 형식 규칙
 
@@ -77,7 +77,7 @@ Notion의 논의가 구현 결정으로 확정되면 관련 코드와 함께 `do
 - Linux와 macOS에서 직접 실행되는 `gradlew` 및 셸 스크립트는 LF를 유지한다.
 - 줄바꿈 형식만 바꾸는 불필요한 전체 파일 수정은 만들지 않는다.
 
-세부 규칙은 `docs/conventions/file-convention.md`를 따른다.
+세부 규칙은 `docs/04-conventions/file-convention.md`를 따른다.
 
 ## Git 규칙
 
@@ -91,7 +91,7 @@ Notion의 논의가 구현 결정으로 확정되면 관련 코드와 함께 `do
 - Pull Request 제목은 `<type>:[CLUTCH-<issue>] <작업 내용>` 형식을 사용한다.
 - Backend CI 성공과 1명 이상의 승인을 받은 후 Squash and merge한다.
 
-세부 규칙은 `docs/conventions/git-convention.md`와 `docs/conventions/jira-github-workflow.md`를 따른다.
+세부 규칙은 `docs/04-conventions/git-convention.md`와 `docs/04-conventions/jira-github-workflow.md`를 따른다.
 
 ## AI 작업 규칙
 
