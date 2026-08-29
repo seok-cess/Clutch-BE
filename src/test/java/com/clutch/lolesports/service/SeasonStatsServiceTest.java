@@ -21,6 +21,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class SeasonStatsServiceTest {
 
+    /** 실제 LCK id 를 쓸 이유는 없다 — 리그가 쿼리까지 전달되는지만 본다 */
+    private static final String LEAGUE = "98767991310872058";
+
     private static SeasonStatsRepository.PlayerTotals player(
             String name, String team, long k, long d, long a, long games) {
         SeasonStatsRepository.PlayerTotals t = Mockito.mock(SeasonStatsRepository.PlayerTotals.class);
@@ -61,9 +64,9 @@ class SeasonStatsServiceTest {
         SeasonStatsRepository r = repo();
         List<SeasonStatsRepository.PlayerTotals> totals = List.of(
                 player("Perfect", "RVN", 6, 0, 4, 5));
-        Mockito.when(r.playerTotals("2026")).thenReturn(totals);
+        Mockito.when(r.playerTotals("2026", LEAGUE)).thenReturn(totals);
 
-        ApiDtos.PlayerKdaBoard board = new SeasonStatsService(r).playerKda(null, 5);
+        ApiDtos.PlayerKdaBoard board = new SeasonStatsService(r).playerKda(null, LEAGUE, 5);
 
         // (6 + 4) / max(0, 1) = 10.0 — 0 으로 나눠 무한대가 되지 않아야 한다
         assertEquals(10.0, board.players().get(0).kda());
@@ -75,9 +78,9 @@ class SeasonStatsServiceTest {
         List<SeasonStatsRepository.PlayerTotals> totals = List.of(
                 player("Low", "AZR", 4, 4, 4, 5),        // (4+4)/4 = 2.0
                 player("High", "RVN", 10, 2, 10, 5));    // (10+10)/2 = 10.0
-        Mockito.when(r.playerTotals("2026")).thenReturn(totals);
+        Mockito.when(r.playerTotals("2026", LEAGUE)).thenReturn(totals);
 
-        List<ApiDtos.PlayerKdaRow> rows = new SeasonStatsService(r).playerKda(null, 5).players();
+        List<ApiDtos.PlayerKdaRow> rows = new SeasonStatsService(r).playerKda(null, LEAGUE, 5).players();
 
         assertEquals("High", rows.get(0).summonerName());
         assertEquals(1, rows.get(0).rank());
@@ -91,9 +94,9 @@ class SeasonStatsServiceTest {
         List<SeasonStatsRepository.PlayerTotals> totals = List.of(
                 player("OneGame", "GLC", 20, 0, 20, 1), // 한 판만 뛰고 KDA 40 — 제외돼야 한다
                 player("Regular", "RVN", 10, 5, 10, 8));
-        Mockito.when(r.playerTotals("2026")).thenReturn(totals);
+        Mockito.when(r.playerTotals("2026", LEAGUE)).thenReturn(totals);
 
-        List<ApiDtos.PlayerKdaRow> rows = new SeasonStatsService(r).playerKda(null, 5).players();
+        List<ApiDtos.PlayerKdaRow> rows = new SeasonStatsService(r).playerKda(null, LEAGUE, 5).players();
 
         assertEquals(1, rows.size());
         assertEquals("Regular", rows.get(0).summonerName());
@@ -136,10 +139,10 @@ class SeasonStatsServiceTest {
 
         SeasonStatsService service = new SeasonStatsService(r);
 
-        assertTrue(service.playerKda(null, 5).players().isEmpty());
+        assertTrue(service.playerKda(null, LEAGUE, 5).players().isEmpty());
         assertTrue(service.champions(null, 5).champions().isEmpty());
-        assertNull(service.playerKda(null, 5).seasonKey());
+        assertNull(service.playerKda(null, LEAGUE, 5).seasonKey());
         // 시즌이 없으면 집계 쿼리를 아예 실행하지 않아야 한다
-        Mockito.verify(r, Mockito.never()).playerTotals(Mockito.anyString());
+        Mockito.verify(r, Mockito.never()).playerTotals(Mockito.anyString(), Mockito.anyString());
     }
 }
