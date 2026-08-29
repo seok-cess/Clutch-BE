@@ -97,7 +97,24 @@ class DataCacheServiceTest {
     }
 
     @Test
-    void 실제_인게임과_일시정지_프레임에서만_세트_진행으로_판정한다() {
+    void 고배속_replay_시계열은_압축된_벽시계가_아닌_게임시간_간격으로_솎는다() {
+        DataCacheService cache = new DataCacheService();
+        WindowResponse.TeamFrame team = new WindowResponse.TeamFrame(
+                100L, 0, 0, 0, 0, List.of(), List.of());
+        cache.addWindowFrames(GAME, null, List.of(
+                new WindowResponse.Frame(T0.toString(), "in_game", team, team, 0L),
+                new WindowResponse.Frame(T0.plusMillis(200).toString(), "in_game", team, team, 12L),
+                new WindowResponse.Frame(T0.plusMillis(400).toString(), "in_game", team, team, 24L)
+        ));
+
+        List<WindowResponse.Frame> series = cache.getWindowSeries(GAME, Instant.MAX, 10);
+
+        assertEquals(List.of(0L, 12L, 24L),
+                series.stream().map(WindowResponse.Frame::gameTimeSeconds).toList());
+    }
+
+    @Test
+    void 실제_인게임_프레임에서만_세트_진행으로_판정한다() {
         DataCacheService cache = new DataCacheService();
 
         assertEquals(false, cache.isGameInProgress(GAME));
@@ -105,7 +122,7 @@ class DataCacheServiceTest {
         assertEquals(true, cache.isGameInProgress(GAME));
         cache.addWindowFrames(GAME, null, List.of(new WindowResponse.Frame(
                 T0.plusSeconds(1).toString(), "paused", null, null)));
-        assertEquals(true, cache.isGameInProgress(GAME));
+        assertEquals(false, cache.isGameInProgress(GAME));
         cache.addWindowFrames(GAME, null, List.of(new WindowResponse.Frame(
                 T0.plusSeconds(2).toString(), "finished", null, null)));
         assertEquals(false, cache.isGameInProgress(GAME));
