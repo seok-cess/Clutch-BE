@@ -5,6 +5,7 @@ import com.clutch.coupon.claim.domain.CouponClaimRequest;
 import com.clutch.coupon.claim.repository.CouponClaimRequestRepository;
 import com.clutch.coupon.contract.kafka.CouponIssueResultEvent;
 import com.clutch.coupon.contract.kafka.CouponIssueResultStatus;
+import com.clutch.coupon.statistics.service.CouponIssueStatisticsService;
 import com.clutch.lolesports.service.PollingScheduler;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -52,6 +53,9 @@ class CouponIssueResultKafkaIntegrationTest {
 
     @MockitoBean
     private PollingScheduler pollingScheduler;
+
+    @MockitoBean
+    private CouponIssueStatisticsService statisticsService;
 
     private Long savedClaimId;
 

@@ -165,7 +165,7 @@ services:
       - node
       - replay-server.js
       - --dir
-      - "${REPLAY_FIXTURE_DIR:-fixtures/sample-match-bo3-001}"
+      - "${REPLAY_FIXTURE_DIR:-fixtures/sample-two-live-matches}"
       - --speed
       - "${REPLAY_SPEED:-1}"
     ports:
@@ -184,7 +184,7 @@ services:
       - ./k6:/scripts:ro
     extra_hosts:
       - host.docker.internal:host-gateway
-    command: [run, /scripts/smoke.js]
+    command: [run, /scripts/smoke/smoke.js]
 
 volumes:
   mysql-data:

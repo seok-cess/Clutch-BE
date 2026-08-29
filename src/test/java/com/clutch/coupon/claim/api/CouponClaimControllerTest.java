@@ -3,7 +3,7 @@ package com.clutch.coupon.claim.api;
 import com.clutch.coupon.claim.api.dto.CouponClaimCreateResponse;
 import com.clutch.coupon.claim.domain.ClaimRequestStatus;
 import com.clutch.coupon.claim.exception.CouponClaimException;
-import com.clutch.coupon.claim.service.CouponClaimService;
+import com.clutch.coupon.claim.service.CouponClaimApplicationService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -41,7 +41,7 @@ class CouponClaimControllerTest {
      * 쿠폰 발급 요청 서비스 모의 객체
      */
     @MockitoBean
-    private CouponClaimService couponClaimService;
+    private CouponClaimApplicationService couponClaimApplicationService;
 
     /**
      * 정상 쿠폰 발급 요청 응답 검증
@@ -66,7 +66,7 @@ class CouponClaimControllerTest {
                         )
                 );
 
-        when(couponClaimService.claim(
+        when(couponClaimApplicationService.claim(
                 USER_ID,
                 COUPON_EVENT_ID,
                 COUPON_EVENT_OCCURRENCE_ID
@@ -97,7 +97,7 @@ class CouponClaimControllerTest {
                                 .value("SUCCEEDED")
                 );
 
-        verify(couponClaimService).claim(
+        verify(couponClaimApplicationService).claim(
                 USER_ID,
                 COUPON_EVENT_ID,
                 COUPON_EVENT_OCCURRENCE_ID
@@ -130,7 +130,7 @@ class CouponClaimControllerTest {
      */
     @Test
     void claimFailsWhenEventDoesNotExist() throws Exception {
-        when(couponClaimService.claim(
+        when(couponClaimApplicationService.claim(
                 USER_ID,
                 COUPON_EVENT_ID,
                 COUPON_EVENT_OCCURRENCE_ID
@@ -162,7 +162,7 @@ class CouponClaimControllerTest {
      */
     @Test
     void claimFailsWhenStockIsExhausted() throws Exception {
-        when(couponClaimService.claim(
+        when(couponClaimApplicationService.claim(
                 USER_ID,
                 COUPON_EVENT_ID,
                 COUPON_EVENT_OCCURRENCE_ID

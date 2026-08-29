@@ -2,12 +2,10 @@ package com.clutch.replay.service;
 
 import java.util.List;
 
-/** JSONL fixture 타임라인에서의 현재 replay 위치. */
+/** JSONL fixture 타임라인에서의 현재 replay 위치와 동시 재생 경기 목록. */
 public record ReplayStatusResult(
         String runId,
-        String matchId,
-        Long esportsMatchId,
-        List<String> gameIds,
+        List<ReplayMatchResult> matches,
         long elapsedSeconds,
         long totalSeconds,
         double progressPercent,
@@ -16,6 +14,6 @@ public record ReplayStatusResult(
 ) {
 
     public ReplayStatusResult {
-        gameIds = gameIds == null ? List.of() : List.copyOf(gameIds);
+        matches = matches == null ? List.of() : List.copyOf(matches);
     }
 }

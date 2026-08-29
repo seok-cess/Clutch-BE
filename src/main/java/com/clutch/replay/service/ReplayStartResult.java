@@ -2,14 +2,13 @@ package com.clutch.replay.service;
 
 import java.util.List;
 
-/** 새 replay 실행에 할당된 외부 경기·세트 ID. */
+/** 새 replay 실행에 할당된 외부 경기·세트 ID 목록. */
 public record ReplayStartResult(
         String runId,
-        String matchId,
-        List<String> gameIds
+        List<ReplayMatchResult> matches
 ) {
 
     public ReplayStartResult {
-        gameIds = gameIds == null ? List.of() : List.copyOf(gameIds);
+        matches = matches == null ? List.of() : List.copyOf(matches);
     }
 }

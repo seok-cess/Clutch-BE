@@ -142,13 +142,18 @@ public class GamePersistService {
      * 세트 통계는 기존 종료 적재 흐름에서 확정한다.</p>
      *
      * @param liveMatch 현재 라이브 매치 스냅샷
+     * @param origin 같은 상세 응답에서 확인한 실제 리그·대회 식별자
      */
     @Transactional
-    public void persistLiveMatch(DataCacheService.LiveMatch liveMatch) {
+    public void persistLiveMatch(
+            DataCacheService.LiveMatch liveMatch,
+            HistoricalGameService.MatchOrigin origin
+    ) {
         MatchContext context = MatchContext.of(
                 liveMatch,
                 liveMatch.activeGameId(),
-                liveMatch.bestOf()
+                liveMatch.bestOf(),
+                origin
         );
         EsportsMatch match = upsertMatch(context);
         if (match == null) {
@@ -356,8 +361,7 @@ public class GamePersistService {
                 meta != null ? meta.patchVersion() : null,
                 toLdt(start),
                 toLdt(lastTs),
-                (start != null && lastTs != null)
-                        ? (int) Duration.between(start, lastTs).getSeconds() : null,
+                gameElapsedSeconds(start, lastFrame),
                 toLdt(lastTs),
                 lastDetails != null ? toLdt(parse(lastDetails.rfc460Timestamp())) : null);
 
@@ -422,7 +426,7 @@ public class GamePersistService {
 
         for (WindowResponse.Frame f : frames) {
             if (prev != null) {
-                Long t = elapsed(start, f.rfc460Timestamp());
+                Long t = gameElapsed(start, f);
                 collectSide(out, t, "blue", prev.blueTeam(), f.blueTeam());
                 collectSide(out, t, "red", prev.redTeam(), f.redTeam());
             }
@@ -560,7 +564,7 @@ public class GamePersistService {
         Integer to = null;
 
         for (WindowResponse.Frame f : frames) {
-            Long t = elapsed(start, f.rfc460Timestamp());
+            Long t = gameElapsed(start, f);
             if (t == null || t < 0 || f.blueTeam() == null || f.redTeam() == null) {
                 continue;
             }
@@ -587,6 +591,18 @@ public class GamePersistService {
     }
 
     // ---- 유틸 ----
+
+    private static Integer gameElapsedSeconds(Instant start, WindowResponse.Frame frame) {
+        Long elapsed = gameElapsed(start, frame);
+        return elapsed != null && elapsed <= Integer.MAX_VALUE ? elapsed.intValue() : null;
+    }
+
+    private static Long gameElapsed(Instant start, WindowResponse.Frame frame) {
+        if (frame != null && frame.gameTimeSeconds() != null) {
+            return frame.gameTimeSeconds();
+        }
+        return frame != null ? elapsed(start, frame.rfc460Timestamp()) : null;
+    }
 
     private static Map<Integer, WindowResponse.ParticipantMetadata> participantMeta(
             WindowResponse.GameMetadata meta) {
