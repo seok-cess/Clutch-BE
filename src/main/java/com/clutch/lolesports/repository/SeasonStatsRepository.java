@@ -55,13 +55,10 @@ public interface SeasonStatsRepository extends JpaRepository<GamePlayerStat, Lon
             LEFT JOIN match_team mt   ON mt.match_team_id = ps.match_team_id
             WHERE g.finalized_at IS NOT NULL
               AND m.season_key = :seasonKey
-              AND m.league_external_id = :leagueId
               AND ps.summoner_name IS NOT NULL
             GROUP BY ps.summoner_name, mt.team_code
             """, nativeQuery = true)
-    List<PlayerTotals> playerTotals(
-            @Param("seasonKey") String seasonKey,
-            @Param("leagueId") String leagueId);
+    List<PlayerTotals> playerTotals(@Param("seasonKey") String seasonKey);
 
     @Query(value = """
             SELECT ps.champion_id AS championId,

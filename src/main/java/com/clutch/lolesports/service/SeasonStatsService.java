@@ -31,14 +31,9 @@ public class SeasonStatsService {
         this.repository = repository;
     }
 
-    /**
-     * 시즌 누적 KDA 상위 선수.
-     *
-     * <p>리그를 인자로 받는다. 적재에는 다른 리그 경기가 섞일 수 있는데,
-     * 한 화면에서 서로 다른 리그의 선수를 같은 순위표에 세우면 비교가 성립하지 않는다.</p>
-     */
+    /** 시즌 누적 KDA 상위 선수 */
     @Transactional(readOnly = true)
-    public ApiDtos.PlayerKdaBoard playerKda(String season, String leagueId, int limit) {
+    public ApiDtos.PlayerKdaBoard playerKda(String season, int limit) {
         String seasonKey = resolveSeason(season);
         if (seasonKey == null) {
             return new ApiDtos.PlayerKdaBoard(null, 0, List.of());
@@ -46,7 +41,7 @@ public class SeasonStatsService {
 
         int totalGames = (int) repository.finalizedGameCount(seasonKey);
 
-        List<ApiDtos.PlayerKdaRow> rows = repository.playerTotals(seasonKey, leagueId).stream()
+        List<ApiDtos.PlayerKdaRow> rows = repository.playerTotals(seasonKey).stream()
                 .filter(t -> count(t.getGames()) >= MIN_GAMES_FOR_KDA)
                 .map(t -> {
                     int kills = count(t.getKills());
