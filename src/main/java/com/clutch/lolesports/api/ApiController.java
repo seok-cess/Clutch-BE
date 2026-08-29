@@ -288,12 +288,18 @@ public class ApiController {
 
     // ---- 시즌 누적 집계 (메인 화면 요약 카드) ----
 
-    /** 시즌 누적 KDA 상위 선수 (예: /api/stats/players/kda?limit=5) */
+    /**
+     * 시즌 누적 KDA 상위 선수 (예: /api/stats/players/kda?limit=5).
+     *
+     * 리그 미지정이면 설정의 리그(LCK)만 집계한다 — 순위표와 같은 규칙이다.
+     */
     @GetMapping("/stats/players/kda")
     public ResponseEntity<ApiDtos.PlayerKdaBoard> playerKda(
             @org.springframework.web.bind.annotation.RequestParam(value = "season", required = false) String season,
+            @org.springframework.web.bind.annotation.RequestParam(value = "leagueId", required = false) String leagueId,
             @org.springframework.web.bind.annotation.RequestParam(value = "limit", defaultValue = "5") int limit) {
-        return ResponseEntity.ok(seasonStats.playerKda(season, limit));
+        String league = (leagueId == null || leagueId.isBlank()) ? props.leagueId() : leagueId;
+        return ResponseEntity.ok(seasonStats.playerKda(season, league, limit));
     }
 
     /** 시즌 챔피언 픽률·승률 (예: /api/stats/champions?limit=5) */
