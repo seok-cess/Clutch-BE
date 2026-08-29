@@ -1,7 +1,7 @@
 package com.clutch.coupon.claim.api;
 
 import com.clutch.coupon.claim.api.dto.CouponClaimCreateResponse;
-import com.clutch.coupon.claim.service.CouponClaimService;
+import com.clutch.coupon.claim.service.CouponClaimApplicationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class CouponClaimController {
 
-    private final CouponClaimService couponClaimService;
+    private final CouponClaimApplicationService couponClaimApplicationService;
 
     /**
      * 쿠폰 발급 요청 생성
@@ -44,7 +44,7 @@ public class CouponClaimController {
             Long couponEventOccurrenceId
     ) {
         CouponClaimCreateResponse response =
-                couponClaimService.claim(
+                couponClaimApplicationService.claim(
                         userId,
                         couponEventId,
                         couponEventOccurrenceId

@@ -99,11 +99,16 @@
 - Kafka는 실제 쿠폰 생성을 결정하는 핵심 경로가 아니라 발급 결과 후속 전달에 사용한다.
 - 발급 결과 Consumer는 `messageId` 기준으로 이벤트별 성공·실패 통계를 멱등 집계하고,
   재시도 소진 후 `-dlt`에 도달한 메시지는 Kafka 처리 오류 통계로 기록한다.
+- 품절, 중복, 신청 불가 시간과 Redis 장애처럼 Claim 생성 전에 종료된 신청은
+  `coupon.claim.rejected`로 비동기 전달하고 `messageId` 기준으로 멱등 저장한다.
+- 관리자 운영 홈의 실패 수는 확정 발급 실패와 위 사전 거절을 합산한다. 거절 통계 발행
+  실패가 기존 사용자 409·503 응답을 변경해서는 안 된다.
 - 관리자 발급 통계는 Kafka 전달 시점까지의 비동기 값이며 재고와 장애 복구 판단에는
   사용하지 않는다. 상세 결정은 `docs/adr/004-kafka-coupon-issue-statistics.md`를 따른다.
 - 기존 `coupon.claim.accepted` 소비 경로는 호환을 위해 유지하며 신규 발급 요청의 핵심 경로에서는 사용하지 않는다.
 - 상세 결정과 대안은 `docs/adr/001-synchronous-coupon-issuance.md`와
-  `docs/adr/003-async-coupon-success-count.md`를 따른다.
+  `docs/adr/003-async-coupon-success-count.md`,
+  `docs/adr/005-kafka-coupon-claim-rejection-statistics.md`를 따른다.
 - 여러 애플리케이션 인스턴스가 실행되어도 성공 수량 집계는 MySQL named lock을
   획득한 한 인스턴스만 수행한다. 잠금을 얻지 못한 인스턴스는 해당 주기를 건너뛴다.
 
