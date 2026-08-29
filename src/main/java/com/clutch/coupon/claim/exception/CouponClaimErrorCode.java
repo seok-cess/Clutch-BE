@@ -78,6 +78,10 @@ public enum CouponClaimErrorCode {
     INVALID_ADMIN_CLAIM_QUERY(
             HttpStatus.BAD_REQUEST,
             "관리자 발급 내역 조회 조건이 올바르지 않습니다."
+    ),
+    INVALID_ADMIN_STATISTICS_QUERY(
+            HttpStatus.BAD_REQUEST,
+            "관리자 쿠폰 통계 조회 조건이 올바르지 않습니다."
     );
 
 

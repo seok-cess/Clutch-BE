@@ -4,6 +4,7 @@ import com.clutch.coupon.claim.domain.CouponClaimRequest;
 import com.clutch.coupon.claim.exception.CouponClaimException;
 import com.clutch.coupon.claim.repository.CouponClaimRequestRepository;
 import com.clutch.coupon.contract.kafka.CouponIssueResultEvent;
+import com.clutch.coupon.statistics.service.CouponIssueStatisticsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +27,8 @@ public class CouponIssueResultService {
     private final CouponClaimRequestRepository
             claimRequestRepository;
 
+    private final CouponIssueStatisticsService statisticsService;
+
     /**
      * 쿠폰 생성 결과 처리
      *
@@ -46,26 +49,26 @@ public class CouponIssueResultService {
                                 )
                         );
 
-        if (!claimRequest.isPending()) {
-            return;
-        }
-
-        LocalDateTime completedAt =
-                LocalDateTime.ofInstant(
-                        event.occurredAt(),
-                        ZoneOffset.UTC
-                );
-
-        switch (event.status()) {
-            case SUCCEEDED ->
-                    claimRequest.succeed(completedAt);
-
-            case FAILED ->
-                    claimRequest.fail(
-                            event.failureReason(),
-                            completedAt
+        if (claimRequest.isPending()) {
+            LocalDateTime completedAt =
+                    LocalDateTime.ofInstant(
+                            event.occurredAt(),
+                            ZoneOffset.UTC
                     );
+
+            switch (event.status()) {
+                case SUCCEEDED ->
+                        claimRequest.succeed(completedAt);
+
+                case FAILED ->
+                        claimRequest.fail(
+                                event.failureReason(),
+                                completedAt
+                        );
+            }
         }
+
+        statisticsService.recordResult(event, claimRequest);
     }
 
     /**

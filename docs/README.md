@@ -65,6 +65,8 @@
 
 - [배팅 API](01-api/betting.md)
 - [쿠폰 API](01-api/coupon.md)
+- [관리자 쿠폰 운영 홈 API](01-api/coupon-dashboard.md)
+- [관리자 쿠폰 발급 통계 API](01-api/coupon-issue-statistics.md)
 - [LoL Esports API](01-api/lolesports.md)
 - [Replay 제어 API](01-api/replay.md)
 - [사용자 API](01-api/user.md)
@@ -84,6 +86,9 @@
 ### 기술 결정과 개발 규칙
 
 - [ADR 작성 방법과 목록](03-decisions/README.md)
+- [Redis 쿠폰 재고 복구 결정](03-decisions/002-redis-coupon-stock-recovery.md)
+- [Kafka 발급 결과 통계 결정](03-decisions/004-kafka-coupon-issue-statistics.md)
+- [Kafka 쿠폰 신청 거절 통계 결정](03-decisions/005-kafka-coupon-claim-rejection-statistics.md)
 - [패키지 구조](04-conventions/package-structure.md)
 - [데이터베이스 규칙](04-conventions/database-convention.md)
 - [파일 인코딩과 줄바꿈 규칙](04-conventions/file-convention.md)
@@ -94,6 +99,8 @@
 
 - [Redis 쿠폰 재고 장애 복구](06-operations/coupon-redis-recovery.md)
 - [쿠폰 대량 데이터 정합성 검증](07-verification/README.md)
+- [쿠폰 대량 데이터 정합성 검증 결과](07-verification/results/2026-08-26-coupon-integrity.md)
+- [쿠폰 집계 안정성 개선 보고서](07-verification/results/2026-08-26-coupon-reliability-improvements.pdf)
 - [쿠폰 대량 발급 행 잠금 문제](08-troubleshooting/coupon-claim-lock-contention-troubleshooting.md)
 - [새 쿠폰 회차 첫 발급 실패 문제](08-troubleshooting/coupon-first-claim-initialization-troubleshooting.md)
 

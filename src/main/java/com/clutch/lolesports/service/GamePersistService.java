@@ -31,6 +31,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * 경기 종료 시 캐시의 최종값을 DB 로 적재한다.
@@ -95,6 +96,10 @@ public class GamePersistService {
             }
 
             EsportsMatch match = upsertMatch(ctx);
+            if (match == null) {
+                // 리그 미상이라 적재하지 않는다. 재시도해도 같은 결과라 캐시는 비운다.
+                return true;
+            }
             Map<String, MatchTeam> teamsByExternalId = upsertMatchTeams(match, ctx);
             EsportsGame game = upsertGame(match, externalGameId, ctx, lastFrame, teamsByExternalId);
 
@@ -137,15 +142,24 @@ public class GamePersistService {
      * 세트 통계는 기존 종료 적재 흐름에서 확정한다.</p>
      *
      * @param liveMatch 현재 라이브 매치 스냅샷
+     * @param origin 같은 상세 응답에서 확인한 실제 리그·대회 식별자
      */
     @Transactional
-    public void persistLiveMatch(DataCacheService.LiveMatch liveMatch) {
+    public void persistLiveMatch(
+            DataCacheService.LiveMatch liveMatch,
+            HistoricalGameService.MatchOrigin origin
+    ) {
         MatchContext context = MatchContext.of(
                 liveMatch,
                 liveMatch.activeGameId(),
-                liveMatch.bestOf()
+                liveMatch.bestOf(),
+                origin
         );
         EsportsMatch match = upsertMatch(context);
+        if (match == null) {
+            // 리그 미상 — 선저장하지 않는다. 상세가 채워지면 다음 폴링에서 적재된다.
+            return;
+        }
         Map<String, MatchTeam> teamsByExternalId = upsertMatchTeams(match, context);
         persistLateDecidedWinners(liveMatch, teamsByExternalId);
     }
@@ -202,24 +216,42 @@ public class GamePersistService {
 
     // ---- 매치 / 팀 ----
 
+    /**
+     * 매치 행을 만들거나 갱신한다.
+     *
+     * <p>리그·대회를 모르는 매치는 새로 만들지 않고 null 을 반환한다. getLive 는 전 리그를
+     * 주는데 예전에는 여기서 설정값(LCK)으로 폴백했다. 그 결과 상세 조회가 비어 있던
+     * 타 리그 경기가 LCK 정규시즌으로 저장돼 순위표에 남의 팀이 올라왔다.
+     * 리그를 모르는 매치는 순위·일정 어디에도 쓸 수 없으니 적재하지 않는다.</p>
+     *
+     * <p>이미 저장된 매치는 그대로 갱신한다 — 리그는 생성 시점에 이미 정해졌다.</p>
+     *
+     * @return 매치 행. 리그·대회 미상이라 적재를 건너뛰면 null
+     */
     private EsportsMatch upsertMatch(MatchContext ctx) {
-        return matchRepo.findByExternalMatchId(ctx.matchId())
-                .map(m -> {
-                    m.updateProgress(ctx.state(), toLdt(ctx.startTime()), ctx.bestOf());
-                    return m;
-                })
-                .orElseGet(() -> matchRepo.save(new EsportsMatch(
-                        ctx.matchId(),
-                        // 소스가 준 실제 리그를 쓴다. getLive 는 전 리그를 주므로
-                        // 설정값을 그대로 박으면 타 리그 경기까지 LCK 로 저장된다.
-                        ctx.leagueId() != null ? ctx.leagueId() : props.leagueId(),
-                        seasonKeyOf(ctx.startTime()),
-                        ctx.tournamentId() != null ? ctx.tournamentId() : props.tournamentId(),
-                        ctx.blockName(),
-                        toLdt(ctx.startTime()),
-                        toLdt(ctx.startTime()),
-                        ctx.state() != null ? ctx.state() : "completed",
-                        ctx.bestOf())));
+        Optional<EsportsMatch> existing = matchRepo.findByExternalMatchId(ctx.matchId());
+        if (existing.isPresent()) {
+            EsportsMatch m = existing.get();
+            m.updateProgress(ctx.state(), toLdt(ctx.startTime()), ctx.bestOf());
+            return m;
+        }
+
+        if (ctx.leagueId() == null || ctx.tournamentId() == null) {
+            log.warn("매치 적재 건너뜀 — 리그/대회 미상 (matchId={}, leagueId={}, tournamentId={})",
+                    ctx.matchId(), ctx.leagueId(), ctx.tournamentId());
+            return null;
+        }
+
+        return matchRepo.save(new EsportsMatch(
+                ctx.matchId(),
+                ctx.leagueId(),
+                seasonKeyOf(ctx.startTime()),
+                ctx.tournamentId(),
+                ctx.blockName(),
+                toLdt(ctx.startTime()),
+                toLdt(ctx.startTime()),
+                ctx.state() != null ? ctx.state() : "completed",
+                ctx.bestOf()));
     }
 
     /** @return externalTeamId → MatchTeam (진영 판별용) */
@@ -329,8 +361,7 @@ public class GamePersistService {
                 meta != null ? meta.patchVersion() : null,
                 toLdt(start),
                 toLdt(lastTs),
-                (start != null && lastTs != null)
-                        ? (int) Duration.between(start, lastTs).getSeconds() : null,
+                gameElapsedSeconds(start, lastFrame),
                 toLdt(lastTs),
                 lastDetails != null ? toLdt(parse(lastDetails.rfc460Timestamp())) : null);
 
@@ -395,7 +426,7 @@ public class GamePersistService {
 
         for (WindowResponse.Frame f : frames) {
             if (prev != null) {
-                Long t = elapsed(start, f.rfc460Timestamp());
+                Long t = gameElapsed(start, f);
                 collectSide(out, t, "blue", prev.blueTeam(), f.blueTeam());
                 collectSide(out, t, "red", prev.redTeam(), f.redTeam());
             }
@@ -533,7 +564,7 @@ public class GamePersistService {
         Integer to = null;
 
         for (WindowResponse.Frame f : frames) {
-            Long t = elapsed(start, f.rfc460Timestamp());
+            Long t = gameElapsed(start, f);
             if (t == null || t < 0 || f.blueTeam() == null || f.redTeam() == null) {
                 continue;
             }
@@ -560,6 +591,18 @@ public class GamePersistService {
     }
 
     // ---- 유틸 ----
+
+    private static Integer gameElapsedSeconds(Instant start, WindowResponse.Frame frame) {
+        Long elapsed = gameElapsed(start, frame);
+        return elapsed != null && elapsed <= Integer.MAX_VALUE ? elapsed.intValue() : null;
+    }
+
+    private static Long gameElapsed(Instant start, WindowResponse.Frame frame) {
+        if (frame != null && frame.gameTimeSeconds() != null) {
+            return frame.gameTimeSeconds();
+        }
+        return frame != null ? elapsed(start, frame.rfc460Timestamp()) : null;
+    }
 
     private static Map<Integer, WindowResponse.ParticipantMetadata> participantMeta(
             WindowResponse.GameMetadata meta) {

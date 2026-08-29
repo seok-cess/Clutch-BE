@@ -12,12 +12,14 @@ import com.clutch.lolesports.repository.GamePlayerStatRepository;
 import com.clutch.lolesports.repository.GameTimelinePointRepository;
 import com.clutch.lolesports.repository.MatchTeamRepository;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
@@ -48,6 +50,31 @@ class GamePersistServiceWinnerTest {
     );
 
     @Test
+    void 첫_세트_진행_중에도_상세_출처로_경기를_선저장한다() {
+        EsportsMatch savedMatch = mock(EsportsMatch.class);
+        given(savedMatch.getId()).willReturn(10L);
+        given(matchRepository.findByExternalMatchId("match-1")).willReturn(Optional.empty());
+        given(matchRepository.save(any(EsportsMatch.class))).willReturn(savedMatch);
+        given(matchTeamRepository.findByMatchIdOrderByDisplayOrderAsc(10L))
+                .willReturn(List.of());
+        given(matchTeamRepository.save(any(MatchTeam.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
+
+        service.persistLiveMatch(
+                liveMatch(),
+                new HistoricalGameService.MatchOrigin("league-1", "tournament-1")
+        );
+
+        ArgumentCaptor<EsportsMatch> matchCaptor = ArgumentCaptor.forClass(EsportsMatch.class);
+        verify(matchRepository).save(matchCaptor.capture());
+        EsportsMatch createdMatch = matchCaptor.getValue();
+        assertEquals("match-1", createdMatch.getExternalMatchId());
+        assertEquals("league-1", createdMatch.getLeagueExternalId());
+        assertEquals("tournament-1", createdMatch.getTournamentExternalId());
+        assertEquals("inProgress", createdMatch.getLifecycleStatus());
+    }
+
+    @Test
     void persistsWinnerDecidedAfterFinishedGameWasAlreadyStored() {
         EsportsMatch match = mock(EsportsMatch.class);
         MatchTeam firstTeam = team("team-a", 101L);
@@ -61,7 +88,7 @@ class GamePersistServiceWinnerTest {
         given(game.getExternalGameId()).willReturn("game-1");
         given(winnerTracker.winnerOf("match-1", "game-1")).willReturn("team-a");
 
-        service.persistLiveMatch(liveMatch());
+        service.persistLiveMatch(liveMatch(), null);
 
         verify(game).decideWinner(eq(101L), any(LocalDateTime.class));
     }

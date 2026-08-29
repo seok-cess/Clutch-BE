@@ -34,8 +34,10 @@ class ReplayControlServiceTest {
         ReplayStartResult result = service.start();
 
         assertEquals("new-run", result.runId());
-        assertEquals("replay-new-run-m1", result.matchId());
-        assertEquals(List.of("replay-new-run-g1"), result.gameIds());
+        assertEquals(2, result.matches().size());
+        assertEquals("replay-new-run-m1", result.matches().getFirst().matchId());
+        assertEquals(List.of("replay-new-run-g1"), result.matches().getFirst().gameIds());
+        assertEquals("replay-new-run-m2", result.matches().get(1).matchId());
         var order = inOrder(pollingScheduler);
         order.verify(pollingScheduler).resetForExternalSourceChange();
         order.verify(pollingScheduler).pollMeta();
@@ -43,7 +45,7 @@ class ReplayControlServiceTest {
     }
 
     @Test
-    void replay_배속을_바꾸면_이전_시간축_캐시를_초기화한_뒤_즉시_다시_조회한다() {
+    void replay_배속을_바꾸면_인게임_캐시는_유지하고_메타데이터만_즉시_다시_조회한다() {
         PollingScheduler pollingScheduler = mock(PollingScheduler.class);
         ReplayControlService service = new ReplayControlService(
                 replaySpeedClient(),
@@ -52,21 +54,25 @@ class ReplayControlServiceTest {
                 mock(EsportsMatchRepository.class)
         );
 
-        ReplayStatusResult result = service.changeSpeed(20);
+        ReplayStatusResult result = service.changeSpeed(60);
 
-        assertEquals(20.0, result.speed());
+        assertEquals(60.0, result.speed());
+        assertEquals(2, result.matches().size());
+        assertEquals("replay-run-m2", result.matches().get(1).matchId());
         var order = inOrder(pollingScheduler);
-        order.verify(pollingScheduler).resetForExternalSourceChange();
         order.verify(pollingScheduler).pollMeta();
         order.verify(pollingScheduler).pollLiveMatches();
+        org.mockito.Mockito.verify(pollingScheduler, org.mockito.Mockito.never())
+                .resetForExternalSourceChange();
     }
 
     private WebClient replayStartClient() {
         return WebClient.builder()
                 .exchangeFunction(request -> Mono.just(ClientResponse.create(HttpStatus.OK)
                         .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-                        .body("{\"runId\":\"new-run\",\"matchId\":\"replay-new-run-m1\","
-                                + "\"gameIds\":[\"replay-new-run-g1\"]}")
+                        .body("{\"runId\":\"new-run\",\"matches\":[{\"matchId\":\"replay-new-run-m1\","
+                                + "\"gameIds\":[\"replay-new-run-g1\"]},{\"matchId\":\"replay-new-run-m2\","
+                                + "\"gameIds\":[\"replay-new-run-g2\"]}]}")
                         .build()))
                 .build();
     }
@@ -75,10 +81,11 @@ class ReplayControlServiceTest {
         return WebClient.builder()
                 .exchangeFunction(request -> Mono.just(ClientResponse.create(HttpStatus.OK)
                         .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-                        .body("{\"runId\":\"run\",\"matchId\":\"replay-run-m1\","
-                                + "\"gameIds\":[\"replay-run-g1\"],\"elapsedSeconds\":600,"
+                        .body("{\"runId\":\"run\",\"matches\":[{\"matchId\":\"replay-run-m1\","
+                                + "\"gameIds\":[\"replay-run-g1\"]},{\"matchId\":\"replay-run-m2\","
+                                + "\"gameIds\":[\"replay-run-g2\"]}],\"elapsedSeconds\":600,"
                                 + "\"totalSeconds\":5340,\"progressPercent\":11.2,"
-                                + "\"fixtureTime\":\"2026-08-19T08:00:00Z\",\"speed\":20}")
+                                + "\"fixtureTime\":\"2026-08-19T08:00:00Z\",\"speed\":60}")
                         .build()))
                 .build();
     }

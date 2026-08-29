@@ -1,0 +1,14 @@
+{
+  "matches": [
+    {
+      "key": "match-a",
+      "fixture": "../sample-match-bo3-001",
+      "offsetSeconds": 0
+    },
+    {
+      "key": "match-b",
+      "fixture": "../sample-match-bo3-002",
+      "offsetSeconds": 600
+    }
+  ]
+}
