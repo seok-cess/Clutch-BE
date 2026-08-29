@@ -7,7 +7,7 @@ import java.time.LocalDate;
  *
  * @param date Asia/Seoul 기준 날짜
  * @param issuedCount 발급 성공 수
- * @param failedCount 발급 실패 수
+ * @param failedCount 발급 처리 실패와 Redis·조건 검증 거절 수
  */
 public record DailyIssuanceResponse(
         LocalDate date,

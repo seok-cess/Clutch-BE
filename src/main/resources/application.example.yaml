@@ -74,6 +74,8 @@ coupon:
       accepted-group: ${COUPON_CLAIM_ACCEPTED_GROUP:coupon-wallet-issuer}
       issue-result-group: ${COUPON_ISSUE_RESULT_GROUP:clutch-coupon-issue-result}
       statistics-dlt-group: ${COUPON_STATISTICS_DLT_GROUP:clutch-coupon-issue-statistics-dlt}
+      rejected-topic: ${COUPON_CLAIM_REJECTED_TOPIC:coupon.claim.rejected}
+      rejected-group: ${COUPON_CLAIM_REJECTED_GROUP:clutch-coupon-claim-rejected}
   stock-recovery:
     interval-ms: ${COUPON_STOCK_RECOVERY_INTERVAL_MS:2000}
   success-count-sync:

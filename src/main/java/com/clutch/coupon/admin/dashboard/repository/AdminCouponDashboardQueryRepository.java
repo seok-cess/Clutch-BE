@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -44,19 +45,36 @@ public class AdminCouponDashboardQueryRepository {
     ) {
         MapSqlParameterSource parameters = rangeParameters(startUtc, endUtc);
         return jdbcTemplate.queryForObject("""
-                SELECT COUNT(*) AS request_count,
-                       COALESCE(SUM(CASE
-                           WHEN request_status = 'SUCCEEDED' THEN 1 ELSE 0
-                       END), 0) AS issued_count,
-                       COALESCE(SUM(CASE
-                           WHEN request_status = 'FAILED' THEN 1 ELSE 0
-                       END), 0) AS failed_count,
-                       COALESCE(SUM(CASE
-                           WHEN request_status = 'PENDING' THEN 1 ELSE 0
-                       END), 0) AS pending_count
-                  FROM coupon_claim_request
-                 WHERE created_at >= :startUtc
-                   AND created_at < :endUtc
+                SELECT claim.request_count + rejection.rejection_count
+                           AS request_count,
+                       claim.issued_count AS issued_count,
+                       claim.failed_count + rejection.rejection_count
+                           AS failed_count,
+                       claim.pending_count AS pending_count
+                  FROM (
+                      SELECT COUNT(*) AS request_count,
+                             COALESCE(SUM(CASE
+                                 WHEN request_status = 'SUCCEEDED'
+                                 THEN 1 ELSE 0
+                             END), 0) AS issued_count,
+                             COALESCE(SUM(CASE
+                                 WHEN request_status = 'FAILED'
+                                 THEN 1 ELSE 0
+                             END), 0) AS failed_count,
+                             COALESCE(SUM(CASE
+                                 WHEN request_status = 'PENDING'
+                                 THEN 1 ELSE 0
+                             END), 0) AS pending_count
+                        FROM coupon_claim_request
+                       WHERE created_at >= :startUtc
+                         AND created_at < :endUtc
+                  ) claim
+                  CROSS JOIN (
+                      SELECT COUNT(*) AS rejection_count
+                        FROM coupon_claim_rejection_message
+                       WHERE occurred_at >= :startUtc
+                         AND occurred_at < :endUtc
+                  ) rejection
                 """, parameters, this::mapAggregateRow);
     }
 
@@ -67,18 +85,33 @@ public class AdminCouponDashboardQueryRepository {
             LocalDateTime endUtc
     ) {
         return jdbcTemplate.query("""
-                SELECT DATE(DATE_ADD(created_at, INTERVAL 9 HOUR))
-                           AS issuance_date,
-                       COALESCE(SUM(CASE
-                           WHEN request_status = 'SUCCEEDED' THEN 1 ELSE 0
-                       END), 0) AS issued_count,
-                       COALESCE(SUM(CASE
-                           WHEN request_status = 'FAILED' THEN 1 ELSE 0
-                       END), 0) AS failed_count
-                  FROM coupon_claim_request
-                 WHERE created_at >= :startUtc
-                   AND created_at < :endUtc
-                 GROUP BY issuance_date
+                SELECT daily.issuance_date,
+                       SUM(daily.issued_count) AS issued_count,
+                       SUM(daily.failed_count) AS failed_count
+                  FROM (
+                      SELECT DATE(DATE_ADD(created_at, INTERVAL 9 HOUR))
+                                 AS issuance_date,
+                             SUM(request_status = 'SUCCEEDED')
+                                 AS issued_count,
+                             SUM(request_status = 'FAILED')
+                                 AS failed_count
+                        FROM coupon_claim_request
+                       WHERE created_at >= :startUtc
+                         AND created_at < :endUtc
+                       GROUP BY issuance_date
+
+                      UNION ALL
+
+                      SELECT DATE(DATE_ADD(occurred_at, INTERVAL 9 HOUR))
+                                 AS issuance_date,
+                             0 AS issued_count,
+                             COUNT(*) AS failed_count
+                        FROM coupon_claim_rejection_message
+                       WHERE occurred_at >= :startUtc
+                         AND occurred_at < :endUtc
+                       GROUP BY issuance_date
+                  ) daily
+                 GROUP BY daily.issuance_date
                  ORDER BY issuance_date
                 """, rangeParameters(startUtc, endUtc), this::mapDailyRow);
     }
@@ -173,7 +206,7 @@ public class AdminCouponDashboardQueryRepository {
             int rowNumber
     ) throws SQLException {
         return new DailyIssuanceRow(
-                resultSet.getDate("issuance_date").toLocalDate(),
+                resultSet.getObject("issuance_date", LocalDate.class),
                 resultSet.getLong("issued_count"),
                 resultSet.getLong("failed_count")
         );

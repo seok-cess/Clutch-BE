@@ -111,7 +111,8 @@ wallet_outbox Publisher
 
 현재 동기 발급 transaction이 rollback된 요청은 Claim과 결과 Outbox도 함께 rollback되므로
 실패 통계에 남지 않는다. 실패 수는 결과 이벤트로 확정된 실패만 의미하며, Redis 품절·중복
-거절이나 HTTP 요청 오류 수가 아니다.
+거절이나 HTTP 요청 오류 수가 아니다. 관리자 운영 홈은 ADR-005에 따라 별도
+`coupon.claim.rejected` 통계를 합산하지만 이 API의 결과 통계 계약은 그대로 유지한다.
 
 Kafka 브로커 자체가 중단되면 Consumer 처리 오류가 아니므로 DLT 오류가 증가하지 않는다.
 결과 Outbox가 PENDING으로 남고 Kafka 복구 후 통계가 따라잡는다.
