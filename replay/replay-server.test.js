@@ -111,7 +111,7 @@ test('does not expose future live or live-stat data before its capturedAt', asyn
     child = await startReplayServer(fixtureDirectory, port);
     const status = await get(port, '/__replay/status');
     assert.equal(status.status, 200);
-    const replayGameId = JSON.parse(status.body).gameIds[0];
+    const replayGameId = JSON.parse(status.body).matches[0].gameIds[0];
 
     const liveBefore = await get(port, '/getLive');
     assert.equal(liveBefore.status, 200);
@@ -356,7 +356,7 @@ test('interpolates only gold and CS across a long opening telemetry gap', async 
     ].join('\n') + '\n');
 
     child = await startReplayServer(fixtureDirectory, port, 20);
-    const replayGameId = JSON.parse((await get(port, '/__replay/status')).body).gameIds[0];
+    const replayGameId = JSON.parse((await get(port, '/__replay/status')).body).matches[0].gameIds[0];
     await new Promise((resolve) => setTimeout(resolve, 450));
     const response = await get(port, `/window/${replayGameId}?startingTime=now`);
     const frame = JSON.parse(response.body).frames.at(-1);
@@ -398,7 +398,7 @@ test('reports replay game time at one second per wall-clock second at 1x', async
     );
 
     child = await startReplayServer(fixtureDirectory, port, 1);
-    const replayGameId = JSON.parse((await get(port, '/__replay/status')).body).gameIds[0];
+    const replayGameId = JSON.parse((await get(port, '/__replay/status')).body).matches[0].gameIds[0];
     const first = await get(port, `/window/${replayGameId}?startingTime=now`);
     assert.equal(JSON.parse(first.body).frames.at(-1).gameTimeSeconds, 0);
 
@@ -433,7 +433,7 @@ test('advances the clock while the next recorded frame is still minutes away', a
     ].join('\n') + '\n');
 
     child = await startReplayServer(fixtureDirectory, port, 1);
-    const replayGameId = JSON.parse((await get(port, '/__replay/status')).body).gameIds[0];
+    const replayGameId = JSON.parse((await get(port, '/__replay/status')).body).matches[0].gameIds[0];
     const first = JSON.parse((await get(port, `/window/${replayGameId}?startingTime=now`)).body).frames.at(-1);
     await new Promise((resolve) => setTimeout(resolve, 1_100));
     const second = JSON.parse((await get(port, `/window/${replayGameId}?startingTime=now`)).body).frames.at(-1);
@@ -474,7 +474,7 @@ test('uses the earliest in-game frame timestamp even when JSONL capture order di
     );
 
     child = await startReplayServer(fixtureDirectory, port, 1);
-    const replayGameId = JSON.parse((await get(port, '/__replay/status')).body).gameIds[0];
+    const replayGameId = JSON.parse((await get(port, '/__replay/status')).body).matches[0].gameIds[0];
     const response = await get(port, `/window/${replayGameId}?startingTime=now`);
 
     assert.equal(response.status, 200);
@@ -516,7 +516,7 @@ test('keeps frame timestamps monotonic when replay speed changes', async () => {
     );
 
     child = await startReplayServer(fixtureDirectory, port, 1);
-    const replayGameId = JSON.parse((await get(port, '/__replay/status')).body).gameIds[0];
+    const replayGameId = JSON.parse((await get(port, '/__replay/status')).body).matches[0].gameIds[0];
 
     await new Promise((resolve) => setTimeout(resolve, 1_100));
     const before = await get(port, `/window/${replayGameId}?startingTime=now`);

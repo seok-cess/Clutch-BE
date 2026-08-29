@@ -27,7 +27,7 @@ public class ReplayController {
         this.replayControlService = replayControlService;
     }
 
-    /** 새 외부 matchId/gameId로 fixture 재생을 처음부터 시작한다. */
+    /** 새 외부 matchId/gameId 목록으로 fixture 재생을 처음부터 시작한다. */
     @PostMapping("/start")
     public ResponseEntity<?> start() {
         try {

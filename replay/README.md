@@ -9,16 +9,19 @@
 안 건드리고, 개인 설정 파일의 주소 두 줄만 이 서버로 돌리면, 폴링·DB 저장·배팅·시청 포인트까지
 전체 파이프라인이 실제 라이브 때와 동일하게 동작한다.
 
-## 빠르게 시작하기 (공유 실제 경기 fixture)
+## 빠르게 시작하기 (공유 두 경기 fixture)
 
 ```bash
-node replay/replay-server.js --dir replay/fixtures/sample-match-bo3-001 --speed 3
+node replay/replay-server.js --dir replay/fixtures/sample-two-live-matches --speed 3
 ./gradlew bootRun --args='--spring.profiles.active=replay'
 ```
 
-`fixtures/sample-match-bo3-001/`는 실제 GEN–KT best-of-3 녹화에서 만든 Git 추적 기본 fixture다.
-Docker Compose의 replay 컨테이너도 별도 환경 변수가 없으면 이 fixture를 사용하므로, 저장소를 받은
-모든 개발자가 같은 세트 진행·정산 흐름을 재생한다. 데이터 축약 방법과 마지막 세트 결과 보정은
+`fixtures/sample-two-live-matches/`는 첫 번째 GEN–KT 녹화본과 두 번째 T1–HLE 테스트 fixture를 함께
+재생하는 Git 추적 기본 fixture다. 두 번째 경기는 공통 replay 시계 기준 10분 뒤에 시작하므로, 첫 경기가
+끝난 뒤에도 두 번째 경기로 자동 전환하는 흐름을 확인할 수 있다. replay 서버는 각 fixture에 서로 다른 외부
+경기·세트 ID를 발급한다. Docker Compose의 replay 컨테이너도 별도 환경 변수가 없으면 이 fixture를 사용한다.
+실제 두 번째 녹화본을 받으면 [multi fixture README](fixtures/sample-two-live-matches/README.md)의 설명대로
+manifest 경로만 바꾸면 된다. 원본 fixture의 데이터 축약 방법과 마지막 세트 결과 보정은
 [fixture README](fixtures/sample-match-bo3-001/README.md)를 참고한다.
 
 `fixtures/smoke-test/`는 손으로 만든 가짜 경기(세트 1개, bestOf 1) 픽스처다. 스텁 서버의 최소 동작만
@@ -52,8 +55,8 @@ node replay/convert-recorded-fixture.js \
 변환 결과는 원본 보관·압축 입력으로만 사용한다. replay 컨테이너에 원본을 마운트하거나 직접
 재생하지 않는다. 아래의 Git 공유용 압축 과정을 거쳐 `sample-match-bo3-001`을 갱신하면 된다.
 
-Docker Compose는 `REPLAY_FIXTURE_DIR`을 별도로 지정하지 않으면 Git 추적 압축 fixture
-(`sample-match-bo3-001`)를 사용한다.
+Docker Compose는 `REPLAY_FIXTURE_DIR`을 별도로 지정하지 않으면 Git 추적 두 경기 fixture
+(`sample-two-live-matches`)를 사용한다.
 
 - 대상 매치의 `getLive`, `getEventDetails`, `getSchedule` 응답과 그 매치에 속한
   `window`·`details` 세트 응답만 추출한다. `204`, `400`, `404` 같은 실패 응답은 재생 fixture에 넣지 않는다.
@@ -128,12 +131,14 @@ lolesports:
 이 profile에서만 `POST /api/replay/start`와 `GET /api/replay/status`가 열린다. 프론트는 상태 API가
 정상 응답할 때만 테스트 시작 버튼을 표시하며, 별도 `VITE_REPLAY_MODE` 환경 변수는 필요 없다. 버튼은
 시작 API를 호출하면
-된다. 요청할 때마다 스텁 서버가 새 `matchId`/`gameId`를 만들고 타임라인을 처음부터 재생한 뒤,
+된다. 요청할 때마다 스텁 서버가 각 재생 경기에 새 `matchId`/`gameId`를 만들고 공통 타임라인을 처음부터 재생한 뒤,
 백엔드도 즉시 한 번 라이브 폴링을 수행하므로,
 기존 테스트 경기 데이터와 충돌하지 않는다. 스텁 서버 프로세스 자체는 이 API가 실행하지 않으므로
 먼저 `node replay/replay-server.js ...`로 켜져 있어야 한다.
 
-`GET /api/replay/status`는 JSONL 전체의 첫·마지막 `capturedAt`을 기준으로 현재 재생 위치를 반환한다.
+`POST /api/replay/start`와 `GET /api/replay/status`는 단일 `matchId` 대신 `matches[]`를 반환한다. 각 항목은
+`matchId`, `esportsMatchId`, `gameIds`를 가지며, 화면은 이 목록을 모두 표시한 뒤 사용자가 고른 한 경기의
+상세 API만 요청한다. `GET /api/replay/status`는 공통 replay 시계의 현재 위치를 반환한다.
 예를 들어 `elapsedSeconds: 1350`, `totalSeconds: 8400`이면 fixture 140분 중 22분 30초 지점이다.
 
 재생 중 배속을 바꾸려면 `POST /api/replay/speed?value=5`처럼 1~20배속을 요청한다. 타임라인은
@@ -170,6 +175,25 @@ replay profile은 `getLive`도 실제 1초마다 확인한다. 따라서 20배�
 - replay 서버는 `capturedAt`에 아직 도달하지 않은 미래 응답을 반환하지 않는다. `getLive`·일정·순위는
   그 전까지 빈 응답을 반환하고, `window`/`details`는 `204 No Content`를 반환한다. 따라서 새 test 경기
   시작 직후 미래의 `inProgress` 상태로 첫 세트가 즉시 마감되거나, 화면에 고정된 미래 통계가 표시되지 않는다.
+
+### 여러 경기를 함께 재생하는 manifest
+
+여러 경기 fixture를 한 replay 서버에서 동시에 재생하려면 상위 디렉터리에 `manifest.json`을 둔다.
+
+```json
+{
+  "matches": [
+    { "key": "match-a", "fixture": "../recording-a", "offsetSeconds": 0 },
+    { "key": "match-b", "fixture": "../recording-b", "offsetSeconds": 60 }
+  ]
+}
+```
+
+- `fixture`는 manifest가 있는 디렉터리를 기준으로 한 경기 fixture 경로다.
+- `offsetSeconds`는 선택 사항이며, 공통 replay 시계에서 그 경기가 시작할 상대 시각이다.
+- `getLive`/`getSchedule`은 현재 시작된 모든 경기의 이벤트를 한 응답으로 합친다.
+- `getEventDetails?id={matchId}`, `window/{gameId}`, `details/{gameId}`는 해당 ID가 속한 fixture만 읽는다.
+- 배속은 manifest의 경기별 값이 아니라 replay run 하나의 공통 값이다.
 
 ### window/details 프레임 시각도 재생 시간축을 따른다
 
@@ -208,7 +232,7 @@ replay 전용 `gameTimeSeconds`도 함께 내려준다. 화면은 이 값을 우
   `rfc460Timestamp` 기준으로 수행한다.
 - 재생 제어 UI는 replay profile의 프론트 라이브 화면에서만 제공한다. mock 서버 프로세스 자체를
   실행·종료하는 기능은 제공하지 않는다.
-- 한 번에 매치 하나만 재생한다. 여러 매치를 동시에 재생하려면 서버를 여러 포트로 여러 개 띄우면 된다.
+- 한 replay 서버는 manifest에 선언한 여러 매치를 하나의 공통 시계·배속으로 동시에 재생한다.
 
 ## 쿠폰 PENTAKILL 트리거 시연
 

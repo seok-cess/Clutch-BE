@@ -1,6 +1,7 @@
 package com.clutch.replay.api;
 
 import com.clutch.replay.service.ReplayControlService;
+import com.clutch.replay.service.ReplayMatchResult;
 import com.clutch.replay.service.ReplayStartResult;
 import com.clutch.replay.service.ReplaySourceModeException;
 import org.junit.jupiter.api.Test;
@@ -32,15 +33,23 @@ class ReplayControllerTest {
     void startsNewReplayRun() throws Exception {
         given(replayControlService.start()).willReturn(new ReplayStartResult(
                 "a8f31c",
-                "replay-a8f31c-m1",
-                List.of("replay-a8f31c-g1", "replay-a8f31c-g2")
+                List.of(new ReplayMatchResult(
+                        "replay-a8f31c-m1",
+                        321L,
+                        List.of("replay-a8f31c-g1", "replay-a8f31c-g2")
+                ), new ReplayMatchResult(
+                        "replay-a8f31c-m2",
+                        322L,
+                        List.of("replay-a8f31c-g3")
+                ))
         ));
 
         mockMvc.perform(post("/api/replay/start"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.runId").value("a8f31c"))
-                .andExpect(jsonPath("$.matchId").value("replay-a8f31c-m1"))
-                .andExpect(jsonPath("$.gameIds[0]").value("replay-a8f31c-g1"));
+                .andExpect(jsonPath("$.matches[0].matchId").value("replay-a8f31c-m1"))
+                .andExpect(jsonPath("$.matches[0].gameIds[0]").value("replay-a8f31c-g1"))
+                .andExpect(jsonPath("$.matches[1].matchId").value("replay-a8f31c-m2"));
     }
 
     @Test
@@ -56,9 +65,7 @@ class ReplayControllerTest {
     void returnsReplayTimelinePosition() throws Exception {
         given(replayControlService.status()).willReturn(new com.clutch.replay.service.ReplayStatusResult(
                 "a8f31c",
-                "replay-a8f31c-m1",
-                321L,
-                List.of("replay-a8f31c-g1"),
+                List.of(new ReplayMatchResult("replay-a8f31c-m1", 321L, List.of("replay-a8f31c-g1"))),
                 1350,
                 8400,
                 16.1,
@@ -68,7 +75,7 @@ class ReplayControllerTest {
 
         mockMvc.perform(get("/api/replay/status"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.esportsMatchId").value(321))
+                .andExpect(jsonPath("$.matches[0].esportsMatchId").value(321))
                 .andExpect(jsonPath("$.elapsedSeconds").value(1350))
                 .andExpect(jsonPath("$.totalSeconds").value(8400))
                 .andExpect(jsonPath("$.progressPercent").value(16.1));
@@ -78,9 +85,7 @@ class ReplayControllerTest {
     void changesReplaySpeedWithoutRestartingRun() throws Exception {
         given(replayControlService.changeSpeed(5.0)).willReturn(new com.clutch.replay.service.ReplayStatusResult(
                 "a8f31c",
-                "replay-a8f31c-m1",
-                321L,
-                List.of("replay-a8f31c-g1"),
+                List.of(new ReplayMatchResult("replay-a8f31c-m1", 321L, List.of("replay-a8f31c-g1"))),
                 1350,
                 8400,
                 16.1,

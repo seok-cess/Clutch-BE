@@ -165,7 +165,7 @@ services:
       - node
       - replay-server.js
       - --dir
-      - "${REPLAY_FIXTURE_DIR:-fixtures/sample-match-bo3-001}"
+      - "${REPLAY_FIXTURE_DIR:-fixtures/sample-two-live-matches}"
       - --speed
       - "${REPLAY_SPEED:-1}"
     ports:

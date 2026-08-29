@@ -53,7 +53,7 @@ public class ReplayControlService {
                     .retrieve()
                     .bodyToMono(ReplayServerStartResponse.class)
                     .block(REQUEST_TIMEOUT);
-            if (response == null || response.runId() == null || response.matchId() == null) {
+            if (response == null || response.runId() == null || !hasMatches(response.matches())) {
                 throw new ReplayControlException("replay 스텁 서버가 새 경기 정보를 반환하지 않았다");
             }
             // 새 run의 외부 ID는 이전 run과 다르다. 이전 경기의 캐시·백오프·세트 상태를
@@ -62,7 +62,7 @@ public class ReplayControlService {
             // 기본 폴링을 기다리지 않고, 프론트가 곧바로 새 경기를 조회할 수 있게 한다.
             pollingScheduler.pollMeta();
             pollingScheduler.pollLiveMatches();
-            return new ReplayStartResult(response.runId(), response.matchId(), response.gameIds());
+            return new ReplayStartResult(response.runId(), toMatches(response.matches()));
         } catch (WebClientException | IllegalStateException exception) {
             throw new ReplayControlException("replay 스텁 서버에 연결할 수 없다. node replay/replay-server.js 실행 상태를 확인하세요.", exception);
         }
@@ -75,7 +75,7 @@ public class ReplayControlService {
                     .retrieve()
                     .bodyToMono(ReplayServerStatusResponse.class)
                     .block(REQUEST_TIMEOUT);
-            if (response == null || response.runId() == null || response.matchId() == null) {
+            if (response == null || response.runId() == null || !hasMatches(response.matches())) {
                 throw new ReplayControlException("replay 스텁 서버가 재생 위치를 반환하지 않았다");
             }
             return toStatusResult(response);
@@ -94,7 +94,7 @@ public class ReplayControlService {
                     .retrieve()
                     .bodyToMono(ReplayServerStatusResponse.class)
                     .block(REQUEST_TIMEOUT);
-            if (response == null || response.runId() == null || response.matchId() == null) {
+            if (response == null || response.runId() == null || !hasMatches(response.matches())) {
                 throw new ReplayControlException("replay 스텁 서버가 변경된 배속을 반환하지 않았다");
             }
             refreshStubCachesAfterSpeedChange();
@@ -104,7 +104,27 @@ public class ReplayControlService {
         }
     }
 
-    private record ReplayServerStartResponse(String runId, String matchId, List<String> gameIds) {
+    private boolean hasMatches(List<ReplayServerMatch> matches) {
+        return matches != null
+                && !matches.isEmpty()
+                && matches.stream().allMatch(match -> match != null
+                && match.matchId() != null
+                && !match.matchId().isBlank());
+    }
+
+    private List<ReplayMatchResult> toMatches(List<ReplayServerMatch> matches) {
+        return matches.stream()
+                .map(match -> new ReplayMatchResult(
+                        match.matchId(),
+                        esportsMatchRepository.findByExternalMatchId(match.matchId())
+                                .map(existing -> existing.getId())
+                                .orElse(null),
+                        match.gameIds()
+                ))
+                .toList();
+    }
+
+    private record ReplayServerStartResponse(String runId, List<ReplayServerMatch> matches) {
     }
 
     /**
@@ -130,11 +150,7 @@ public class ReplayControlService {
     private ReplayStatusResult toStatusResult(ReplayServerStatusResponse response) {
         return new ReplayStatusResult(
                 response.runId(),
-                response.matchId(),
-                esportsMatchRepository.findByExternalMatchId(response.matchId())
-                        .map(match -> match.getId())
-                        .orElse(null),
-                response.gameIds(),
+                toMatches(response.matches()),
                 response.elapsedSeconds(),
                 response.totalSeconds(),
                 response.progressPercent(),
@@ -145,13 +161,15 @@ public class ReplayControlService {
 
     private record ReplayServerStatusResponse(
             String runId,
-            String matchId,
-            List<String> gameIds,
+            List<ReplayServerMatch> matches,
             long elapsedSeconds,
             long totalSeconds,
             double progressPercent,
             String fixtureTime,
             double speed
     ) {
+    }
+
+    private record ReplayServerMatch(String matchId, List<String> gameIds) {
     }
 }
