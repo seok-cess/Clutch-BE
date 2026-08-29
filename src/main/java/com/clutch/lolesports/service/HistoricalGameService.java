@@ -234,6 +234,12 @@ public class HistoricalGameService {
      * 라이브 활성 게임은 폴링 스케줄러가 이미 캐시를 채우므로 이 경로를 타지 않는다.
      */
     public void ensureGameLoaded(String gameId) {
+        // 라이브 목록에 올라온 활성 게임은 폴링 스케줄러만 소스를 읽게 한다.
+        // 화면 요청이 정기 폴링보다 먼저 도착했다고 과거 경기 로더까지 실행하면,
+        // replay 고배속에서 동일 cursor를 병렬 소비해 초반 프레임이 유실될 수 있다.
+        if (cache.getActiveGameIds().contains(gameId)) {
+            return;
+        }
         // 열람 순서를 기록해 상한을 넘으면 오래된 것부터 밀어낸다.
         // 진행 중인 라이브 게임은 밀려나면 안 되므로 보호 목록으로 넘긴다.
         cache.touchOnDemand(gameId, java.util.Set.copyOf(cache.getActiveGameIds()));

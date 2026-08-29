@@ -247,10 +247,18 @@ public class DataCacheService {
         }
         List<WindowResponse.Frame> out = new ArrayList<>();
         Instant next = null;
+        Long nextGameTimeSeconds = null;
         for (Map.Entry<Instant, WindowResponse.Frame> e : buf.frames.headMap(until, true).entrySet()) {
-            if (next == null || !e.getKey().isBefore(next)) {
-                out.add(e.getValue());
+            WindowResponse.Frame frame = e.getValue();
+            Long gameTimeSeconds = frame.gameTimeSeconds();
+            boolean shouldAdd = gameTimeSeconds != null
+                    ? nextGameTimeSeconds == null || gameTimeSeconds >= nextGameTimeSeconds
+                    : next == null || !e.getKey().isBefore(next);
+            if (shouldAdd) {
+                out.add(frame);
                 next = e.getKey().plusSeconds(stepSeconds);
+                nextGameTimeSeconds = gameTimeSeconds != null
+                        ? gameTimeSeconds + stepSeconds : null;
             }
         }
         return out;
@@ -266,7 +274,7 @@ public class DataCacheService {
      * replay 서버가 재생 시간축으로 변환한 실제 벽시계 기준 프레임을 고른다.
      *
      * <p>프레임 시각 자체가 현재 재생 배속을 반영한다. 따라서 1배속에서는 매초 한 프레임,
-     * 20배속에서는 매 실제 초에 게임 시간 20초만큼 전진한다. 수신 배치를 다시 1배속으로
+     * 60배속에서는 매 실제 초에 게임 시간 60초만큼 전진한다. 수신 배치를 다시 1배속으로
      * 풀어내면 고배속 재생이 느려지고, 다음 배치에서 시계가 되감기는 문제가 생긴다.</p>
      */
     public WindowResponse.Frame getReplayWindowFrame(String gameId, Instant now) {

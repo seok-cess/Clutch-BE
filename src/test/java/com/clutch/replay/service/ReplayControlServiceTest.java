@@ -45,7 +45,7 @@ class ReplayControlServiceTest {
     }
 
     @Test
-    void replay_배속을_바꾸면_이전_시간축_캐시를_초기화한_뒤_즉시_다시_조회한다() {
+    void replay_배속을_바꾸면_인게임_캐시는_유지하고_메타데이터만_즉시_다시_조회한다() {
         PollingScheduler pollingScheduler = mock(PollingScheduler.class);
         ReplayControlService service = new ReplayControlService(
                 replaySpeedClient(),
@@ -60,9 +60,10 @@ class ReplayControlServiceTest {
         assertEquals(2, result.matches().size());
         assertEquals("replay-run-m2", result.matches().get(1).matchId());
         var order = inOrder(pollingScheduler);
-        order.verify(pollingScheduler).resetForExternalSourceChange();
         order.verify(pollingScheduler).pollMeta();
         order.verify(pollingScheduler).pollLiveMatches();
+        org.mockito.Mockito.verify(pollingScheduler, org.mockito.Mockito.never())
+                .resetForExternalSourceChange();
     }
 
     private WebClient replayStartClient() {

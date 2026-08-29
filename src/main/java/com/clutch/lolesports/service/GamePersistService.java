@@ -356,8 +356,7 @@ public class GamePersistService {
                 meta != null ? meta.patchVersion() : null,
                 toLdt(start),
                 toLdt(lastTs),
-                (start != null && lastTs != null)
-                        ? (int) Duration.between(start, lastTs).getSeconds() : null,
+                gameElapsedSeconds(start, lastFrame),
                 toLdt(lastTs),
                 lastDetails != null ? toLdt(parse(lastDetails.rfc460Timestamp())) : null);
 
@@ -422,7 +421,7 @@ public class GamePersistService {
 
         for (WindowResponse.Frame f : frames) {
             if (prev != null) {
-                Long t = elapsed(start, f.rfc460Timestamp());
+                Long t = gameElapsed(start, f);
                 collectSide(out, t, "blue", prev.blueTeam(), f.blueTeam());
                 collectSide(out, t, "red", prev.redTeam(), f.redTeam());
             }
@@ -560,7 +559,7 @@ public class GamePersistService {
         Integer to = null;
 
         for (WindowResponse.Frame f : frames) {
-            Long t = elapsed(start, f.rfc460Timestamp());
+            Long t = gameElapsed(start, f);
             if (t == null || t < 0 || f.blueTeam() == null || f.redTeam() == null) {
                 continue;
             }
@@ -587,6 +586,18 @@ public class GamePersistService {
     }
 
     // ---- 유틸 ----
+
+    private static Integer gameElapsedSeconds(Instant start, WindowResponse.Frame frame) {
+        Long elapsed = gameElapsed(start, frame);
+        return elapsed != null && elapsed <= Integer.MAX_VALUE ? elapsed.intValue() : null;
+    }
+
+    private static Long gameElapsed(Instant start, WindowResponse.Frame frame) {
+        if (frame != null && frame.gameTimeSeconds() != null) {
+            return frame.gameTimeSeconds();
+        }
+        return frame != null ? elapsed(start, frame.rfc460Timestamp()) : null;
+    }
 
     private static Map<Integer, WindowResponse.ParticipantMetadata> participantMeta(
             WindowResponse.GameMetadata meta) {

@@ -98,7 +98,7 @@ public class ReplayControlService {
             if (response == null || response.runId() == null || !hasMatches(response.matches())) {
                 throw new ReplayControlException("replay 스텁 서버가 변경된 배속을 반환하지 않았다");
             }
-            refreshStubCachesAfterSpeedChange();
+            refreshStubMetadataAfterSpeedChange();
             return toStatusResult(response);
         } catch (WebClientException | IllegalStateException exception) {
             throw new ReplayControlException("replay 스텁 서버의 배속을 변경할 수 없다.", exception);
@@ -129,19 +129,15 @@ public class ReplayControlService {
     }
 
     /**
-     * 배속이 바뀌면 replay 서버가 돌려주는 일정·프레임 시각도 즉시 달라진다.
-     * 기존 캐시를 다음 정기 폴링까지 유지하면 첫 세트 마감과 다음 세트 오픈 시각이 이전 배속 기준으로
-     * 남으므로, STUB 모드에서만 즉시 다시 읽는다.
+     * 배속 변경으로 달라진 일정 시각은 즉시 다시 읽되, 이미 수집한 인게임 프레임은 보존한다.
+     * replay 서버는 전달 완료 프레임의 cursor를 유지하므로 백엔드 프레임 캐시만 지우면
+     * 이전 프레임을 다시 받을 수 없어 세트 시작·종료 정보가 유실된다.
      */
-    private void refreshStubCachesAfterSpeedChange() {
+    private void refreshStubMetadataAfterSpeedChange() {
         sourceState.withWriteLock(() -> {
             if (sourceState.mode() != ExternalSourceMode.STUB) {
                 return null;
             }
-            // replay 프레임 rfc460Timestamp는 선택한 배속에 맞춘 벽시계 좌표다.
-            // 이전 배속으로 키가 잡힌 프레임을 남기면 새 좌표의 프레임과 섞여 타이머가
-            // 되감기거나 최초 프레임에 고정될 수 있으므로, 새 run과 같은 캐시 경계를 만든다.
-            pollingScheduler.resetForExternalSourceChange();
             pollingScheduler.pollMeta();
             pollingScheduler.pollLiveMatches();
             return null;
