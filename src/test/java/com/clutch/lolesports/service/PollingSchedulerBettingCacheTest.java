@@ -121,7 +121,10 @@ class PollingSchedulerBettingCacheTest {
 
         DataCacheService.LiveMatch liveMatch = cache.getLiveMatches().getFirst();
         assertEquals("live-match", liveMatch.matchId());
-        verify(persistService).persistLiveMatch(liveMatch);
+        verify(persistService).persistLiveMatch(
+                liveMatch,
+                new HistoricalGameService.MatchOrigin("league-id", "tournament-id")
+        );
     }
 
     /**
@@ -200,8 +203,8 @@ class PollingSchedulerBettingCacheTest {
                         new EventDetailsResponse.Event(
                                 matchId,
                                 "match",
-                                new ScheduleResponse.League(null, "LCK", "lck"),
-                                null,
+                                new ScheduleResponse.League("league-id", "LCK", "lck"),
+                                new EventDetailsResponse.Tournament("tournament-id"),
                                 new EventDetailsResponse.Match(
                                         teams,
                                         List.of(),

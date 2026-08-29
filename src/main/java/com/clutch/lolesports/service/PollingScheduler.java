@@ -190,7 +190,7 @@ public class PollingScheduler {
         }
         try {
             ScheduleResponse live = api.getLive();
-            List<DataCacheService.LiveMatch> matches = new ArrayList<>();
+            List<ResolvedLiveMatch> resolvedMatches = new ArrayList<>();
 
             if (live != null && live.data() != null && live.data().schedule() != null
                     && live.data().schedule().events() != null) {
@@ -199,11 +199,14 @@ public class PollingScheduler {
                     if (event.match() == null || event.match().id() == null) {
                         continue;
                     }
-                    matches.add(resolveLiveMatch(event));
+                    resolvedMatches.add(resolveLiveMatch(event));
                 }
             }
 
-            persistLiveMatches(matches);
+            persistLiveMatches(resolvedMatches);
+            List<DataCacheService.LiveMatch> matches = resolvedMatches.stream()
+                    .map(ResolvedLiveMatch::liveMatch)
+                    .toList();
             matches = dropLongFinished(matches);
             cache.putLiveMatches(matches);
             cache.putBettingMatches(resolveBettingMatches(matches));
@@ -221,10 +224,11 @@ public class PollingScheduler {
     }
 
     /** 라이브 매치별 선저장 실패를 격리해 나머지 캐시 갱신을 계속한다. */
-    private void persistLiveMatches(List<DataCacheService.LiveMatch> matches) {
-        for (DataCacheService.LiveMatch match : matches) {
+    private void persistLiveMatches(List<ResolvedLiveMatch> matches) {
+        for (ResolvedLiveMatch resolved : matches) {
+            DataCacheService.LiveMatch match = resolved.liveMatch();
             try {
-                persistService.persistLiveMatch(match);
+                persistService.persistLiveMatch(match, resolved.origin());
             } catch (RuntimeException exception) {
                 log.warn("라이브 매치 선저장 실패 (matchId={}): {}",
                         match.matchId(), exception.toString());
@@ -256,7 +260,7 @@ public class PollingScheduler {
                     || candidates.containsKey(event.match().id())) {
                 continue;
             }
-            DataCacheService.LiveMatch candidate = resolveLiveMatch(event);
+            DataCacheService.LiveMatch candidate = resolveLiveMatch(event).liveMatch();
             candidates.put(candidate.matchId(), candidate);
         }
         return List.copyOf(candidates.values());
@@ -331,18 +335,21 @@ public class PollingScheduler {
      * @param event getLive 또는 일정 캐시에서 조회한 매치 이벤트
      * @return 팀·세트·best-of 정보가 결합된 라이브 매치 캐시 값
      */
-    private DataCacheService.LiveMatch resolveLiveMatch(ScheduleResponse.Event event) {
+    private ResolvedLiveMatch resolveLiveMatch(ScheduleResponse.Event event) {
         String matchId = event.match().id();
         List<EventDetailsResponse.Game> games = List.of();
         List<ScheduleResponse.Team> detailTeams = List.of();
         String activeGameId = null;
         Integer bestOf = null;
+        HistoricalGameService.MatchOrigin origin = null;
 
         try {
             EventDetailsResponse details = api.getEventDetails(matchId);
             if (details != null && details.data() != null && details.data().event() != null
                     && details.data().event().match() != null) {
-                EventDetailsResponse.Match m = details.data().event().match();
+                EventDetailsResponse.Event detailEvent = details.data().event();
+                EventDetailsResponse.Match m = detailEvent.match();
+                origin = matchOrigin(detailEvent);
                 if (m.teams() != null) {
                     detailTeams = m.teams();
                 }
@@ -369,16 +376,38 @@ public class PollingScheduler {
         setWinners.observe(matchId, teams, games);
 
         // 배팅 이벤트가 Bo3/Bo5의 종료 시점을 판단할 수 있도록 매치 전략도 함께 캐시한다.
-        return new DataCacheService.LiveMatch(
-                matchId,
-                event.blockName(),
-                event.league() != null ? event.league().name() : null,
-                event.startTime(),
-                bestOf != null ? bestOf : bestOfFromSchedule(matchId),
-                teams,
-                games,
-                activeGameId
+        return new ResolvedLiveMatch(
+                new DataCacheService.LiveMatch(
+                        matchId,
+                        event.blockName(),
+                        event.league() != null ? event.league().name() : null,
+                        event.startTime(),
+                        bestOf != null ? bestOf : bestOfFromSchedule(matchId),
+                        teams,
+                        games,
+                        activeGameId
+                ),
+                origin
         );
+    }
+
+    /** 이미 조회한 상세 응답에서 DB 선저장에 필요한 실제 리그·대회 ID를 꺼낸다. */
+    private static HistoricalGameService.MatchOrigin matchOrigin(
+            EventDetailsResponse.Event event
+    ) {
+        String leagueId = event.league() != null ? event.league().id() : null;
+        String tournamentId = event.tournament() != null ? event.tournament().id() : null;
+        if (leagueId == null && tournamentId == null) {
+            return null;
+        }
+        return new HistoricalGameService.MatchOrigin(leagueId, tournamentId);
+    }
+
+    /** 라이브 화면 데이터와 같은 상세 응답에서 얻은 DB 적재 출처를 함께 운반한다. */
+    private record ResolvedLiveMatch(
+            DataCacheService.LiveMatch liveMatch,
+            HistoricalGameService.MatchOrigin origin
+    ) {
     }
 
     /**

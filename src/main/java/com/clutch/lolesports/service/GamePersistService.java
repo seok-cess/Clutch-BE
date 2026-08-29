@@ -142,13 +142,18 @@ public class GamePersistService {
      * 세트 통계는 기존 종료 적재 흐름에서 확정한다.</p>
      *
      * @param liveMatch 현재 라이브 매치 스냅샷
+     * @param origin 같은 상세 응답에서 확인한 실제 리그·대회 식별자
      */
     @Transactional
-    public void persistLiveMatch(DataCacheService.LiveMatch liveMatch) {
+    public void persistLiveMatch(
+            DataCacheService.LiveMatch liveMatch,
+            HistoricalGameService.MatchOrigin origin
+    ) {
         MatchContext context = MatchContext.of(
                 liveMatch,
                 liveMatch.activeGameId(),
-                liveMatch.bestOf()
+                liveMatch.bestOf(),
+                origin
         );
         EsportsMatch match = upsertMatch(context);
         if (match == null) {
