@@ -78,6 +78,150 @@ async function startReplayServer(fixtureDirectory, port, speed = 20) {
   return child;
 }
 
+function writeSingleMatchFixture(directory, matchId, gameId, marker) {
+  const origin = '2026-01-01T00:00:00.000Z';
+  const event = {
+    id: matchId,
+    match: {
+      id: matchId,
+      games: [{ id: gameId, state: 'inProgress' }],
+    },
+  };
+  const frame = {
+    rfc460Timestamp: origin,
+    gameState: 'in_game',
+    sourceMarker: marker,
+    blueTeam: { participants: [] },
+    redTeam: { participants: [] },
+  };
+  fs.mkdirSync(directory, { recursive: true });
+  fs.writeFileSync(
+    path.join(directory, 'getLive.jsonl'),
+    `${jsonLine(origin, { data: { schedule: { events: [event] } } })}\n`,
+  );
+  fs.writeFileSync(
+    path.join(directory, 'eventDetails.jsonl'),
+    `${jsonLine(origin, { data: { event } })}\n`,
+  );
+  fs.writeFileSync(
+    path.join(directory, 'window.jsonl'),
+    `${jsonLine(origin, { sourceMarker: marker, frames: [frame] }, gameId)}\n`,
+  );
+  fs.writeFileSync(
+    path.join(directory, 'details.jsonl'),
+    `${jsonLine(origin, { sourceMarker: marker, frames: [frame] }, gameId)}\n`,
+  );
+}
+
+test('replays two fixtures on one clock while routing match and game details by the selected ID', async () => {
+  const fixtureDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'clutch-replay-multi-'));
+  const port = await reservePort();
+  let child;
+
+  try {
+    writeSingleMatchFixture(path.join(fixtureDirectory, 'match-a'), 'recorded-match-a', 'recorded-game-a', 'A');
+    writeSingleMatchFixture(path.join(fixtureDirectory, 'match-b'), 'recorded-match-b', 'recorded-game-b', 'B');
+    fs.writeFileSync(path.join(fixtureDirectory, 'manifest.json'), JSON.stringify({
+      matches: [
+        { key: 'match-a', fixture: 'match-a', offsetSeconds: 0 },
+        { key: 'match-b', fixture: 'match-b', offsetSeconds: 0 },
+      ],
+    }));
+
+    child = await startReplayServer(fixtureDirectory, port, 1);
+    const status = JSON.parse((await get(port, '/__replay/status')).body);
+    assert.equal(status.matches.length, 2);
+    assert.notEqual(status.matches[0].matchId, status.matches[1].matchId);
+    assert.notEqual(status.matches[0].gameIds[0], status.matches[1].gameIds[0]);
+
+    const live = JSON.parse((await get(port, '/getLive')).body);
+    assert.deepEqual(
+      live.data.schedule.events.map((event) => event.match.id),
+      status.matches.map((match) => match.matchId),
+      'getLive는 동시 재생 중인 두 경기를 함께 반환한다',
+    );
+
+    for (const [index, marker] of ['A', 'B'].entries()) {
+      const selectedMatch = status.matches[index];
+      const details = JSON.parse((await get(port, `/getEventDetails?id=${selectedMatch.matchId}`)).body);
+      assert.equal(details.data.event.match.id, selectedMatch.matchId,
+        '상세 응답은 요청한 경기의 ID만 포함한다');
+
+      const window = JSON.parse((await get(
+        port,
+        `/window/${selectedMatch.gameIds[0]}?startingTime=now`,
+      )).body);
+      assert.equal(window.sourceMarker, marker,
+        '게임 상세 프레임은 선택한 경기의 fixture에서만 읽는다');
+    }
+
+    const speed = JSON.parse((await post(port, '/__replay/speed?value=5')).body);
+    assert.equal(speed.speed, 5);
+    assert.deepEqual(speed.matches, status.matches,
+      '배속은 경기마다 따로 설정하지 않고 한 replay run 전체에 공통 적용한다');
+
+    const tooFast = await post(port, '/__replay/speed?value=61');
+    assert.equal(tooFast.status, 400);
+    assert.match(tooFast.body, /1 이상 60 이하/);
+  } finally {
+    if (child && !child.killed) {
+      child.kill();
+      await once(child, 'exit');
+    }
+    fs.rmSync(fixtureDirectory, { recursive: true, force: true });
+  }
+});
+
+test('delays the second match and keeps it live after the first match disappears', async () => {
+  const fixtureDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'clutch-replay-staggered-'));
+  const origin = '2026-01-01T00:00:00.000Z';
+  const firstMatchEndsAt = '2026-01-01T00:00:05.000Z';
+  const port = await reservePort();
+  let child;
+
+  try {
+    const firstFixture = path.join(fixtureDirectory, 'match-a');
+    const secondFixture = path.join(fixtureDirectory, 'match-b');
+    writeSingleMatchFixture(firstFixture, 'recorded-match-a', 'recorded-game-a', 'A');
+    writeSingleMatchFixture(secondFixture, 'recorded-match-b', 'recorded-game-b', 'B');
+    fs.appendFileSync(
+      path.join(firstFixture, 'getLive.jsonl'),
+      `${jsonLine(firstMatchEndsAt, { data: { schedule: { events: [] } } })}\n`,
+    );
+    fs.writeFileSync(path.join(fixtureDirectory, 'manifest.json'), JSON.stringify({
+      matches: [
+        { key: 'match-a', fixture: 'match-a', offsetSeconds: 0 },
+        { key: 'match-b', fixture: 'match-b', offsetSeconds: 2 },
+      ],
+    }));
+
+    child = await startReplayServer(fixtureDirectory, port, 20);
+    const matches = JSON.parse((await get(port, '/__replay/status')).body).matches;
+    const firstMatchId = matches[0].matchId;
+    const secondMatchId = matches[1].matchId;
+
+    let live = JSON.parse((await get(port, '/getLive')).body);
+    assert.deepEqual(live.data.schedule.events.map((event) => event.match.id), [firstMatchId],
+      '두 번째 fixture는 지정한 시작 시각 전에는 라이브 목록에 나타나지 않는다');
+
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    live = JSON.parse((await get(port, '/getLive')).body);
+    assert.deepEqual(live.data.schedule.events.map((event) => event.match.id), [firstMatchId, secondMatchId],
+      '두 번째 fixture는 지연 시간 뒤 첫 번째 경기와 같은 공통 시계에서 함께 진행한다');
+
+    await new Promise((resolve) => setTimeout(resolve, 220));
+    live = JSON.parse((await get(port, '/getLive')).body);
+    assert.deepEqual(live.data.schedule.events.map((event) => event.match.id), [secondMatchId],
+      '첫 번째 경기가 끝난 뒤에도 지연 시작한 두 번째 경기는 라이브로 남는다');
+  } finally {
+    if (child && !child.killed) {
+      child.kill();
+      await once(child, 'exit');
+    }
+    fs.rmSync(fixtureDirectory, { recursive: true, force: true });
+  }
+});
+
 test('does not expose future live or live-stat data before its capturedAt', async () => {
   const fixtureDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'clutch-replay-'));
   const gameId = 'recorded-game-1';
@@ -522,7 +666,9 @@ test('keeps frame timestamps monotonic when replay speed changes', async () => {
     const before = await get(port, `/window/${replayGameId}?startingTime=now`);
     const beforeTimestamp = Date.parse(JSON.parse(before.body).frames.at(-1).rfc460Timestamp);
 
-    assert.equal((await post(port, '/__replay/speed?value=20')).status, 200);
+    const changed = await post(port, '/__replay/speed?value=60');
+    assert.equal(changed.status, 200);
+    assert.equal(JSON.parse(changed.body).speed, 60);
     await new Promise((resolve) => setTimeout(resolve, 150));
     const after = await get(port, `/window/${replayGameId}?startingTime=now`);
     const afterTimestamp = Date.parse(JSON.parse(after.body).frames.at(-1).rfc460Timestamp);

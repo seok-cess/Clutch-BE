@@ -83,18 +83,25 @@ class ReplayControllerTest {
 
     @Test
     void changesReplaySpeedWithoutRestartingRun() throws Exception {
-        given(replayControlService.changeSpeed(5.0)).willReturn(new com.clutch.replay.service.ReplayStatusResult(
+        given(replayControlService.changeSpeed(60.0)).willReturn(new com.clutch.replay.service.ReplayStatusResult(
                 "a8f31c",
                 List.of(new ReplayMatchResult("replay-a8f31c-m1", 321L, List.of("replay-a8f31c-g1"))),
                 1350,
                 8400,
                 16.1,
                 "2026-01-01T00:22:30Z",
-                5.0
+                60.0
         ));
 
-        mockMvc.perform(post("/api/replay/speed").param("value", "5"))
+        mockMvc.perform(post("/api/replay/speed").param("value", "60"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.speed").value(5.0));
+                .andExpect(jsonPath("$.speed").value(60.0));
+    }
+
+    @Test
+    void rejectsReplaySpeedOverSixty() throws Exception {
+        mockMvc.perform(post("/api/replay/speed").param("value", "61"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("배속은 1 이상 60 이하여야 한다"));
     }
 }

@@ -54,9 +54,11 @@ class ReplayControlServiceTest {
                 mock(EsportsMatchRepository.class)
         );
 
-        ReplayStatusResult result = service.changeSpeed(20);
+        ReplayStatusResult result = service.changeSpeed(60);
 
-        assertEquals(20.0, result.speed());
+        assertEquals(60.0, result.speed());
+        assertEquals(2, result.matches().size());
+        assertEquals("replay-run-m2", result.matches().get(1).matchId());
         var order = inOrder(pollingScheduler);
         order.verify(pollingScheduler).resetForExternalSourceChange();
         order.verify(pollingScheduler).pollMeta();
@@ -82,7 +84,7 @@ class ReplayControlServiceTest {
                                 + "\"gameIds\":[\"replay-run-g1\"]},{\"matchId\":\"replay-run-m2\","
                                 + "\"gameIds\":[\"replay-run-g2\"]}],\"elapsedSeconds\":600,"
                                 + "\"totalSeconds\":5340,\"progressPercent\":11.2,"
-                                + "\"fixtureTime\":\"2026-08-19T08:00:00Z\",\"speed\":20}")
+                                + "\"fixtureTime\":\"2026-08-19T08:00:00Z\",\"speed\":60}")
                         .build()))
                 .build();
     }

@@ -174,8 +174,8 @@ public class PollingScheduler {
     }
 
     /**
-     * replay는 시간축을 최대 20배까지 압축하므로, 상태 전환도 0.25초마다 읽어야 한다.
-     * 1초 주기면 20배속에서 한 번에 재생 시간 20초를 건너뛴다.
+     * replay는 시간축을 최대 60배까지 압축한다. 상태 전환은 0.25초마다 읽어,
+     * 60배속에서도 최대 재생 시간 15초 안에 반영한다.
      */
     @Scheduled(fixedDelay = 250)
     public void pollStubLiveMatches() {

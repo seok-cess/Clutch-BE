@@ -23,6 +23,9 @@ const fs = require('fs');
 const path = require('path');
 const { randomUUID } = require('crypto');
 
+const MIN_REPLAY_SPEED = 1;
+const MAX_REPLAY_SPEED = 60;
+
 function parseArgs(argv) {
   const args = { dir: null, port: 4000, speed: 1 };
   for (let i = 0; i < argv.length; i++) {
@@ -34,7 +37,8 @@ function parseArgs(argv) {
     else if (a === '--compress-frame-time') continue;
     else if (a === '--help' || a === '-h') { printUsage(); process.exit(0); }
   }
-  if (!args.dir || !Number.isFinite(args.port) || !Number.isFinite(args.speed) || args.speed <= 0) {
+  if (!args.dir || !Number.isFinite(args.port) || !Number.isFinite(args.speed)
+    || args.speed < MIN_REPLAY_SPEED || args.speed > MAX_REPLAY_SPEED) {
     printUsage();
     process.exit(1);
   }

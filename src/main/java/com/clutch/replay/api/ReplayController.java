@@ -56,8 +56,8 @@ public class ReplayController {
     /** 재생을 멈추지 않고 JSONL 타임라인의 배속을 변경한다. */
     @PostMapping("/speed")
     public ResponseEntity<?> changeSpeed(@RequestParam double value) {
-        if (value < 1 || value > 20) {
-            return ResponseEntity.badRequest().body(Map.of("error", "배속은 1 이상 20 이하여야 한다"));
+        if (value < 1 || value > ReplayControlService.MAX_REPLAY_SPEED) {
+            return ResponseEntity.badRequest().body(Map.of("error", "배속은 1 이상 60 이하여야 한다"));
         }
         try {
             return ResponseEntity.ok(replayControlService.changeSpeed(value));

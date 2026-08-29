@@ -19,6 +19,7 @@ import java.util.List;
 public class ReplayControlService {
 
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(5);
+    public static final double MAX_REPLAY_SPEED = 60;
 
     private final WebClient replayControlWebClient;
     private final PollingScheduler pollingScheduler;
@@ -85,8 +86,8 @@ public class ReplayControlService {
     }
 
     public ReplayStatusResult changeSpeed(double speed) {
-        if (speed < 1 || speed > 20) {
-            throw new ReplayControlException("배속은 1 이상 20 이하여야 한다");
+        if (speed < 1 || speed > MAX_REPLAY_SPEED) {
+            throw new ReplayControlException("배속은 1 이상 60 이하여야 한다");
         }
         try {
             ReplayServerStatusResponse response = replayControlWebClient.post()
