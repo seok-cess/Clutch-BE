@@ -2,6 +2,8 @@ package com.clutch.watch.repository;
 
 import com.clutch.watch.domain.WatchPointTransaction;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
@@ -18,6 +20,14 @@ public interface WatchPointTransactionRepository
             Long watchSessionId,
             long rewardSequence
     );
+
+    /** 특정 사용자가 한 번에 수령한 최대 시청 보상 포인트를 조회한다. */
+    @Query("""
+            select coalesce(max(pointTransaction.awardedPoint), 0)
+            from WatchPointTransaction pointTransaction
+            where pointTransaction.userId = :userId
+            """)
+    long findMaxAwardedPointByUserId(@Param("userId") Long userId);
 
     @Transactional
     void deleteAllByWatchSessionId(Long watchSessionId);

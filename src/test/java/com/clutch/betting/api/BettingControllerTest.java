@@ -157,6 +157,8 @@ class BettingControllerTest {
                 2,
                 "team-a",
                 "team-b",
+                "A",
+                "B",
                 "team-a",
                 1_000L,
                 3_000L,
@@ -173,6 +175,8 @@ class BettingControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].externalMatchId").value("match-1"))
                 .andExpect(jsonPath("$[0].setNumber").value(2))
+                .andExpect(jsonPath("$[0].firstTeamCode").value("A"))
+                .andExpect(jsonPath("$[0].secondTeamCode").value("B"))
                 .andExpect(jsonPath("$[0].selectedTeamId").value("team-a"))
                 .andExpect(jsonPath("$[0].settlementPoint").value(3_000))
                 .andExpect(jsonPath("$[0].netPointChange").value(2_000))

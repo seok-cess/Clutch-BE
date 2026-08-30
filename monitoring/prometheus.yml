@@ -1,0 +1,43 @@
+# Prometheus 공통 설정
+global:
+
+  # 서버 지표를 5초마다 수집
+  scrape_interval: 5s
+  scrape_timeout: 4s
+  evaluation_interval: 5s
+
+# 지표를 수집할 대상 목록
+scrape_configs:
+
+  # Prometheus 자체 상태 수집 설정
+  - job_name: prometheus
+    static_configs:
+      - targets:
+          - "localhost:9090"
+
+  # Spring Boot 서버 수집 설정
+  - job_name: clutch-api
+
+    # Spring Boot에서 Prometheus 지표를 제공하는 주소
+    metrics_path: /actuator/prometheus
+
+    # 고정된 서버 주소를 수집 대상으로 사용
+    static_configs:
+
+      # 수집할 서버 목록
+      - targets:
+
+          # 서버 컴퓨터의 Tailscale IP와 Spring Boot 포트
+          - "100.101.76.93:8080"
+
+  # MySQL Exporter 수집 설정
+  - job_name: clutch-mysql
+    static_configs:
+      - targets:
+          - "100.101.76.93:9104"
+
+  # Redis Exporter 수집 설정
+  - job_name: clutch-redis
+    static_configs:
+      - targets:
+          - "100.101.76.93:9121"

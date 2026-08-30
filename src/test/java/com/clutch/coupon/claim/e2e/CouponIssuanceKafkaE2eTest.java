@@ -9,6 +9,7 @@ import com.clutch.coupon.claim.outbox.CouponClaimOutboxStatus;
 import com.clutch.coupon.claim.repository.CouponClaimRequestRepository;
 import com.clutch.coupon.contract.kafka.CouponClaimAcceptedEvent;
 import com.clutch.coupon.contract.kafka.CouponKafkaTopics;
+import com.clutch.coupon.statistics.service.CouponIssueStatisticsService;
 import com.clutch.lolesports.service.PollingScheduler;
 import com.clutch.wallet.domain.UserCoupon;
 import com.clutch.wallet.domain.UserCouponStatus;
@@ -95,6 +96,9 @@ class CouponIssuanceKafkaE2eTest {
 
     @MockitoBean
     private PollingScheduler pollingScheduler;
+
+    @MockitoBean
+    private CouponIssueStatisticsService statisticsService;
 
     private Long claimId;
     private Long claimOutboxId;

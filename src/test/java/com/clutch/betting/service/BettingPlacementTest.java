@@ -47,6 +47,7 @@ class BettingPlacementTest {
             userBetRepository,
             transactionRepository,
             userRepository,
+            mock(com.clutch.lolesports.repository.MatchTeamRepository.class),
             liveStateReader,
             dataCacheService,
             setWinnerTracker,

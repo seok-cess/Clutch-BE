@@ -72,12 +72,19 @@ coupon:
   claim:
     kafka:
       accepted-group: ${COUPON_CLAIM_ACCEPTED_GROUP:coupon-wallet-issuer}
+      issue-result-group: ${COUPON_ISSUE_RESULT_GROUP:clutch-coupon-issue-result}
+      statistics-dlt-group: ${COUPON_STATISTICS_DLT_GROUP:clutch-coupon-issue-statistics-dlt}
+      rejected-topic: ${COUPON_CLAIM_REJECTED_TOPIC:coupon.claim.rejected}
+      rejected-group: ${COUPON_CLAIM_REJECTED_GROUP:clutch-coupon-claim-rejected}
   stock-recovery:
     interval-ms: ${COUPON_STOCK_RECOVERY_INTERVAL_MS:2000}
   success-count-sync:
     enabled: ${COUPON_SUCCESS_COUNT_SYNC_ENABLED:true}
     interval-ms: ${COUPON_SUCCESS_COUNT_SYNC_INTERVAL_MS:5000}
     lock-name: ${COUPON_SUCCESS_COUNT_SYNC_LOCK_NAME:clutch:coupon-success-count-synchronization}
+  integrity-check:
+    lock-name: ${COUPON_INTEGRITY_CHECK_LOCK_NAME:clutch:coupon-integrity-check}
+    recovery-grace: ${COUPON_INTEGRITY_CHECK_RECOVERY_GRACE:5m}
   test:
     event:
       expiration-interval-ms: ${COUPON_TEST_EVENT_EXPIRATION_INTERVAL_MS:1000}

@@ -55,10 +55,13 @@ public interface SeasonStatsRepository extends JpaRepository<GamePlayerStat, Lon
             LEFT JOIN match_team mt   ON mt.match_team_id = ps.match_team_id
             WHERE g.finalized_at IS NOT NULL
               AND m.season_key = :seasonKey
+              AND m.league_external_id = :leagueId
               AND ps.summoner_name IS NOT NULL
             GROUP BY ps.summoner_name, mt.team_code
             """, nativeQuery = true)
-    List<PlayerTotals> playerTotals(@Param("seasonKey") String seasonKey);
+    List<PlayerTotals> playerTotals(
+            @Param("seasonKey") String seasonKey,
+            @Param("leagueId") String leagueId);
 
     @Query(value = """
             SELECT ps.champion_id AS championId,
@@ -136,7 +139,18 @@ public interface SeasonStatsRepository extends JpaRepository<GamePlayerStat, Lon
             """, nativeQuery = true)
     long finalizedGameCount(@Param("seasonKey") String seasonKey);
 
-    /** 시즌 미지정 시 사용할 기본값. 적재된 시즌이 없으면 null */
-    @Query(value = "SELECT MAX(m.season_key) FROM esports_match m", nativeQuery = true)
+    /**
+     * 시즌 미지정 시 사용할 기본값. 적재된 시즌이 없으면 null.
+     *
+     * season_key 는 VARCHAR 라 MAX() 가 사전순으로 비교된다. 연도 형식이 아닌 값이
+     * 한 건이라도 섞이면 그게 최댓값이 되어(예: 't' > '2' 라 'test' 가 '2026' 을 이긴다)
+     * 실제 시즌 대신 그 값이 선택된다. V15 의 쿠폰 테스트용 경기가 그런 행이었다.
+     * 그래서 연도 4자리인 값만 후보로 둔다.
+     */
+    @Query(value = """
+            SELECT MAX(m.season_key)
+            FROM esports_match m
+            WHERE m.season_key REGEXP '^[0-9]{4}$'
+            """, nativeQuery = true)
     String latestSeasonKey();
 }

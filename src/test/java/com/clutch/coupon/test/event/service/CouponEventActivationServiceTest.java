@@ -1,11 +1,15 @@
 package com.clutch.coupon.test.event.service;
 
+import com.clutch.coupon.claim.outbox.CouponBenefitSnapshot;
+import com.clutch.coupon.claim.outbox.CouponBenefitSnapshotRepository;
 import com.clutch.coupon.claim.redis.CouponStockInitializer;
 import com.clutch.coupon.claim.recovery.CouponStockRecoveryStateManager;
 import com.clutch.coupon.event.domain.CouponEventItem;
 import com.clutch.coupon.event.domain.CouponEventOccurrenceStatus;
+import com.clutch.coupon.event.domain.CouponEventPhase;
 import com.clutch.coupon.event.domain.CouponEventStatus;
 import com.clutch.coupon.event.repository.CouponEventItemRepository;
+import com.clutch.coupon.event.repository.CouponEventPhaseRepository;
 import com.clutch.coupon.test.event.api.dto.CouponEventActivationResponse;
 import com.clutch.coupon.test.event.domain.CouponEvent;
 import com.clutch.coupon.test.event.domain.CouponEventOccurrence;
@@ -22,6 +26,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -59,6 +64,12 @@ class CouponEventActivationServiceTest {
     private CouponEventOccurrenceRepository occurrenceRepository;
 
     @Mock
+    private CouponEventPhaseRepository couponEventPhaseRepository;
+
+    @Mock
+    private CouponBenefitSnapshotRepository benefitSnapshotRepository;
+
+    @Mock
     private CouponStockInitializer couponStockInitializer;
 
     @Mock
@@ -71,6 +82,8 @@ class CouponEventActivationServiceTest {
         activationService = new CouponEventActivationService(
                 couponEventRepository,
                 couponEventItemRepository,
+                couponEventPhaseRepository,
+                benefitSnapshotRepository,
                 occurrenceRepository,
                 couponStockInitializer,
                 recoveryStateManager,
@@ -247,6 +260,75 @@ class CouponEventActivationServiceTest {
     }
 
     @Test
+    void 단계별_이벤트는_단계마다_남은_수량과_전체_수량을_함께_내려준다() {
+        CouponEvent event = event(1L, CouponEventStatus.OPEN);
+        CouponEventItem first = item(11L, 150, 108);
+        CouponEventItem second = item(12L, 88, 0);
+        CouponEventOccurrence occurrence = withId(
+                CouponEventOccurrence.manualOpen(
+                        1L,
+                        NOW_UTC.minusSeconds(10),
+                        60
+                ),
+                20L
+        );
+        when(occurrenceRepository
+                .findFirstByOccurrenceStatusAndClosedAtIsNullAndOpenedAtLessThanEqualAndExpiresAtAfterOrderByOpenedAtDescIdDesc(
+                        CouponEventOccurrenceStatus.OPEN,
+                        NOW_UTC,
+                        NOW_UTC
+                )).thenReturn(Optional.of(occurrence));
+        when(couponEventRepository.findById(1L))
+                .thenReturn(Optional.of(event));
+        when(couponEventItemRepository.findAllByCouponEventId(1L))
+                .thenReturn(List.of(first, second));
+        when(couponEventPhaseRepository
+                .findAllByCouponEventIdOrderByOpenOffsetSecondsAsc(1L))
+                .thenReturn(List.of(
+                        CouponEventPhase.create(1L, 11L, 1, 0),
+                        CouponEventPhase.create(1L, 12L, 2, 10)
+                ));
+        when(benefitSnapshotRepository.findByCouponEventItemId(11L))
+                .thenReturn(Optional.of(new CouponBenefitSnapshot(
+                        "RATE",
+                        BigDecimal.valueOf(20)
+                )));
+        when(benefitSnapshotRepository.findByCouponEventItemId(12L))
+                .thenReturn(Optional.of(new CouponBenefitSnapshot(
+                        "RATE",
+                        BigDecimal.valueOf(10)
+                )));
+
+        Optional<CouponEventActivationResponse> response = activationService
+                .findActive();
+
+        assertThat(response).isPresent().get()
+                .extracting(CouponEventActivationResponse::phases)
+                .asInstanceOf(
+                        org.assertj.core.api.InstanceOfAssertFactories.list(
+                                CouponEventActivationResponse.Phase.class
+                        )
+                )
+                .satisfiesExactly(
+                        phase -> {
+                            assertThat(phase.couponEventItemId())
+                                    .isEqualTo(11L);
+                            assertThat(phase.openOffsetSeconds()).isZero();
+                            assertThat(phase.remainingStock()).isEqualTo(42L);
+                            assertThat(phase.totalStock()).isEqualTo(150L);
+                        },
+                        phase -> {
+                            assertThat(phase.couponEventItemId())
+                                    .isEqualTo(12L);
+                            assertThat(phase.openOffsetSeconds())
+                                    .isEqualTo(10);
+                            assertThat(phase.remainingStock()).isEqualTo(88L);
+                            assertThat(phase.totalStock()).isEqualTo(88L);
+                        }
+                );
+    }
+
+    @Test
     void 트리거로_대기_이벤트를_열고_회차_기준으로_재고를_초기화한다() {
         CouponEvent event = event(1L, CouponEventStatus.READY);
         CouponEventItem item = CouponEventItem.create(1L, 10L, 100);
@@ -343,6 +425,13 @@ class CouponEventActivationServiceTest {
         ReflectionTestUtils.setField(event, "eventStatus", status);
         ReflectionTestUtils.setField(event, "claimWindowSeconds", 60);
         return event;
+    }
+
+    private CouponEventItem item(Long id, int quantity, int successCount) {
+        CouponEventItem item = CouponEventItem.create(1L, 10L, quantity);
+        ReflectionTestUtils.setField(item, "id", id);
+        item.synchronizeSuccessCount(successCount);
+        return item;
     }
 
     private CouponEventOccurrence withId(
