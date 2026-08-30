@@ -1,14 +1,12 @@
 ﻿[CmdletBinding()]
 param(
     [string]$BaseUrl = "http://100.101.76.93:8080",
+    [string]$HealthCheckBaseUrl = "",
     [string]$PrometheusUrl = "http://100.105.168.7:9090/api/v1/write",
     [int]$TotalVus = 20000,
     [int]$CouponQuantity = 10000,
     [ValidateRange(1, 3600)]
     [int]$RampUpSeconds = 60,
-    [ValidateRange(1, 1000000)]
-    [int]$PreAllocatedVus = 5000,
-    [int]$MaxVus = 0,
     [long]$UserIdStart = 900001,
     [int]$MatchId = 316,
     [int]$ClaimWindowSeconds = 900,
@@ -19,6 +17,10 @@ param(
 
 $ErrorActionPreference = "Stop"
 $BaseUrl = $BaseUrl.TrimEnd("/")
+if ([string]::IsNullOrWhiteSpace($HealthCheckBaseUrl)) {
+    $HealthCheckBaseUrl = $BaseUrl
+}
+$HealthCheckBaseUrl = $HealthCheckBaseUrl.TrimEnd("/")
 
 if ($TotalVus -le 0 -or $CouponQuantity -le 0 -or $CouponQuantity -ge $TotalVus) {
     throw "TotalVus와 CouponQuantity 설정을 확인하세요. CouponQuantity는 TotalVus보다 작아야 합니다."
@@ -29,13 +31,6 @@ if ($UserIdStart -le 0 -or $MatchId -le 0 -or $ClaimWindowSeconds -le 0) {
 if ($FinalVerificationTimeoutSeconds -le 0) {
     throw "FinalVerificationTimeoutSeconds는 1 이상이어야 합니다."
 }
-if ($MaxVus -eq 0) {
-    $MaxVus = $TotalVus
-}
-if ($MaxVus -lt $PreAllocatedVus) {
-    throw "MaxVus는 PreAllocatedVus 이상이어야 합니다."
-}
-
 if ([string]::IsNullOrWhiteSpace($TestId)) {
     $TestId = "$(Get-Date -Format 'yyyyMMdd-HHmmss')-coupon-${TotalVus}vus-ramp${RampUpSeconds}s"
 }
@@ -67,8 +62,6 @@ $dockerArgs = @(
     "-e", "MATCH_ID=$MatchId",
     "-e", "CLAIM_WINDOW_SECONDS=$ClaimWindowSeconds",
     "-e", "RAMP_UP_SECONDS=$RampUpSeconds",
-    "-e", "PRE_ALLOCATED_VUS=$PreAllocatedVus",
-    "-e", "MAX_VUS=$MaxVus",
     "-e", "CLAIM_REQUEST_TIMEOUT=1m",
     "-e", "VERIFY_INDIVIDUAL_PERSISTENCE=false",
     "-e", "FINAL_VERIFICATION_TIMEOUT_SECONDS=$FinalVerificationTimeoutSeconds",
@@ -96,11 +89,11 @@ function Write-RunLog {
 
 try {
     Write-RunLog "TEST_START timestamp=$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss K')"
-    Write-RunLog "백엔드 연결을 확인합니다: $BaseUrl"
-    Invoke-RestMethod -Method Get -Uri "$BaseUrl/actuator/health" | Out-Null
+    Write-RunLog "백엔드 연결을 확인합니다: $HealthCheckBaseUrl"
+    Invoke-RestMethod -Method Get -Uri "$HealthCheckBaseUrl/actuator/health" | Out-Null
 
     Write-RunLog "단일 노트북 쿠폰 부하 테스트를 시작합니다."
-    Write-RunLog "TEST_CONFIG testId=$TestId users=$TotalVus stock=$CouponQuantity rampUp=${RampUpSeconds}s preAllocatedVUs=$PreAllocatedVus maxVUs=$MaxVus"
+    Write-RunLog "TEST_CONFIG testId=$TestId users=$TotalVus stock=$CouponQuantity rampUp=${RampUpSeconds}s uniqueUsers=true baseUrl=$BaseUrl healthCheckBaseUrl=$HealthCheckBaseUrl"
     Write-RunLog "로그 파일: $logFile"
 
     Push-Location $repoRoot
