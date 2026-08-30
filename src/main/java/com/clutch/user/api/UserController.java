@@ -1,6 +1,7 @@
 package com.clutch.user.api;
 
 import com.clutch.user.dto.response.PointRankingResponse;
+import com.clutch.user.dto.response.MyPointRankingResponse;
 import com.clutch.user.dto.response.UserPointResponse;
 import com.clutch.user.dto.response.UserPointSummaryResponse;
 import com.clutch.user.service.UserService;
@@ -42,6 +43,16 @@ public class UserController {
     ) {
         return ResponseEntity.ok(UserPointSummaryResponse.from(
                 userService.getPointSummary(userId)
+        ));
+    }
+
+    /** 현재 사용자의 보유 포인트와 전체 순위를 조회한다. */
+    @GetMapping("/me/point-ranking")
+    public ResponseEntity<MyPointRankingResponse> getMyPointRanking(
+            @CurrentUserId Long userId
+    ) {
+        return ResponseEntity.ok(MyPointRankingResponse.from(
+                userService.getMyPointRanking(userId)
         ));
     }
 

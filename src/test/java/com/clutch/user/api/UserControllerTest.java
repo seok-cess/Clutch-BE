@@ -2,6 +2,7 @@ package com.clutch.user.api;
 
 import com.clutch.user.exception.UserNotFoundException;
 import com.clutch.user.dto.PointRanking;
+import com.clutch.user.dto.MyPointRanking;
 import com.clutch.user.dto.UserPointSummary;
 import com.clutch.user.service.UserService;
 import org.junit.jupiter.api.Test;
@@ -70,6 +71,17 @@ class UserControllerTest {
                 .andExpect(jsonPath("$.predictionCount").value(26))
                 .andExpect(jsonPath("$.predictionSuccessCount").value(15))
                 .andExpect(jsonPath("$.maxEarnedPoint").value(3600));
+    }
+
+    @Test
+    void getsCurrentUserPointRanking() throws Exception {
+        given(userService.getMyPointRanking(10L)).willReturn(new MyPointRanking(12_450L, 24L));
+
+        mockMvc.perform(get("/api/users/me/point-ranking")
+                .header("X-User-Id", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.point").value(12450))
+                .andExpect(jsonPath("$.rank").value(24));
     }
 
     @Test

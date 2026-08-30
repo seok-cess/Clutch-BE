@@ -12,6 +12,8 @@ import com.clutch.betting.live.BettingLiveStateReader;
 import com.clutch.betting.repository.BetPointTransactionRepository;
 import com.clutch.betting.repository.BettingEventRepository;
 import com.clutch.betting.repository.UserBetRepository;
+import com.clutch.lolesports.entity.MatchTeam;
+import com.clutch.lolesports.repository.MatchTeamRepository;
 import com.clutch.lolesports.service.DataCacheService;
 import com.clutch.lolesports.service.PollingScheduler;
 import com.clutch.lolesports.service.SetWinnerTracker;
@@ -39,6 +41,7 @@ class BettingQueryTest {
     private final BetPointTransactionRepository transactionRepository =
             mock(BetPointTransactionRepository.class);
     private final UserRepository userRepository = mock(UserRepository.class);
+    private final MatchTeamRepository matchTeamRepository = mock(MatchTeamRepository.class);
     private final BettingLiveStateReader liveStateReader = mock(BettingLiveStateReader.class);
     private final DataCacheService dataCacheService = mock(DataCacheService.class);
     private final SetWinnerTracker setWinnerTracker = mock(SetWinnerTracker.class);
@@ -48,6 +51,7 @@ class BettingQueryTest {
             userBetRepository,
             transactionRepository,
             userRepository,
+            matchTeamRepository,
             liveStateReader,
             dataCacheService,
             setWinnerTracker,
@@ -159,6 +163,10 @@ class BettingQueryTest {
         given(eventRepository.findAllById(List.of(2L))).willReturn(List.of(event));
         given(userBetRepository.findAllByBettingEventIdIn(anyCollection())).willReturn(List.of(userBet));
         given(transactionRepository.findAllByUserBetIdIn(List.of(20L))).willReturn(List.of());
+        given(matchTeamRepository.findByExternalTeamIdIn(anyCollection())).willReturn(List.of(
+                new MatchTeam(1L, "team-a", 1, "A", "A Team", null, null, null, null, null),
+                new MatchTeam(1L, "team-b", 2, "B", "B Team", null, null, null, null, null)
+        ));
 
         List<MyBetView> views = service.getMyBets(10L);
 
@@ -166,6 +174,8 @@ class BettingQueryTest {
             assertThat(view.externalMatchId()).isEqualTo("match-1");
             assertThat(view.externalGameId()).isEqualTo("game-2");
             assertThat(view.setNumber()).isEqualTo(2);
+            assertThat(view.firstTeamCode()).isEqualTo("A");
+            assertThat(view.secondTeamCode()).isEqualTo("B");
             assertThat(view.selectedTeamId()).isEqualTo("team-a");
             assertThat(view.amount()).isEqualTo(2_000L);
             assertThat(view.settlementPoint()).isNull();

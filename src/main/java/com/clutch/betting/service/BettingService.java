@@ -19,6 +19,8 @@ import com.clutch.betting.repository.BettingEventRepository;
 import com.clutch.betting.repository.UserBetRepository;
 import com.clutch.lolesports.dto.external.EventDetailsResponse;
 import com.clutch.lolesports.dto.external.ScheduleResponse;
+import com.clutch.lolesports.entity.MatchTeam;
+import com.clutch.lolesports.repository.MatchTeamRepository;
 import com.clutch.lolesports.service.DataCacheService;
 import com.clutch.lolesports.service.PollingScheduler;
 import com.clutch.lolesports.service.SetWinnerTracker;
@@ -34,6 +36,7 @@ import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -58,6 +61,7 @@ public class BettingService {
     private final UserBetRepository userBetRepository;
     private final BetPointTransactionRepository transactionRepository;
     private final UserRepository userRepository;
+    private final MatchTeamRepository matchTeamRepository;
     private final BettingLiveStateReader liveStateReader;
     private final DataCacheService dataCacheService;
     private final SetWinnerTracker setWinnerTracker;
@@ -317,14 +321,21 @@ public class BettingService {
 
     // 조회 유스케이스 보조 로직
 
-    /** 내 배팅·이벤트·원장을 한 번씩만 조회한 뒤 이력 조회 모델로 조합한다. */
+    /** 내 배팅·이벤트·원장·팀 스냅샷을 한 번씩만 조회한 뒤 이력 조회 모델로 조합한다. */
     private List<MyBetView> loadMyBetViews(List<UserBet> userBets) {
         Map<Long, BettingEvent> eventsById = loadEventsById(userBets);
         Map<Long, List<UserBet>> eventBetsByEventId = eventBetsByEventId(eventsById.keySet());
         Map<Long, BetPointTransaction> settlementTransactionsByBetId = settlementTransactionsByBetId(
                 userBets
         );
-        return toMyBetViews(userBets, eventsById, eventBetsByEventId, settlementTransactionsByBetId);
+        Map<String, String> teamCodesByExternalId = teamCodesByExternalId(eventsById.values());
+        return toMyBetViews(
+                userBets,
+                eventsById,
+                eventBetsByEventId,
+                settlementTransactionsByBetId,
+                teamCodesByExternalId
+        );
     }
 
     /** 배팅이 열려 있는 매치만 캐시에서 골라 후보 카드 조회 모델로 변환한다. */
@@ -355,16 +366,39 @@ public class BettingService {
             List<UserBet> userBets,
             Map<Long, BettingEvent> eventsById,
             Map<Long, List<UserBet>> eventBetsByEventId,
-            Map<Long, BetPointTransaction> settlementTransactionsByBetId
+            Map<Long, BetPointTransaction> settlementTransactionsByBetId,
+            Map<String, String> teamCodesByExternalId
     ) {
         return userBets.stream()
                 .map(userBet -> toMyBetView(
                         userBet,
                         eventOf(userBet, eventsById),
                         eventBetsByEventId.getOrDefault(userBet.getBettingEventId(), List.of()),
-                        settlementTransactionsByBetId.get(userBet.getId())
+                        settlementTransactionsByBetId.get(userBet.getId()),
+                        teamCodesByExternalId
                 ))
                 .toList();
+    }
+
+    /** 배팅 이력의 팀 ID를 화면용 팀 코드로 한 번에 변환한다. */
+    private Map<String, String> teamCodesByExternalId(Collection<BettingEvent> events) {
+        Set<String> externalTeamIds = events.stream()
+                .flatMap(event -> java.util.stream.Stream.of(
+                        event.getFirstExternalTeamId(),
+                        event.getSecondExternalTeamId()
+                ))
+                .filter(teamId -> teamId != null && !teamId.isBlank())
+                .collect(Collectors.toSet());
+        if (externalTeamIds.isEmpty()) {
+            return Map.of();
+        }
+        return matchTeamRepository.findByExternalTeamIdIn(externalTeamIds).stream()
+                .filter(team -> team.getTeamCode() != null && !team.getTeamCode().isBlank())
+                .collect(Collectors.toMap(
+                        MatchTeam::getExternalTeamId,
+                        MatchTeam::getTeamCode,
+                        (first, ignored) -> first
+                ));
     }
 
     /** 이벤트별 전체 배팅을 묶어 진행 중 배팅의 예상 풀 배당 계산에 사용한다. */
@@ -396,12 +430,17 @@ public class BettingService {
             UserBet userBet,
             BettingEvent event,
             List<UserBet> eventBets,
-            BetPointTransaction settlementTransaction
+            BetPointTransaction settlementTransaction,
+            Map<String, String> teamCodesByExternalId
     ) {
+        String firstTeamCode = teamCodesByExternalId.get(event.getFirstExternalTeamId());
+        String secondTeamCode = teamCodesByExternalId.get(event.getSecondExternalTeamId());
         if (userBet.getStatus() == UserBetStatus.PLACED) {
             return MyBetView.from(
                     userBet,
                     event,
+                    firstTeamCode,
+                    secondTeamCode,
                     null,
                     null,
                     expectedPayoutMultiplier(userBet, eventBets),
@@ -412,6 +451,8 @@ public class BettingService {
             return MyBetView.from(
                     userBet,
                     event,
+                    firstTeamCode,
+                    secondTeamCode,
                     0L,
                     -userBet.getAmount(),
                     BigDecimal.ZERO,
@@ -419,13 +460,24 @@ public class BettingService {
             );
         }
         if (settlementTransaction == null) {
-            return MyBetView.from(userBet, event, null, null, null, false);
+            return MyBetView.from(
+                    userBet,
+                    event,
+                    firstTeamCode,
+                    secondTeamCode,
+                    null,
+                    null,
+                    null,
+                    false
+            );
         }
 
         long settlementPoint = settlementTransaction.getPointDelta();
         return MyBetView.from(
                 userBet,
                 event,
+                firstTeamCode,
+                secondTeamCode,
                 settlementPoint,
                 Math.subtractExact(settlementPoint, userBet.getAmount()),
                 userBet.getStatus() == UserBetStatus.WON

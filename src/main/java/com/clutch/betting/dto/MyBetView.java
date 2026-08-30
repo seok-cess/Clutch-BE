@@ -18,6 +18,8 @@ import java.time.LocalDateTime;
  * @param setNumber 매치 내 세트 번호
  * @param firstTeamId 첫 번째 배팅 선택 팀 ID
  * @param secondTeamId 두 번째 배팅 선택 팀 ID
+ * @param firstTeamCode 첫 번째 배팅 선택 팀 표시 코드
+ * @param secondTeamCode 두 번째 배팅 선택 팀 표시 코드
  * @param selectedTeamId 사용자가 선택한 팀 ID
  * @param amount 배팅 포인트
  * @param settlementPoint 실제 지급 또는 환불 포인트. 정산 전이면 null
@@ -36,6 +38,8 @@ public record MyBetView(
         int setNumber,
         String firstTeamId,
         String secondTeamId,
+        String firstTeamCode,
+        String secondTeamCode,
         String selectedTeamId,
         long amount,
         Long settlementPoint,
@@ -51,6 +55,8 @@ public record MyBetView(
     public static MyBetView from(
             UserBet userBet,
             BettingEvent event,
+            String firstTeamCode,
+            String secondTeamCode,
             Long settlementPoint,
             Long netPointChange,
             BigDecimal payoutMultiplier,
@@ -64,6 +70,8 @@ public record MyBetView(
                 event.getSetNumber(),
                 event.getFirstExternalTeamId(),
                 event.getSecondExternalTeamId(),
+                firstTeamCode,
+                secondTeamCode,
                 userBet.getSelectedExternalTeamId(),
                 userBet.getAmount(),
                 settlementPoint,

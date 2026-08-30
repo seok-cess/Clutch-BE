@@ -7,6 +7,7 @@ import com.clutch.betting.repository.UserBetRepository;
 import com.clutch.common.privacy.PersonalDataMasker;
 import com.clutch.user.domain.User;
 import com.clutch.user.domain.UserRole;
+import com.clutch.user.dto.MyPointRanking;
 import com.clutch.user.dto.PointRanking;
 import com.clutch.user.dto.UserPointSummary;
 import com.clutch.user.exception.UserNotFoundException;
@@ -74,6 +75,20 @@ public class UserService {
                 predictionSuccessCount,
                 Math.max(maxBetPayout, maxWatchAward)
         );
+    }
+
+    /**
+     * 현재 사용자의 전체 보유 포인트 순위를 조회한다.
+     * 동점자는 같은 순위를 가지며, 나보다 포인트가 높은 일반 사용자 수에 1을 더해 계산한다.
+     *
+     * @param userId 사용자 ID
+     * @return 현재 보유 포인트와 전체 사용자 중 순위
+     */
+    @Transactional(readOnly = true)
+    public MyPointRanking getMyPointRanking(Long userId) {
+        long point = getPoint(userId);
+        long rank = userRepository.countByRoleAndPointGreaterThan(UserRole.USER, point) + 1L;
+        return new MyPointRanking(point, rank);
     }
 
     /**
