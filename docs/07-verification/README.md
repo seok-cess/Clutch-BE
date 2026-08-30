@@ -91,6 +91,10 @@ Flyway 스키마는 사용자 쿠폰의 `EXPIRED` 상태와 발급 요청의 `CA
 PASS/WARN/FAIL 요약, fingerprint와 후속 조치를 남긴다. 개인정보와 접속 비밀번호는
 기록하지 않는다.
 
+쿠폰 20,000 VU 부하 테스트의 실행 조건, 측정 결과와 Docker 실행기 문제 해결 결과는
+[`2026-08-30-coupon-20000-vu-load-test.md`](results/2026-08-30-coupon-20000-vu-load-test.md)에
+기록한다.
+
 ## 주의사항
 
 - 이 SQL에는 `UPDATE`, `DELETE`, `INSERT`와 DDL이 없다.
