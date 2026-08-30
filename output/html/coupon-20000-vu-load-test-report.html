@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>쿠폰 20,000 VU 부하 테스트 결과 보고서</title>
+  <style>
+    :root {
+      --navy: #12213a;
+      --blue: #2563eb;
+      --cyan: #06b6d4;
+      --green: #16a36a;
+      --red: #dc4c64;
+      --amber: #d89118;
+      --ink: #172033;
+      --muted: #667085;
+      --line: #dce3ee;
+      --pale: #f5f8fc;
+      --pale-blue: #eaf1ff;
+      --pale-green: #eaf8f2;
+    }
+    * { box-sizing: border-box; }
+    html { background: #e9eef5; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+      line-height: 1.62;
+      font-size: 14px;
+    }
+    .report { max-width: 1080px; margin: 34px auto; background: white; box-shadow: 0 18px 50px rgba(18,33,58,.14); }
+    .hero {
+      min-height: 610px;
+      padding: 58px 64px 52px;
+      color: white;
+      background:
+        radial-gradient(circle at 84% 20%, rgba(6,182,212,.35), transparent 28%),
+        linear-gradient(135deg, #0d1830 0%, #18335d 65%, #155e75 130%);
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::after {
+      content: "";
+      position: absolute;
+      width: 330px;
+      height: 330px;
+      right: -110px;
+      bottom: -160px;
+      border: 1px solid rgba(255,255,255,.22);
+      border-radius: 50%;
+      box-shadow: 0 0 0 60px rgba(255,255,255,.04), 0 0 0 120px rgba(255,255,255,.03);
+    }
+    .eyebrow { font-size: 12px; letter-spacing: .18em; font-weight: 700; color: #8de7f6; }
+    h1 { margin: 68px 0 18px; font-size: 42px; line-height: 1.2; letter-spacing: -.04em; max-width: 760px; }
+    .subtitle { margin: 0; font-size: 18px; color: #d8e6fa; }
+    .status-row { display: flex; align-items: center; gap: 18px; margin-top: 50px; }
+    .pass {
+      display: inline-flex;
+      align-items: center;
+      padding: 9px 18px;
+      border-radius: 999px;
+      background: #1bbf83;
+      color: white;
+      font-size: 15px;
+      font-weight: 800;
+      letter-spacing: .08em;
+    }
+    .hero-note { color: #c5d3e7; font-size: 13px; }
+    .hero-meta { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 46px; max-width: 800px; }
+    .hero-meta div { border-top: 1px solid rgba(255,255,255,.2); padding-top: 12px; }
+    .hero-meta span { display: block; color: #9fb1ca; font-size: 11px; margin-bottom: 5px; }
+    .hero-meta strong { font-size: 14px; }
+    main { padding: 52px 64px 68px; }
+    section { margin: 0 0 50px; }
+    h2 { color: var(--navy); font-size: 24px; line-height: 1.25; letter-spacing: -.03em; margin: 0 0 20px; }
+    h2 .num { color: var(--blue); font-size: 14px; margin-right: 9px; letter-spacing: .06em; }
+    h3 { color: var(--navy); font-size: 17px; margin: 28px 0 12px; }
+    p { margin: 0 0 13px; }
+    .lead { font-size: 16px; color: #344054; max-width: 850px; }
+    .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 26px 0 8px; }
+    .card { border: 1px solid var(--line); border-radius: 12px; padding: 18px; background: white; }
+    .card span { display: block; color: var(--muted); font-size: 12px; margin-bottom: 7px; }
+    .card strong { display: block; font-size: 25px; line-height: 1.15; color: var(--navy); }
+    .card em { display: block; margin-top: 7px; font-size: 11px; color: var(--green); font-style: normal; font-weight: 700; }
+    table { width: 100%; border-collapse: collapse; margin: 18px 0 8px; font-size: 13px; }
+    th { background: var(--navy); color: white; text-align: left; padding: 11px 12px; }
+    th:not(:first-child), td:not(:first-child) { text-align: right; }
+    td { padding: 10px 12px; border-bottom: 1px solid var(--line); }
+    tbody tr:nth-child(even) { background: var(--pale); }
+    .ok { color: var(--green); font-weight: 800; }
+    .bad { color: var(--red); font-weight: 800; }
+    .callout { margin: 20px 0; padding: 18px 20px; border-left: 4px solid var(--blue); background: var(--pale-blue); border-radius: 0 10px 10px 0; }
+    .callout.warning { border-left-color: var(--amber); background: #fff7e8; }
+    .callout.success { border-left-color: var(--green); background: var(--pale-green); }
+    .flow { display: grid; gap: 10px; margin: 18px 0; }
+    .flow-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .flow-box { padding: 10px 13px; border: 1px solid var(--line); border-radius: 8px; background: white; font-weight: 700; color: var(--navy); }
+    .arrow { color: var(--blue); font-weight: 900; }
+    .bars { margin: 22px 0; }
+    .bar-row { display: grid; grid-template-columns: 140px 1fr 90px; align-items: center; gap: 12px; margin: 12px 0; }
+    .bar-track { height: 16px; background: #e8edf4; border-radius: 999px; overflow: hidden; }
+    .bar { height: 100%; border-radius: inherit; }
+    .bar.docker { width: 100%; background: var(--red); }
+    .bar.native { width: 51.7%; background: var(--green); }
+    pre { margin: 16px 0; background: #0d1729; color: #e4edf9; border-radius: 10px; padding: 18px; overflow: auto; font: 12px/1.6 Consolas, monospace; }
+    ul, ol { margin: 8px 0 14px 22px; padding: 0; }
+    li { margin: 6px 0; }
+    .conclusion { padding: 28px; border-radius: 14px; color: white; background: linear-gradient(135deg, var(--navy), #174f67); }
+    .conclusion h2 { color: white; margin-bottom: 12px; }
+    .conclusion strong { color: #8de7f6; }
+    .source { color: var(--muted); font-size: 12px; }
+    a { color: var(--blue); }
+    footer { padding: 22px 64px; color: #778399; background: var(--pale); border-top: 1px solid var(--line); font-size: 11px; display: flex; justify-content: space-between; }
+    @page { size: A4; margin: 13mm; }
+    @media print {
+      html, body { background: white; }
+      .report { margin: 0; max-width: none; box-shadow: none; }
+      .hero { min-height: 255mm; page-break-after: always; }
+      main { padding: 12mm 10mm; }
+      section { break-inside: avoid-page; }
+      .cards, table, .callout, .flow, .bars, .conclusion { break-inside: avoid; }
+      footer { display: none; }
+    }
+    @media (max-width: 760px) {
+      .report { margin: 0; }
+      .hero, main { padding-left: 24px; padding-right: 24px; }
+      h1 { font-size: 34px; }
+      .hero-meta, .cards { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+<article class="report">
+  <header class="hero">
+    <div class="eyebrow">CLUTCH PERFORMANCE VALIDATION</div>
+    <h1>쿠폰 20,000 VU<br>부하 테스트 결과 보고서</h1>
+    <p class="subtitle">재고 10,000장 선착순 발급 시나리오</p>
+    <div class="status-row"><span class="pass">PASS</span><span class="hero-note">모든 k6 Threshold 통과</span></div>
+    <div class="hero-meta">
+      <div><span>TEST DATE</span><strong>2026-08-30</strong></div>
+      <div><span>LOAD MODEL</span><strong>20,000 VU / Ramp-up 60s</strong></div>
+      <div><span>LOAD GENERATOR</span><strong>Windows Native k6 v2.2.0</strong></div>
+    </div>
+  </header>
+
+  <main>
+    <section>
+      <h2><span class="num">01</span>Executive summary</h2>
+      <p class="lead">중복 없는 가상 사용자 20,000명이 재고 10,000장의 동일 쿠폰 회차에 한 번씩 신청하는 조건을 재현했다. Windows 네이티브 k6로 실행한 결과 성공 10,000건과 정상 품절 10,000건으로 모든 신청이 종료됐으며 전송 실패와 비정상 응답은 없었다.</p>
+      <div class="cards">
+        <div class="card"><span>최대 활성 VU</span><strong>20,000</strong><em>목표 도달</em></div>
+        <div class="card"><span>발급 성공</span><strong>10,000</strong><em>재고 일치</em></div>
+        <div class="card"><span>정상 품절</span><strong>10,000</strong><em>누락 없음</em></div>
+        <div class="card"><span>Claim p95</span><strong>951ms</strong><em>기준 5초 미만</em></div>
+      </div>
+      <div class="callout success"><strong>최종 판정 PASS.</strong> 신청 20,000건, 성공 10,000건, 품절 10,000건, 전송 실패 0건, 예상하지 못한 응답 0건을 모두 충족했다.</div>
+    </section>
+
+    <section>
+      <h2><span class="num">02</span>Test scope and configuration</h2>
+      <table>
+        <thead><tr><th>항목</th><th>설정</th></tr></thead>
+        <tbody>
+          <tr><td>재고</td><td>10,000장</td></tr>
+          <tr><td>가상 사용자</td><td>중복 없는 20,000명</td></tr>
+          <tr><td>Ramp-up</td><td>60초</td></tr>
+          <tr><td>사용자별 신청</td><td>정확히 1회</td></tr>
+          <tr><td>사용자 ID</td><td>900001부터 순차 할당</td></tr>
+          <tr><td>연결 재사용</td><td>사용 안 함</td></tr>
+          <tr><td>최종 검증</td><td>관리자 API issuedQuantity = 10,000</td></tr>
+        </tbody>
+      </table>
+      <h3>실행 흐름</h3>
+      <div class="flow">
+        <div class="flow-row"><span class="flow-box">이벤트 생성</span><span class="arrow">→</span><span class="flow-box">READY 검증</span><span class="arrow">→</span><span class="flow-box">수동 OPEN</span></div>
+        <div class="flow-row"><span class="flow-box">VU 0 → 20,000</span><span class="arrow">→</span><span class="flow-box">사용자별 신청 1회</span><span class="arrow">→</span><span class="flow-box">최종 수량 검증</span></div>
+      </div>
+      <p class="source">기준 파일: k6/ramp/run-coupon-ramp.ps1, k6/ramp/coupon-ramp.js, k6/common/coupon-claim.js</p>
+    </section>
+
+    <section>
+      <h2><span class="num">03</span>Measured results</h2>
+      <table>
+        <thead><tr><th>검증 지표</th><th>측정값</th><th>기준</th><th>판정</th></tr></thead>
+        <tbody>
+          <tr><td>총 신청 시도</td><td>20,000</td><td>20,000</td><td class="ok">PASS</td></tr>
+          <tr><td>발급 성공</td><td>10,000</td><td>10,000</td><td class="ok">PASS</td></tr>
+          <tr><td>품절 응답</td><td>10,000</td><td>10,000</td><td class="ok">PASS</td></tr>
+          <tr><td>전송 실패</td><td>0</td><td>0</td><td class="ok">PASS</td></tr>
+          <tr><td>예상하지 못한 응답</td><td>0</td><td>0</td><td class="ok">PASS</td></tr>
+          <tr><td>최종 수량 검증</td><td>1</td><td>1</td><td class="ok">PASS</td></tr>
+          <tr><td>Claim p95</td><td>951.19ms</td><td>&lt; 5초</td><td class="ok">PASS</td></tr>
+          <tr><td>최대 활성 VU</td><td>20,000</td><td>20,000</td><td class="ok">PASS</td></tr>
+        </tbody>
+      </table>
+      <h3>응답시간 분포</h3>
+      <table>
+        <thead><tr><th>평균</th><th>중앙값</th><th>p90</th><th>p95</th><th>최대</th></tr></thead>
+        <tbody><tr><td>336.95ms</td><td>216.36ms</td><td>694.43ms</td><td>951.19ms</td><td>2.88초</td></tr></tbody>
+      </table>
+      <div class="callout"><strong>20,004개의 전체 HTTP 요청</strong>에는 사용자 신청 20,000건 외에 이벤트 생성, 오픈과 최종 검증을 위한 관리자 요청이 포함된다.</div>
+    </section>
+
+    <section>
+      <h2><span class="num">04</span>Docker failure and native improvement</h2>
+      <p>Docker 컨테이너에서 같은 규모로 실행했을 때는 6,216건이 <code>dial: i/o timeout</code>으로 종료됐다. 이는 품절 응답이나 로그 전송 실패가 아니라 신청 HTTP 요청이 상태 코드를 받지 못한 전송 실패였다.</p>
+      <table>
+        <thead><tr><th>항목</th><th>Docker k6</th><th>Native k6</th></tr></thead>
+        <tbody>
+          <tr><td>신청 시도</td><td>20,000</td><td>20,000</td></tr>
+          <tr><td>발급 성공</td><td>10,000</td><td>10,000</td></tr>
+          <tr><td>품절 응답</td><td class="bad">3,784</td><td class="ok">10,000</td></tr>
+          <tr><td>전송 실패</td><td class="bad">6,216</td><td class="ok">0</td></tr>
+          <tr><td>Claim 평균</td><td>746.52ms</td><td>336.95ms</td></tr>
+          <tr><td>Claim p95</td><td>1.84초</td><td>951.19ms</td></tr>
+          <tr><td>최종 결과</td><td class="bad">FAIL</td><td class="ok">PASS</td></tr>
+        </tbody>
+      </table>
+      <div class="bars">
+        <div class="bar-row"><strong>Docker p95</strong><div class="bar-track"><div class="bar docker"></div></div><span>1.84s</span></div>
+        <div class="bar-row"><strong>Native p95</strong><div class="bar-track"><div class="bar native"></div></div><span>0.95s</span></div>
+      </div>
+      <h3>네트워크 경로 변화</h3>
+      <div class="flow">
+        <div class="flow-row"><span class="flow-box">Docker k6</span><span class="arrow">→</span><span class="flow-box">Docker/WSL NAT</span><span class="arrow">→</span><span class="flow-box">Windows TCP</span><span class="arrow">→</span><span class="flow-box">Tailscale</span></div>
+        <div class="flow-row"><span class="flow-box">Native k6</span><span class="arrow">→</span><span class="flow-box">Windows TCP</span><span class="arrow">→</span><span class="flow-box">Tailscale</span></div>
+      </div>
+      <p>동일한 사용자 수, 재고와 ramp-up 조건에서 Docker 구간만 제거한 뒤 전송 실패가 0건이 됐다. Claim 평균은 약 55%, p95는 약 48% 감소해 Docker NAT를 포함한 부하 발생기 네트워크 경로가 기존 실패의 주요 병목이었다고 판단했다.</p>
+    </section>
+
+    <section>
+      <h2><span class="num">05</span>Interpretation and limitations</h2>
+      <div class="callout warning"><strong>20,000 VU는 요청 20,000건이 완전히 같은 시각에 시작됐다는 뜻이 아니다.</strong> 60초 동안 VU가 점진적으로 증가해 최대 20,000명에 도달했고 각 VU가 한 번씩 신청한 조건이다.</div>
+      <h3>이번 테스트가 확인한 범위</h3>
+      <ul>
+        <li>고유 사용자 20,000명의 신청 요청이 모두 애플리케이션 응답으로 종료됐다.</li>
+        <li>성공 10,000건과 품절 10,000건으로 재고 초과 발급이 없었다.</li>
+        <li>전송 실패와 예상하지 못한 애플리케이션 응답이 없었다.</li>
+        <li>관리자 API의 최종 발급 수량이 10,000건이었다.</li>
+      </ul>
+      <h3>별도 DB 검증이 필요한 범위</h3>
+      <ul>
+        <li>user_coupon과 SUCCEEDED 요청이 각각 정확히 10,000건인지</li>
+        <li>오래 남은 PENDING 요청이 0건인지</li>
+        <li>동일 사용자의 동시 중복 신청이 차단되는지</li>
+        <li>Outbox와 Kafka backlog가 최종적으로 해소되는지</li>
+        <li>100만 사용자와 300만 발급 이력 전체 정합성</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2><span class="num">06</span>Reproduction</h2>
+      <pre>Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
+
+.\k6\ramp\run-coupon-ramp.ps1 `
+  -TotalVus 20000 `
+  -CouponQuantity 10000 `
+  -RampUpSeconds 60 `
+  -TestId "coupon-native-20000-ramp60-run01"</pre>
+      <p>실행 로그는 <code>k6/logs/&lt;TestId&gt;.log</code>에 저장되고 같은 Test ID가 Prometheus 태그로 기록된다.</p>
+      <p class="source">이번 성공 결과의 Test ID와 원본 로그 경로는 공유된 출력에 없어 미확인으로 남겼다. 수치를 임의로 보완하지 않았다.</p>
+    </section>
+
+    <section class="conclusion">
+      <h2>Final conclusion</h2>
+      <p>Windows 네이티브 k6 환경에서 재고 10,000장, 고유 사용자 20,000명, ramp-up 60초 조건의 부하 테스트는 <strong>PASS</strong>했다. Docker 실행에서 발생했던 TCP 전송 실패는 네이티브 전환 후 재현되지 않았다.</p>
+      <p>이 결과는 과제에서 구체화한 20,000 동시 VU 쿠폰 발급 시연의 근거로 사용할 수 있다. 전체 데이터 정합성은 별도 DB 검증 결과와 함께 제시해야 한다.</p>
+    </section>
+
+    <p class="source">Grafana evidence: <a href="https://snapshots.raintank.io/dashboard/snapshot/2MIwOJ8W0waN3et76PI0OQvDKVZWVHuT">https://snapshots.raintank.io/dashboard/snapshot/2MIwOJ8W0waN3et76PI0OQvDKVZWVHuT</a></p>
+  </main>
+  <footer><span>CLUTCH Backend Project</span><span>Coupon Load Test Report · 2026-08-30</span></footer>
+</article>
+</body>
+</html>

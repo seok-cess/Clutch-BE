@@ -48,11 +48,15 @@ class AdminCouponClaimControllerTest {
                 20L,
                 null,
                 null,
-                100L,
+                2,
                 30
         )).thenReturn(new AdminCouponClaimListResponse(
                 List.of(),
-                null,
+                2,
+                30,
+                65,
+                3,
+                true,
                 false
         ));
 
@@ -64,10 +68,13 @@ class AdminCouponClaimControllerTest {
                         .param("requestStatus", "SUCCEEDED")
                         .param("couponStatus", "ISSUED")
                         .param("couponTypeId", "20")
-                        .param("cursor", "100")
+                        .param("page", "2")
                         .param("size", "30"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.claims").isArray())
+                .andExpect(jsonPath("$.page").value(2))
+                .andExpect(jsonPath("$.totalElements").value(65))
+                .andExpect(jsonPath("$.totalPages").value(3))
                 .andExpect(jsonPath("$.hasNext").value(false));
 
         verify(adminCouponClaimService).findAll(
@@ -79,7 +86,7 @@ class AdminCouponClaimControllerTest {
                 20L,
                 null,
                 null,
-                100L,
+                2,
                 30
         );
     }

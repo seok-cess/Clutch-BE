@@ -33,8 +33,8 @@ import org.mockito.Mock;
 import org.mockito.InOrder;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.SliceImpl;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -270,15 +270,15 @@ class CouponEventServiceTest {
     }
 
     @Test
-    void 목록_커서가_0_이하면_조회할_수_없다() {
-        assertThatThrownBy(() -> couponEventService.findAll(null, 0L, 20))
+    void 목록_페이지가_0_미만이면_조회할_수_없다() {
+        assertThatThrownBy(() -> couponEventService.findAll(null, -1, 20))
                 .isInstanceOf(CouponEventException.class)
-                .hasMessage("커서는 양수여야 합니다.");
+                .hasMessage("페이지 번호는 0 이상이어야 합니다.");
     }
 
     @Test
     void 목록_크기가_허용_범위를_벗어나면_조회할_수_없다() {
-        assertThatThrownBy(() -> couponEventService.findAll(null, null, 101))
+        assertThatThrownBy(() -> couponEventService.findAll(null, 0, 101))
                 .isInstanceOf(CouponEventException.class)
                 .hasMessage("목록 크기는 1개 이상 100개 이하여야 합니다.");
     }
@@ -505,7 +505,7 @@ class CouponEventServiceTest {
     }
 
     @Test
-    void 이벤트_목록을_커서와_수량_정보로_조회한다() {
+    void 이벤트_목록을_페이지와_수량_정보로_조회한다() {
         CouponEvent first = withId(gameTriggeredEvent("첫 이벤트"), 3L);
         CouponEvent second = withId(gameTriggeredEvent("두 번째 이벤트"), 2L);
         CouponEventItem firstItem = withId(
@@ -517,10 +517,10 @@ class CouponEventServiceTest {
         when(couponEventRepository.findByEventStatusOrderByIdDesc(
                 CouponEventStatus.READY,
                 PageRequest.of(0, 2)
-        )).thenReturn(new SliceImpl<>(
+        )).thenReturn(new PageImpl<>(
                 List.of(first, second),
                 PageRequest.of(0, 2),
-                true
+                5
         ));
         when(couponEventItemRepository.findAllByCouponEventIdIn(
                 List.of(3L, 2L)
@@ -528,12 +528,15 @@ class CouponEventServiceTest {
 
         CouponEventListResponse response = couponEventService.findAll(
                 CouponEventStatus.READY,
-                null,
+                0,
                 2
         );
 
         assertThat(response.events()).hasSize(2);
-        assertThat(response.nextCursor()).isEqualTo(2L);
+        assertThat(response.page()).isZero();
+        assertThat(response.totalElements()).isEqualTo(5);
+        assertThat(response.totalPages()).isEqualTo(3);
+        assertThat(response.hasPrevious()).isFalse();
         assertThat(response.hasNext()).isTrue();
         assertThat(response.events().getFirst().totalQuantity())
                 .isEqualTo(5_000);

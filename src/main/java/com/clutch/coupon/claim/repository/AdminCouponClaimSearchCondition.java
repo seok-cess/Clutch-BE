@@ -17,7 +17,6 @@ import java.time.LocalDateTime;
  * @param couponTypeId 쿠폰 종류 ID
  * @param from 발급 요청 조회 시작 시각
  * @param to 발급 요청 조회 종료 시각
- * @param cursor 이전 페이지의 마지막 발급 요청 ID
  * @param statusReferenceTime 쿠폰 만료 상태를 계산할 UTC 기준 시각
  */
 public record AdminCouponClaimSearchCondition(
@@ -30,7 +29,6 @@ public record AdminCouponClaimSearchCondition(
         Long couponTypeId,
         LocalDateTime from,
         LocalDateTime to,
-        Long cursor,
         LocalDateTime statusReferenceTime
 ) {
 }
