@@ -37,6 +37,7 @@ class BettingRefundTest {
             userBetRepository,
             transactionRepository,
             userRepository,
+            mock(com.clutch.lolesports.repository.MatchTeamRepository.class),
             mock(BettingLiveStateReader.class),
             mock(DataCacheService.class),
             mock(SetWinnerTracker.class),

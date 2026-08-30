@@ -36,6 +36,7 @@ class BettingWinnerRecoveryTest {
             userBetRepository,
             mock(BetPointTransactionRepository.class),
             mock(UserRepository.class),
+            mock(com.clutch.lolesports.repository.MatchTeamRepository.class),
             mock(BettingLiveStateReader.class),
             mock(DataCacheService.class),
             mock(SetWinnerTracker.class),
