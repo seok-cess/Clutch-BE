@@ -1,6 +1,6 @@
 # CLUTCH 시스템 아키텍처
 
-> 상태: 현재 구현 기준  
+> 상태: 현재 구현 기준
 > 목적: CLUTCH를 구성하는 시스템과 저장소, 외부 연동 및 주요 데이터 흐름을 한눈에 설명한다.
 
 ## 문서 범위
@@ -179,9 +179,9 @@ Redis는 빠른 재고 제어에 사용하지만 최종 발급 사실의 기준�
 
 - [과제 요구사항](../00-project/requirements.md)
 - [쿠폰 도메인 규칙](../02-domain/coupon.md)
-- [시청 세션과 포인트 지급 규칙](../02-domain/watch-session.md)
+- [시청 세션과 포인트 지급 규칙](../02-domain/watch.md)
 - [승패 배팅 규칙](../02-domain/betting.md)
-- [매치·세트 결과 데이터 계약](../02-domain/match-set-result.md)
+- [매치·세트 결과 데이터 계약](../02-domain/lolesports.md)
 - [기술 결정 기록](../03-decisions/README.md)
 - [패키지 구조](../04-conventions/package-structure.md)
 - [데이터베이스 규칙](../04-conventions/database-convention.md)

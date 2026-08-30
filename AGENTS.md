@@ -32,9 +32,9 @@ Notion의 논의가 구현 결정으로 확정되면 관련 코드와 함께 `do
 
 - 패키지와 계층 책임: `docs/04-conventions/package-structure.md`
 - 쿠폰 발급 도메인 규칙: `docs/02-domain/coupon.md`
-- 시청 세션과 포인트 지급 규칙: `docs/02-domain/watch-session.md`
+- 시청 세션과 포인트 지급 규칙: `docs/02-domain/watch.md`
 - 승패 배팅 규칙: `docs/02-domain/betting.md`
-- 매치·세트 상태와 결과 데이터 계약: `docs/02-domain/match-set-result.md`
+- 매치·세트 상태와 결과 데이터 계약: `docs/02-domain/lolesports.md`
 - 데이터베이스 규칙: `docs/04-conventions/database-convention.md`
 - 파일 인코딩과 줄바꿈 규칙: `docs/04-conventions/file-convention.md`
 - Git과 브랜치 규칙: `docs/04-conventions/git-convention.md`
@@ -68,7 +68,7 @@ Notion의 논의가 구현 결정으로 확정되면 관련 코드와 함께 `do
 - 총 풀에서 운영 수수료 10%를 제외한 배당 풀을 적중자의 배팅 금액 비율로 정산하고,
   실패 시 배팅 포인트를 몰수한다.
 
-상세 규칙은 `docs/02-domain/watch-session.md`와 `docs/02-domain/betting.md`를 따른다.
+상세 규칙은 `docs/02-domain/watch.md`와 `docs/02-domain/betting.md`를 따른다.
 
 ## 파일 형식 규칙
 

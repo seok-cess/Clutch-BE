@@ -7,7 +7,7 @@
 문서를 기준으로 결정한다.
 
 세부 비즈니스 규칙은 `docs/02-domain/`, 기술 선택의 배경은 `docs/03-decisions/`, 외부에 공개하는 상세
-계약은 `docs/02-domain/api/`에서 관리한다. 이 문서는 각 도메인의 세부 규칙을 중복해서 설명하지 않는다.
+계약은 `docs/01-api/`에서 관리한다. 이 문서는 각 도메인의 세부 규칙을 중복해서 설명하지 않는다.
 
 ## 아키텍처 원칙
 
@@ -77,10 +77,28 @@ SSE를 사용한다.
 | `coupon.claim` | 발급 요청, Redis 재고 차감, 동기 발급 흐름, SSE, Outbox와 장애 복구 |
 | `coupon.contract` | 쿠폰과 다른 모듈 사이에서 사용하는 발급·트리거·Kafka 계약 |
 | `coupon.test` | 운영자가 재현 가능한 테스트 이벤트와 경기 트리거를 실행하는 보조 기능 |
+| `coupon.integrity` | 관리자 쿠폰 정합성 검증 실행, 이력·결과 저장과 장애 복구 |
 
 `coupon.claim`은 Redis에서 재고와 중복을 먼저 원자적으로 판단한 뒤 `coupon.contract.issuance`
 계약으로 `wallet`의 실제 쿠폰 생성 기능을 호출한다. 쿠폰 발급의 상세 정합성 규칙은
 `docs/02-domain/coupon.md`를 따른다.
+
+### 쿠폰 정합성 검증 패키지
+
+`com.clutch.coupon.integrity`는 운영 쿠폰 데이터를 수정하지 않는 관리자 검증 기능이다.
+
+```text
+integrity/
+├─ api/          관리자 실행·목록·상세 API, 예외 변환과 응답 DTO
+├─ config/       단일 스레드 전용 Executor
+├─ domain/       실행 이력, 항목 결과, 실행 상태와 판정
+├─ repository/   JPA 이력 저장, JDBC 전체 집계와 MySQL named lock
+└─ service/      실행 접수, 비동기 오케스트레이션, 별도 결과 저장과 장애 복구
+```
+
+대량 집계는 JPQL로 옮기지 않고 `JdbcTemplate` 기반 Query Repository에서 실행한다.
+실행·항목 결과 영속화에는 JPA를 사용하며, 읽기 검증 transaction과 쓰기 이력
+transaction을 분리한다.
 
 ## 모듈 내부 계층
 
@@ -265,8 +283,8 @@ flowchart LR
 ## 관련 문서
 
 - `docs/02-domain/coupon.md`
-- `docs/02-domain/watch-session.md`
+- `docs/02-domain/watch.md`
 - `docs/02-domain/betting.md`
-- `docs/02-domain/match-set-result.md`
+- `docs/02-domain/lolesports.md`
 - `docs/04-conventions/database-convention.md`
 - `docs/03-decisions/README.md`

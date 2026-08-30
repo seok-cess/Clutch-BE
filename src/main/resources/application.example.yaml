@@ -82,6 +82,9 @@ coupon:
     enabled: ${COUPON_SUCCESS_COUNT_SYNC_ENABLED:true}
     interval-ms: ${COUPON_SUCCESS_COUNT_SYNC_INTERVAL_MS:5000}
     lock-name: ${COUPON_SUCCESS_COUNT_SYNC_LOCK_NAME:clutch:coupon-success-count-synchronization}
+  integrity-check:
+    lock-name: ${COUPON_INTEGRITY_CHECK_LOCK_NAME:clutch:coupon-integrity-check}
+    recovery-grace: ${COUPON_INTEGRITY_CHECK_RECOVERY_GRACE:5m}
   test:
     event:
       expiration-interval-ms: ${COUPON_TEST_EVENT_EXPIRATION_INTERVAL_MS:1000}

@@ -399,6 +399,7 @@ checks AS (
 )
 SELECT
     CASE
+        WHEN severity = 'INFO' THEN 'INFO'
         WHEN violation_count = 0 THEN 'PASS'
         WHEN severity = 'WARN' THEN 'WARN'
         ELSE 'FAIL'

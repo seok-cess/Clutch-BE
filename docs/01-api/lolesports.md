@@ -2,7 +2,7 @@
 
 일정·라이브 화면은 외부 API를 요청마다 직접 호출하지 않고 인메모리 캐시에서 응답한다.
 캐시에 없는 과거 세트의 통계 조회는 저장 데이터 반환 또는 온디맨드 적재를 시도한다.
-외부 데이터의 종료·승자 확정 의미는 [`../02-domain/match-set-result.md`](../02-domain/match-set-result.md)를
+외부 데이터의 종료·승자 확정 의미는 [`../02-domain/lolesports.md`](../02-domain/lolesports.md)를
 따른다.
 
 ## 일정·순위·라이브
