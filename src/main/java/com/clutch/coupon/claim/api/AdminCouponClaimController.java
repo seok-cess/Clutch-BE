@@ -42,9 +42,9 @@ public class AdminCouponClaimController {
      * @param couponTypeId 쿠폰 종류 ID
      * @param from 발급 요청 조회 시작 시각
      * @param to 발급 요청 조회 종료 시각
-     * @param cursor 이전 페이지의 마지막 발급 요청 ID
+     * @param page 조회할 페이지 번호, 0부터 시작
      * @param size 한 페이지에서 조회할 내역 수
-     * @return 필터가 적용된 관리자 발급 내역 커서 페이지
+     * @return 필터가 적용된 관리자 발급 내역 번호형 페이지
      */
     @GetMapping
     public AdminCouponClaimListResponse findAll(
@@ -61,7 +61,7 @@ public class AdminCouponClaimController {
             @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
             LocalDateTime to,
-            @RequestParam(required = false) Long cursor,
+            @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
         return adminCouponClaimService.findAll(
@@ -73,7 +73,7 @@ public class AdminCouponClaimController {
                 couponTypeId,
                 from,
                 to,
-                cursor,
+                page,
                 size
         );
     }

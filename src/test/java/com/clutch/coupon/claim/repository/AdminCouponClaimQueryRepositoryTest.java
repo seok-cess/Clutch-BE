@@ -52,7 +52,7 @@ class AdminCouponClaimQueryRepositoryTest {
                         .<RowMapper<AdminCouponClaimRow>>any()
         )).thenReturn(List.of());
 
-        repository.findAll(emptyCondition(), 21);
+        repository.findAll(emptyCondition(), 20, 40L);
 
         ArgumentCaptor<String> idQueryCaptor =
                 ArgumentCaptor.forClass(String.class);
@@ -66,12 +66,14 @@ class AdminCouponClaimQueryRepositoryTest {
         assertThat(idQueryCaptor.getValue())
                 .contains("FROM coupon_claim_request claim")
                 .contains("ORDER BY claim.coupon_claim_request_id DESC")
-                .contains("LIMIT :limit")
+                .contains("LIMIT :size OFFSET :offset")
                 .doesNotContain("JOIN coupon_event event")
                 .doesNotContain("JOIN coupon_event_item filtered_item")
                 .doesNotContain("JOIN user_coupon filtered_coupon");
-        assertThat(idParametersCaptor.getValue().getValue("limit"))
-                .isEqualTo(21);
+        assertThat(idParametersCaptor.getValue().getValue("size"))
+                .isEqualTo(20);
+        assertThat(idParametersCaptor.getValue().getValue("offset"))
+                .isEqualTo(40L);
 
         ArgumentCaptor<String> detailQueryCaptor =
                 ArgumentCaptor.forClass(String.class);
@@ -115,11 +117,10 @@ class AdminCouponClaimQueryRepositoryTest {
                         10L,
                         null,
                         null,
-                        null,
                         STATUS_REFERENCE_TIME
                 );
 
-        repository.findAll(condition, 21);
+        repository.findAll(condition, 20, 0L);
 
         ArgumentCaptor<String> queryCaptor =
                 ArgumentCaptor.forClass(String.class);
@@ -161,11 +162,11 @@ class AdminCouponClaimQueryRepositoryTest {
                 new AdminCouponClaimSearchCondition(
                         null, null, null, null, null,
                         UserCouponStatus.EXPIRED,
-                        null, null, null, null,
+                        null, null, null,
                         STATUS_REFERENCE_TIME
                 );
 
-        repository.findAll(condition, 21);
+        repository.findAll(condition, 20, 0L);
 
         ArgumentCaptor<String> queryCaptor =
                 ArgumentCaptor.forClass(String.class);
@@ -180,9 +181,46 @@ class AdminCouponClaimQueryRepositoryTest {
                 .contains("filtered_coupon.expires_at <= :statusReferenceTime");
     }
 
+    @Test
+    void 목록과_같은_필터로_전체_페이지_계산용_건수를_조회한다() {
+        when(jdbcTemplate.queryForObject(
+                anyString(),
+                any(MapSqlParameterSource.class),
+                eq(Long.class)
+        )).thenReturn(42L);
+        AdminCouponClaimSearchCondition condition =
+                new AdminCouponClaimSearchCondition(
+                        null,
+                        "펜타킬",
+                        null,
+                        null,
+                        ClaimRequestStatus.SUCCEEDED,
+                        null,
+                        null,
+                        null,
+                        null,
+                        STATUS_REFERENCE_TIME
+                );
+
+        long total = repository.count(condition);
+
+        ArgumentCaptor<String> queryCaptor =
+                ArgumentCaptor.forClass(String.class);
+        verify(jdbcTemplate).queryForObject(
+                queryCaptor.capture(),
+                any(MapSqlParameterSource.class),
+                eq(Long.class)
+        );
+        assertThat(total).isEqualTo(42L);
+        assertThat(queryCaptor.getValue())
+                .contains("SELECT COUNT(*)")
+                .contains("event.event_name LIKE :eventNameKeyword")
+                .doesNotContain("ORDER BY")
+                .doesNotContain("LIMIT");
+    }
+
     private AdminCouponClaimSearchCondition emptyCondition() {
         return new AdminCouponClaimSearchCondition(
-                null,
                 null,
                 null,
                 null,

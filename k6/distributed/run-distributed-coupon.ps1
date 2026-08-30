@@ -23,9 +23,10 @@ param(
     [ValidateRange(1, 3600)]
     [int]$RampUpSeconds = 60,
     [ValidateRange(1, 3600)]
-    [int]$HoldSeconds = 30,
+    [int]$HoldSeconds = 1,
     [long]$UserIdStart = 900001,
-    [int]$ApiPort = 6565
+    [int]$ApiPort = 6565,
+    [string]$LogDirectory = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -52,6 +53,16 @@ $loadGenerator = "laptop-$($Node.ToLowerInvariant())"
 $containerName = "clutch-k6-$($TestId.ToLowerInvariant())-$($Node.ToLowerInvariant())"
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $dockerCommand = Get-Command docker -ErrorAction Stop
+
+if ([string]::IsNullOrWhiteSpace($LogDirectory)) {
+    $LogDirectory = Join-Path $repoRoot "k6/logs"
+} elseif (-not [System.IO.Path]::IsPathRooted($LogDirectory)) {
+    $LogDirectory = Join-Path $repoRoot $LogDirectory
+}
+$LogDirectory = [System.IO.Path]::GetFullPath($LogDirectory)
+New-Item -ItemType Directory -Force -Path $LogDirectory | Out-Null
+$stdoutLog = Join-Path $LogDirectory "$TestId-$loadGenerator.log"
+$stderrLog = Join-Path $LogDirectory "$TestId-$loadGenerator.stderr.log"
 
 Write-Host "백엔드 연결을 확인합니다: $BaseUrl"
 Invoke-RestMethod -Method Get -Uri "$BaseUrl/actuator/health" | Out-Null
@@ -87,11 +98,15 @@ $dockerArgs = @(
 )
 
 Write-Host "k6 실행기를 대기 상태로 시작합니다: node=$Node, segment=$segment"
+Write-Host "k6 결과 로그: $stdoutLog"
+Write-Host "Docker 오류 로그: $stderrLog"
 $process = Start-Process `
     -FilePath $dockerCommand.Source `
     -ArgumentList $dockerArgs `
     -WorkingDirectory $repoRoot `
     -NoNewWindow `
+    -RedirectStandardOutput $stdoutLog `
+    -RedirectStandardError $stderrLog `
     -PassThru
 
 $apiUrl = "http://localhost:$ApiPort/v1/status"
@@ -148,8 +163,13 @@ try {
 
     Write-Host "k6 부하 시작: node=$Node, rampUp=${RampUpSeconds}s, actual=$((Get-Date).ToString('yyyy-MM-dd HH:mm:ss.fff'))" -ForegroundColor Green
     $process.WaitForExit()
+    $process.Refresh()
 
     if ($process.ExitCode -ne 0) {
+        Write-Host "k6 결과 로그 마지막 80줄:" -ForegroundColor Yellow
+        Get-Content -LiteralPath $stdoutLog -Tail 80 -ErrorAction SilentlyContinue
+        Write-Host "Docker 오류 로그 마지막 40줄:" -ForegroundColor Yellow
+        Get-Content -LiteralPath $stderrLog -Tail 40 -ErrorAction SilentlyContinue
         throw "k6 실행이 실패했습니다. 종료 코드: $($process.ExitCode)"
     }
 } finally {
@@ -159,5 +179,7 @@ try {
 }
 
 Write-Host "노트북 $Node 실행 및 실행기별 threshold 검증 완료." -ForegroundColor Green
+Write-Host "k6 결과 로그: $stdoutLog"
+Write-Host "Docker 오류 로그: $stderrLog"
 Write-Host "두 노트북이 모두 끝나면 verify-distributed-coupon.ps1을 실행하세요."
 

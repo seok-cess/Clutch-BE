@@ -21,7 +21,7 @@ import java.util.List;
 
 import static com.clutch.coupon.claim.exception.CouponClaimErrorCode.INVALID_ADMIN_CLAIM_QUERY;
 
-/** 관리자 쿠폰 발급 내역의 필터 검증, 마스킹 및 커서 응답을 처리한다. */
+/** 관리자 쿠폰 발급 내역의 필터 검증, 마스킹 및 번호형 페이지 응답을 처리한다. */
 @Service
 @RequiredArgsConstructor
 public class AdminCouponClaimService {
@@ -35,10 +35,11 @@ public class AdminCouponClaimService {
     private final Clock clock;
 
     /**
-     * 관리자 발급 내역을 필터 조합과 ID 커서 기준으로 조회한다.
+     * 관리자 발급 내역을 필터 조합과 페이지 번호 기준으로 조회한다.
      *
      * <p>이벤트 검색어를 ID 또는 이름 조건으로 구분하고, 조회된 개인정보를
-     * 마스킹한 뒤 다음 페이지 존재 여부와 다음 커서를 계산한다.</p>
+     * 마스킹한다. 관리자 화면의 번호형 페이지네이션을 위해 같은 필터의 전체
+     * 건수를 조회하고 전체 페이지 수를 계산한다. {@code page}는 0부터 시작한다.</p>
      *
      * @param eventKeyword 이벤트 ID 또는 이벤트 이름 검색어
      * @param triggerKeyword 경기 트리거 문자열 검색어
@@ -48,9 +49,9 @@ public class AdminCouponClaimService {
      * @param couponTypeId 쿠폰 종류 ID
      * @param from 발급 요청 조회 시작 시각
      * @param to 발급 요청 조회 종료 시각
-     * @param cursor 이전 페이지의 마지막 발급 요청 ID
+     * @param page 조회할 페이지 번호, 0부터 시작
      * @param size 한 페이지에서 조회할 내역 수
-     * @return 마스킹 및 커서 정보가 포함된 발급 내역 목록
+     * @return 마스킹 및 번호형 페이지 정보가 포함된 발급 내역 목록
      */
     @Transactional(readOnly = true)
     public AdminCouponClaimListResponse findAll(
@@ -62,10 +63,10 @@ public class AdminCouponClaimService {
             Long couponTypeId,
             LocalDateTime from,
             LocalDateTime to,
-            Long cursor,
+            int page,
             int size
     ) {
-        validate(userId, couponTypeId, from, to, cursor, size);
+        validate(userId, couponTypeId, from, to, page, size);
 
         String normalizedEventKeyword = normalize(
                 eventKeyword,
@@ -91,29 +92,28 @@ public class AdminCouponClaimService {
                         couponTypeId,
                         from,
                         to,
-                        cursor,
                         LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC)
                 );
 
         List<AdminCouponClaimRow> rows = queryRepository.findAll(
                 condition,
-                size + 1
+                size,
+                (long) page * size
         );
-        boolean hasNext = rows.size() > size;
-        List<AdminCouponClaimRow> pageRows = hasNext
-                ? rows.subList(0, size)
-                : rows;
-        List<AdminCouponClaimResponse> claims = pageRows.stream()
+        long totalElements = queryRepository.count(condition);
+        int totalPages = Math.toIntExact(Math.ceilDiv(totalElements, (long) size));
+        List<AdminCouponClaimResponse> claims = rows.stream()
                 .map(this::toResponse)
                 .toList();
-        Long nextCursor = hasNext && !pageRows.isEmpty()
-                ? pageRows.getLast().claimRequestId()
-                : null;
 
         return new AdminCouponClaimListResponse(
                 claims,
-                nextCursor,
-                hasNext
+                page,
+                size,
+                totalElements,
+                totalPages,
+                page > 0 && totalElements > 0,
+                page + 1 < totalPages
         );
     }
 
@@ -150,13 +150,13 @@ public class AdminCouponClaimService {
     }
 
     /**
-     * ID, 페이지 크기 및 조회 기간 조건의 유효성을 검증한다.
+     * ID, 페이지 번호, 페이지 크기 및 조회 기간 조건의 유효성을 검증한다.
      *
      * @param userId 사용자 ID
      * @param couponTypeId 쿠폰 종류 ID
      * @param from 조회 시작 시각
      * @param to 조회 종료 시각
-     * @param cursor 발급 요청 ID 커서
+     * @param page 조회할 페이지 번호, 0부터 시작
      * @param size 페이지 크기
      */
     private void validate(
@@ -164,7 +164,7 @@ public class AdminCouponClaimService {
             Long couponTypeId,
             LocalDateTime from,
             LocalDateTime to,
-            Long cursor,
+            int page,
             int size
     ) {
         if (userId != null && userId <= 0) {
@@ -173,7 +173,7 @@ public class AdminCouponClaimService {
         if (couponTypeId != null && couponTypeId <= 0) {
             throw invalidQuery();
         }
-        if (cursor != null && cursor <= 0) {
+        if (page < 0) {
             throw invalidQuery();
         }
         if (size < 1 || size > MAX_PAGE_SIZE) {

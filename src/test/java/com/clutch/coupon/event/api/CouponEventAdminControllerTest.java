@@ -234,25 +234,32 @@ class CouponEventAdminControllerTest {
     }
 
     @Test
-    void 이벤트_목록을_상태와_커서로_조회한다() throws Exception {
-        when(couponEventService.findAll(CouponEventStatus.READY, 100L, 10))
+    void 이벤트_목록을_상태와_페이지로_조회한다() throws Exception {
+        when(couponEventService.findAll(CouponEventStatus.READY, 2, 10))
                 .thenReturn(new CouponEventListResponse(
                         List.of(),
-                        null,
+                        2,
+                        10,
+                        25,
+                        3,
+                        true,
                         false
                 ));
 
         mockMvc.perform(get("/api/v1/admin/coupon-events")
                         .param("status", "READY")
-                        .param("cursor", "100")
+                        .param("page", "2")
                         .param("size", "10"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.events").isArray())
+                .andExpect(jsonPath("$.page").value(2))
+                .andExpect(jsonPath("$.totalElements").value(25))
+                .andExpect(jsonPath("$.totalPages").value(3))
                 .andExpect(jsonPath("$.hasNext").value(false));
 
         verify(couponEventService).findAll(
                 CouponEventStatus.READY,
-                100L,
+                2,
                 10
         );
     }
