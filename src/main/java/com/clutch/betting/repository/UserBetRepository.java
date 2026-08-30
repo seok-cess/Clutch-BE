@@ -33,6 +33,12 @@ public interface UserBetRepository extends JpaRepository<UserBet, Long> {
      */
     boolean existsByBettingEventIdAndUserId(Long bettingEventId, Long userId);
 
+    /** 사용자가 등록한 전체 승부예측 횟수를 조회한다. */
+    long countByUserId(Long userId);
+
+    /** 사용자가 적중한 승부예측 횟수를 조회한다. */
+    long countByUserIdAndStatus(Long userId, UserBetStatus status);
+
     /**
      * 사용자의 전체 배팅을 최신 등록 순서로 조회한다.
      *

@@ -1,12 +1,16 @@
 package com.clutch.user.api;
 
 import com.clutch.user.exception.UserNotFoundException;
-import com.clutch.user.service.UserQueryService;
+import com.clutch.user.dto.PointRanking;
+import com.clutch.user.dto.UserPointSummary;
+import com.clutch.user.service.UserService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+
+import java.util.List;
 
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -20,11 +24,11 @@ class UserControllerTest {
     private MockMvc mockMvc;
 
     @MockitoBean
-    private UserQueryService userQueryService;
+    private UserService userService;
 
     @Test
     void getsCurrentPoint() throws Exception {
-        given(userQueryService.getPoint(10L)).willReturn(12_000L);
+        given(userService.getPoint(10L)).willReturn(12_000L);
 
         mockMvc.perform(get("/api/users/me/points")
                         .header("X-User-Id", "10"))
@@ -35,7 +39,7 @@ class UserControllerTest {
 
     @Test
     void returnsNotFoundForUnknownUser() throws Exception {
-        given(userQueryService.getPoint(99L)).willThrow(new UserNotFoundException());
+        given(userService.getPoint(99L)).willThrow(new UserNotFoundException());
 
         mockMvc.perform(get("/api/users/me/points")
                         .header("X-User-Id", "99"))
@@ -48,5 +52,38 @@ class UserControllerTest {
         mockMvc.perform(get("/api/users/me/points"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+    }
+
+    @Test
+    void getsCurrentUserPointSummary() throws Exception {
+        given(userService.getPointSummary(10L)).willReturn(new UserPointSummary(
+                12_450L,
+                26L,
+                15L,
+                3_600L
+        ));
+
+        mockMvc.perform(get("/api/users/me/point-summary")
+                        .header("X-User-Id", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.point").value(12450))
+                .andExpect(jsonPath("$.predictionCount").value(26))
+                .andExpect(jsonPath("$.predictionSuccessCount").value(15))
+                .andExpect(jsonPath("$.maxEarnedPoint").value(3600));
+    }
+
+    @Test
+    void getsTopTenPointRankings() throws Exception {
+        given(userService.getPointRankings()).willReturn(List.of(
+                new PointRanking(1, "김*정", 48_200L),
+                new PointRanking(2, "이*", 41_500L)
+        ));
+
+        mockMvc.perform(get("/api/users/point-rankings"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].rank").value(1))
+                .andExpect(jsonPath("$[0].displayName").value("김*정"))
+                .andExpect(jsonPath("$[0].point").value(48200))
+                .andExpect(jsonPath("$[1].rank").value(2));
     }
 }

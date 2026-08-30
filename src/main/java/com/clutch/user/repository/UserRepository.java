@@ -1,7 +1,9 @@
 package com.clutch.user.repository;
 
 import com.clutch.user.domain.User;
+import com.clutch.user.domain.UserRole;
 import jakarta.persistence.LockModeType;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
@@ -9,6 +11,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Optional;
 
 /** 사용자 조회와 포인트의 동시성 안전한 증감을 제공한다. */
@@ -71,4 +74,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
      */
     @Query("select user.point from User user where user.id = :userId")
     Optional<Long> findPointById(@Param("userId") Long userId);
+
+    /** 일반 사용자만 보유 포인트가 높은 순으로 조회한다. 동점은 사용자 ID 오름차순으로 고정한다. */
+    List<User> findAllByRoleOrderByPointDescIdAsc(UserRole role, Pageable pageable);
 }
