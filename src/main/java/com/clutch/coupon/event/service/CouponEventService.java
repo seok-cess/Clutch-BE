@@ -29,8 +29,8 @@ import com.clutch.coupon.type.domain.CouponType;
 import com.clutch.coupon.type.repository.CouponTypeRepository;
 import com.clutch.wallet.repository.UserCouponRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -216,28 +216,30 @@ public class CouponEventService {
     }
 
     /**
-     * 상태와 ID 커서를 기준으로 쿠폰 이벤트 목록을 조회한다.
+     * 상태와 페이지 번호를 기준으로 쿠폰 이벤트 목록을 조회한다.
+     *
+     * <p>관리자 화면의 번호형 페이지네이션을 위해 전체 이벤트 수와 전체
+     * 페이지 수를 함께 계산한다. {@code page}는 0부터 시작한다.</p>
      *
      * @param status 조회할 이벤트 상태, 전체 조회 시 {@code null}
-     * @param cursor 이 값보다 작은 ID를 조회하며 첫 조회 시 {@code null}
+     * @param page 조회할 페이지 번호, 0부터 시작
      * @param size 조회할 이벤트 수, 1 이상 100 이하
-     * @return 이벤트 요약 목록과 다음 커서 정보
-     * @throws CouponEventException 커서 또는 목록 크기가 유효하지 않은 경우
+     * @return 이벤트 요약 목록과 번호형 페이지네이션 정보
+     * @throws CouponEventException 페이지 번호 또는 목록 크기가 유효하지 않은 경우
      */
     @Transactional(readOnly = true)
     public CouponEventListResponse findAll(
             CouponEventStatus status,
-            Long cursor,
+            int page,
             int size
     ) {
-        validateListCondition(cursor, size);
+        validateListCondition(page, size);
 
-        Slice<CouponEvent> eventSlice = findEventSlice(
+        Page<CouponEvent> eventPage = findEventPage(
                 status,
-                cursor,
-                PageRequest.of(0, size)
+                PageRequest.of(page, size)
         );
-        List<CouponEvent> events = eventSlice.getContent();
+        List<CouponEvent> events = eventPage.getContent();
         Map<Long, List<CouponEventItem>> itemsByEventId =
                 findItemsByEventId(events);
 
@@ -247,14 +249,14 @@ public class CouponEventService {
                         itemsByEventId.getOrDefault(event.getId(), List.of())
                 ))
                 .toList();
-        Long nextCursor = eventSlice.hasNext() && !events.isEmpty()
-                ? events.getLast().getId()
-                : null;
-
         return new CouponEventListResponse(
                 responses,
-                nextCursor,
-                eventSlice.hasNext()
+                eventPage.getNumber(),
+                eventPage.getSize(),
+                eventPage.getTotalElements(),
+                eventPage.getTotalPages(),
+                eventPage.hasPrevious(),
+                eventPage.hasNext()
         );
     }
 
@@ -322,32 +324,17 @@ public class CouponEventService {
         );
     }
 
-    private Slice<CouponEvent> findEventSlice(
+    private Page<CouponEvent> findEventPage(
             CouponEventStatus status,
-            Long cursor,
             PageRequest pageable
     ) {
-        if (status == null && cursor == null) {
+        if (status == null) {
             return couponEventRepository.findAllByOrderByIdDesc(pageable);
         }
-        if (status == null) {
-            return couponEventRepository.findByIdLessThanOrderByIdDesc(
-                    cursor,
-                    pageable
-            );
-        }
-        if (cursor == null) {
-            return couponEventRepository.findByEventStatusOrderByIdDesc(
-                    status,
-                    pageable
-            );
-        }
-        return couponEventRepository
-                .findByEventStatusAndIdLessThanOrderByIdDesc(
-                        status,
-                        cursor,
-                        pageable
-                );
+        return couponEventRepository.findByEventStatusOrderByIdDesc(
+                status,
+                pageable
+        );
     }
 
     private Map<Long, List<CouponEventItem>> findItemsByEventId(
@@ -437,9 +424,9 @@ public class CouponEventService {
                 .sum();
     }
 
-    private void validateListCondition(Long cursor, int size) {
-        if (cursor != null && cursor <= 0) {
-            invalid("커서는 양수여야 합니다.");
+    private void validateListCondition(int page, int size) {
+        if (page < 0) {
+            invalid("페이지 번호는 0 이상이어야 합니다.");
         }
         if (size < 1 || size > 100) {
             invalid("목록 크기는 1개 이상 100개 이하여야 합니다.");

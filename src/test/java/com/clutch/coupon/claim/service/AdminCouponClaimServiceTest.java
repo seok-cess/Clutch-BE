@@ -3,6 +3,7 @@ package com.clutch.coupon.claim.service;
 import com.clutch.common.privacy.PersonalDataMasker;
 import com.clutch.coupon.claim.api.dto.AdminCouponClaimListResponse;
 import com.clutch.coupon.claim.domain.ClaimRequestStatus;
+import com.clutch.coupon.claim.exception.CouponClaimException;
 import com.clutch.coupon.claim.repository.AdminCouponClaimQueryRepository;
 import com.clutch.coupon.claim.repository.AdminCouponClaimRow;
 import com.clutch.coupon.claim.repository.AdminCouponClaimSearchCondition;
@@ -22,6 +23,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -46,11 +48,15 @@ class AdminCouponClaimServiceTest {
     }
 
     @Test
-    void 트리거_문자열을_검색하고_커서_페이지와_마스킹_결과를_반환한다() {
+    void 트리거_문자열을_검색하고_번호형_페이지와_마스킹_결과를_반환한다() {
         when(queryRepository.findAll(
                 org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.eq(3)
-        )).thenReturn(List.of(row(30L), row(29L), row(28L)));
+                org.mockito.ArgumentMatchers.eq(2),
+                org.mockito.ArgumentMatchers.eq(2L)
+        )).thenReturn(List.of(row(28L), row(27L)));
+        when(queryRepository.count(
+                org.mockito.ArgumentMatchers.any()
+        )).thenReturn(5L);
 
         AdminCouponClaimListResponse response = service.findAll(
                 "펜타킬 이벤트",
@@ -61,13 +67,16 @@ class AdminCouponClaimServiceTest {
                 null,
                 null,
                 null,
-                null,
+                1,
                 2
         );
 
         assertThat(response.claims()).hasSize(2);
+        assertThat(response.page()).isEqualTo(1);
+        assertThat(response.totalElements()).isEqualTo(5);
+        assertThat(response.totalPages()).isEqualTo(3);
+        assertThat(response.hasPrevious()).isTrue();
         assertThat(response.hasNext()).isTrue();
-        assertThat(response.nextCursor()).isEqualTo(29L);
         assertThat(response.claims().getFirst().maskedName())
                 .isEqualTo("김*정");
         assertThat(response.claims().getFirst().maskedEmail())
@@ -79,8 +88,11 @@ class AdminCouponClaimServiceTest {
                 ArgumentCaptor.forClass(
                         AdminCouponClaimSearchCondition.class
                 );
-        verify(queryRepository).findAll(captor.capture(),
-                org.mockito.ArgumentMatchers.eq(3));
+        verify(queryRepository).findAll(
+                captor.capture(),
+                org.mockito.ArgumentMatchers.eq(2),
+                org.mockito.ArgumentMatchers.eq(2L)
+        );
         assertThat(captor.getValue().eventNameKeyword())
                 .isEqualTo("펜타킬 이벤트");
         assertThat(captor.getValue().triggerKeyword()).isEqualTo("PENTA");
@@ -95,8 +107,12 @@ class AdminCouponClaimServiceTest {
     void 숫자로만_입력한_이벤트_검색어는_ID_조건으로_변환한다() {
         when(queryRepository.findAll(
                 org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.eq(21)
+                org.mockito.ArgumentMatchers.eq(20),
+                org.mockito.ArgumentMatchers.eq(0L)
         )).thenReturn(List.of());
+        when(queryRepository.count(
+                org.mockito.ArgumentMatchers.any()
+        )).thenReturn(0L);
 
         service.findAll(
                 "123",
@@ -107,7 +123,7 @@ class AdminCouponClaimServiceTest {
                 null,
                 null,
                 null,
-                null,
+                0,
                 20
         );
 
@@ -115,8 +131,11 @@ class AdminCouponClaimServiceTest {
                 ArgumentCaptor.forClass(
                         AdminCouponClaimSearchCondition.class
                 );
-        verify(queryRepository).findAll(captor.capture(),
-                org.mockito.ArgumentMatchers.eq(21));
+        verify(queryRepository).findAll(
+                captor.capture(),
+                org.mockito.ArgumentMatchers.eq(20),
+                org.mockito.ArgumentMatchers.eq(0L)
+        );
         assertThat(captor.getValue().eventIdKeyword()).isEqualTo(123L);
         assertThat(captor.getValue().eventNameKeyword()).isNull();
     }
@@ -135,18 +154,30 @@ class AdminCouponClaimServiceTest {
         );
         when(queryRepository.findAll(
                 org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.eq(21)
+                org.mockito.ArgumentMatchers.eq(20),
+                org.mockito.ArgumentMatchers.eq(0L)
         )).thenReturn(List.of(row));
+        when(queryRepository.count(
+                org.mockito.ArgumentMatchers.any()
+        )).thenReturn(1L);
 
         AdminCouponClaimListResponse response = service.findAll(
                 null, null, null, null, null, null,
-                null, null, null, 20
+                null, null, 0, 20
         );
 
         assertThat(response.claims().getFirst().requestStatus())
                 .isEqualTo(ClaimRequestStatus.CANCELLED);
         assertThat(response.claims().getFirst().couponStatus())
                 .isEqualTo(UserCouponStatus.EXPIRED);
+    }
+
+    @Test
+    void 페이지가_0_미만이면_발급_내역을_조회할_수_없다() {
+        assertThatThrownBy(() -> service.findAll(
+                null, null, null, null, null, null,
+                null, null, -1, 20
+        )).isInstanceOf(CouponClaimException.class);
     }
 
     private AdminCouponClaimRow row(Long claimRequestId) {

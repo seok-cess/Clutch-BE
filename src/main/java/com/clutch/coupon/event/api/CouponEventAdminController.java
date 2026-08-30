@@ -54,17 +54,17 @@ public class CouponEventAdminController {
      * 쿠폰 이벤트 목록을 최신순으로 조회한다.
      *
      * @param status 조회할 이벤트 상태, 전체 조회 시 {@code null}
-     * @param cursor 이전 페이지의 마지막 이벤트 ID, 첫 조회 시 {@code null}
+     * @param page 조회할 페이지 번호, 0부터 시작
      * @param size 한 번에 조회할 이벤트 수
-     * @return 이벤트 목록과 다음 커서 정보
+     * @return 이벤트 목록과 번호형 페이지네이션 정보
      */
     @GetMapping
     public CouponEventListResponse findAll(
             @RequestParam(required = false) CouponEventStatus status,
-            @RequestParam(required = false) Long cursor,
+            @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
-        return couponEventService.findAll(status, cursor, size);
+        return couponEventService.findAll(status, page, size);
     }
 
     /**

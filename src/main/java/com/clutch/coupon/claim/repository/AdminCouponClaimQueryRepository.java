@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * 관리자 발급 내역의 동적 필터 조합과 커서 조회를 담당한다.
+ * 관리자 발급 내역의 동적 필터 조합과 번호형 페이지 조회를 담당한다.
  *
  * <p>먼저 발급 요청 테이블을 기준으로 현재 페이지의 ID만 조회한 뒤,
  * 해당 ID에 한해서 이벤트, 쿠폰 종류, 사용자 및 실제 발급 쿠폰을
@@ -73,14 +73,20 @@ public class AdminCouponClaimQueryRepository {
      * 필터에 맞는 발급 요청 ID를 먼저 조회하고 해당 ID의 상세 내역만 조인한다.
      *
      * @param condition 조회 조건
-     * @param limit 다음 페이지 확인용 값을 포함한 최대 조회 건수
+     * @param size 한 페이지에서 조회할 최대 건수
+     * @param offset 첫 행부터 건너뛸 건수
      * @return 조인된 발급 내역
      */
     public List<AdminCouponClaimRow> findAll(
             AdminCouponClaimSearchCondition condition,
-            int limit
+            int size,
+            long offset
     ) {
-        List<Long> claimRequestIds = findClaimRequestIds(condition, limit);
+        List<Long> claimRequestIds = findClaimRequestIds(
+                condition,
+                size,
+                offset
+        );
         if (claimRequestIds.isEmpty()) {
             return List.of();
         }
@@ -101,22 +107,73 @@ public class AdminCouponClaimQueryRepository {
     /**
      * 동적 필터를 적용해 현재 페이지에 포함할 발급 요청 ID만 조회한다.
      *
-     * <p>필터 처리에 필요한 테이블만 선택적으로 조인한다. 필터가 없는
-     * 첫 페이지는 발급 요청 기본 키를 역순으로 읽다가 {@code limit}에서
-     * 중단할 수 있다.</p>
+     * <p>필터 처리에 필요한 테이블만 선택적으로 조인하고, 번호형
+     * 페이지네이션의 {@code offset}과 {@code size}를 SQL에 적용한다.</p>
      *
      * @param condition 조회 조건
-     * @param limit 다음 페이지 확인용 값을 포함한 최대 조회 건수
+     * @param size 한 페이지에서 조회할 최대 건수
+     * @param offset 첫 행부터 건너뛸 건수
      * @return 최신순으로 정렬된 발급 요청 ID
      */
     private List<Long> findClaimRequestIds(
             AdminCouponClaimSearchCondition condition,
-            int limit
+            int size,
+            long offset
     ) {
-        StringBuilder query = new StringBuilder("""
-                SELECT claim.coupon_claim_request_id
-                  FROM coupon_claim_request claim
-                """);
+        FilteredQuery filteredQuery = buildFilteredQuery(
+                condition,
+                "SELECT claim.coupon_claim_request_id"
+        );
+        StringBuilder query = new StringBuilder(filteredQuery.sql());
+        MapSqlParameterSource parameters = filteredQuery.parameters();
+
+        query.append(" ORDER BY claim.coupon_claim_request_id DESC");
+        query.append(" LIMIT :size OFFSET :offset");
+        parameters.addValue("size", size);
+        parameters.addValue("offset", offset);
+
+        return jdbcTemplate.queryForList(
+                query.toString(),
+                parameters,
+                Long.class
+        );
+    }
+
+    /**
+     * 번호형 페이지네이션의 전체 페이지 수 계산에 사용할 전체 건수를 조회한다.
+     *
+     * <p>목록과 동일한 필터 SQL을 재사용해 표시된 목록과 전체 건수가
+     * 서로 다른 조건으로 계산되지 않게 한다.</p>
+     *
+     * @param condition 조회 조건
+     * @return 조회 조건에 맞는 전체 발급 요청 수
+     */
+    public long count(AdminCouponClaimSearchCondition condition) {
+        FilteredQuery filteredQuery = buildFilteredQuery(
+                condition,
+                "SELECT COUNT(*)"
+        );
+        Long total = jdbcTemplate.queryForObject(
+                filteredQuery.sql(),
+                filteredQuery.parameters(),
+                Long.class
+        );
+        return total == null ? 0L : total;
+    }
+
+    /**
+     * 목록과 전체 건수 조회가 공유하는 동적 조인과 필터 SQL을 구성한다.
+     *
+     * @param condition 조회 조건
+     * @param selectClause 목록 ID 또는 전체 건수 선택 절
+     * @return 완성된 필터 SQL과 바인딩 파라미터
+     */
+    private FilteredQuery buildFilteredQuery(
+            AdminCouponClaimSearchCondition condition,
+            String selectClause
+    ) {
+        StringBuilder query = new StringBuilder(selectClause)
+                .append(" FROM coupon_claim_request claim");
 
         if (condition.eventNameKeyword() != null
                 || condition.triggerKeyword() != null) {
@@ -193,20 +250,14 @@ public class AdminCouponClaimQueryRepository {
             query.append(" AND claim.created_at <= :to");
             parameters.addValue("to", condition.to());
         }
-        if (condition.cursor() != null) {
-            query.append(" AND claim.coupon_claim_request_id < :cursor");
-            parameters.addValue("cursor", condition.cursor());
-        }
 
-        query.append(" ORDER BY claim.coupon_claim_request_id DESC");
-        query.append(" LIMIT :limit");
-        parameters.addValue("limit", limit);
+        return new FilteredQuery(query.toString(), parameters);
+    }
 
-        return jdbcTemplate.queryForList(
-                query.toString(),
-                parameters,
-                Long.class
-        );
+    private record FilteredQuery(
+            String sql,
+            MapSqlParameterSource parameters
+    ) {
     }
 
     /**

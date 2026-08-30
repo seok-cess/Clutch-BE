@@ -79,8 +79,10 @@
 | 항목의 `couponTypeId`·`quantity` | 양수 |
 | `openOffsetSeconds` | 0 이상 |
 
-목록은 `status`, `cursor`, `size`를 받고 `couponEvents`, `nextCursor`, `hasNext`를
-반환한다. 상세에는 전체·발급·잔여 수량, 항목별 `successCount`·단계 정보와 가장 최근
+목록은 `status`, `page`, `size`를 받는다. `page`는 0부터 시작하며 응답은 `events`,
+`page`, `size`, `totalElements`, `totalPages`, `hasPrevious`, `hasNext`를 반환한다.
+관리자 화면은 이 정보를 사용해 처음·현재 주변·마지막 페이지 번호를 구성한다.
+상세에는 전체·발급·잔여 수량, 항목별 `successCount`·단계 정보와 가장 최근
 회차(`latestOccurrence`, 없으면 `null`)가 포함된다. 이벤트 상태는 `READY`, `OPEN`,
 `CLOSED`, `CANCELLED`이고 회차 상태는 `OPEN`, `CLOSED`, `CANCELLED`다.
 
@@ -127,12 +129,14 @@ X-User-Id: 1
 ```
 
 이 API만 현재 `ADMIN` 역할을 검사한다. 지원 쿼리는 `eventKeyword`, `triggerKeyword`,
-`userId`, `requestStatus`, `couponStatus`, `couponTypeId`, `from`, `to`, `cursor`, `size`다.
+`userId`, `requestStatus`, `couponStatus`, `couponTypeId`, `from`, `to`, `page`, `size`다.
+`page`는 0부터 시작한다.
 
 - 숫자로만 된 `eventKeyword`는 이벤트 ID 정확 일치, 그 외는 이벤트 이름 부분 일치다.
 - `from`, `to`는 ISO date-time 형식의 `LocalDateTime`이다.
-- 응답은 `claims`, `nextCursor`, `hasNext`다. 각 행은 요청·완료 시각, 이벤트·회차,
-  마스킹된 사용자 정보, 쿠폰 혜택, 요청·쿠폰 상태와 실패 사유를 포함한다.
+- 응답은 `claims`, `page`, `size`, `totalElements`, `totalPages`, `hasPrevious`,
+  `hasNext`다. 각 행은 요청·완료 시각, 이벤트·회차, 마스킹된 사용자 정보, 쿠폰 혜택,
+  요청·쿠폰 상태와 실패 사유를 포함한다.
 
 ## 재고 조회·SSE·복구
 
