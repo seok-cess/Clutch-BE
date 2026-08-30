@@ -77,4 +77,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     /** 일반 사용자만 보유 포인트가 높은 순으로 조회한다. 동점은 사용자 ID 오름차순으로 고정한다. */
     List<User> findAllByRoleOrderByPointDescIdAsc(UserRole role, Pageable pageable);
+
+    /** 특정 포인트보다 보유 포인트가 높은 일반 사용자 수를 조회한다. */
+    long countByRoleAndPointGreaterThan(UserRole role, long point);
 }

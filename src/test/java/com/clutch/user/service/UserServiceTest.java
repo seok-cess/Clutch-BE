@@ -7,6 +7,7 @@ import com.clutch.betting.repository.UserBetRepository;
 import com.clutch.common.privacy.PersonalDataMasker;
 import com.clutch.user.domain.User;
 import com.clutch.user.domain.UserRole;
+import com.clutch.user.dto.MyPointRanking;
 import com.clutch.user.dto.PointRanking;
 import com.clutch.user.dto.UserPointSummary;
 import com.clutch.user.exception.UserNotFoundException;
@@ -74,6 +75,17 @@ class UserServiceTest {
         UserPointSummary summary = service.getPointSummary(10L);
 
         assertThat(summary).isEqualTo(new UserPointSummary(12_450L, 26L, 15L, 3_600L));
+    }
+
+    @Test
+    void returnsMyPointRankingFromUsersWithMorePoints() {
+        given(userRepository.findPointById(10L)).willReturn(Optional.of(12_450L));
+        given(userRepository.countByRoleAndPointGreaterThan(UserRole.USER, 12_450L))
+                .willReturn(23L);
+
+        MyPointRanking ranking = service.getMyPointRanking(10L);
+
+        assertThat(ranking).isEqualTo(new MyPointRanking(12_450L, 24L));
     }
 
     @Test
