@@ -50,6 +50,7 @@
 | 특정 기술 방식을 왜 선택했는가? | [기술 결정 기록](03-decisions/README.md) |
 | Redis 쿠폰 재고 장애에 어떻게 대응하는가? | [Redis 쿠폰 재고 장애 복구](06-operations/coupon-redis-recovery.md) |
 | 쿠폰 데이터 정합성을 어떻게 검증하는가? | [쿠폰 대량 데이터 정합성 검증](07-verification/README.md) |
+| 쿠폰 20,000 VU 부하 테스트를 어떻게 실행하는가? | [쿠폰 Ramp 테스트 가이드](../k6/ramp/README.md) |
 | 개발 중 발생한 쿠폰 문제와 해결 과정은 무엇인가? | [`08-troubleshooting/`](08-troubleshooting/) |
 
 ## 현재 문서 목록
@@ -100,9 +101,11 @@
 - [Redis 쿠폰 재고 장애 복구](06-operations/coupon-redis-recovery.md)
 - [쿠폰 대량 데이터 정합성 검증](07-verification/README.md)
 - [쿠폰 대량 데이터 정합성 검증 결과](07-verification/results/2026-08-26-coupon-integrity.md)
+- [쿠폰 20,000 VU 부하 테스트 결과](07-verification/results/2026-08-30-coupon-20000-vu-load-test.md)
 - [쿠폰 집계 안정성 개선 보고서](07-verification/results/2026-08-26-coupon-reliability-improvements.pdf)
 - [쿠폰 대량 발급 행 잠금 문제](08-troubleshooting/coupon-claim-lock-contention-troubleshooting.md)
 - [새 쿠폰 회차 첫 발급 실패 문제](08-troubleshooting/coupon-first-claim-initialization-troubleshooting.md)
+- [쿠폰 20,000 VU 부하 테스트 문제](08-troubleshooting/coupon-20000-vu-load-test-troubleshooting.md)
 
 ## 문서별 역할
 
