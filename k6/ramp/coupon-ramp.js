@@ -22,6 +22,7 @@ const finalVerificationTimeoutSeconds = positiveNumber(
 const claimAttempts = new Counter('coupon_claim_attempt_total');
 
 export const options = {
+  noConnectionReuse: true,
   scenarios: {
     claimers: {
       executor: 'ramping-vus',

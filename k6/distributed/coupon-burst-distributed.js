@@ -48,7 +48,7 @@ const rampUpSeconds = phase === 'load'
   ? positiveInteger(__ENV.RAMP_UP_SECONDS, 60, 'RAMP_UP_SECONDS')
   : null;
 const holdSeconds = phase === 'load'
-  ? positiveInteger(__ENV.HOLD_SECONDS, 30, 'HOLD_SECONDS')
+  ? positiveInteger(__ENV.HOLD_SECONDS, 1, 'HOLD_SECONDS')
   : null;
 const verifyIndividualPersistence = phase === 'load'
   ? booleanValue(
@@ -76,6 +76,7 @@ if (phase !== 'verify' && couponQuantity >= virtualUsers) {
 
 const claimSuccesses = new Counter('coupon_claim_success_total');
 const claimSoldOuts = new Counter('coupon_claim_sold_out_total');
+const claimAttempts = new Counter('coupon_claim_attempt_total');
 const unexpectedClaims = new Counter('coupon_claim_unexpected_total');
 const expectedClaimResults = new Rate('coupon_claim_expected');
 const expectedClaims = new Counter('coupon_claim_expected_total');
@@ -90,6 +91,7 @@ const loadThresholds = {
   http_req_failed: ['rate<0.01'],
   'http_req_duration{endpoint:claim,expected_response:true}': ['p(95)<5000'],
   coupon_claim_expected: ['rate>0.99'],
+  coupon_claim_attempt_total: [`count==${expectedClaimCount}`],
   coupon_claim_expected_total: [`count==${expectedClaimCount}`],
   coupon_claim_unexpected_total: ['count==0'],
   coupon_claim_transport_failure_total: ['count==0'],
@@ -101,6 +103,7 @@ if (verifyIndividualPersistence) {
 
 export const options = phase === 'load'
   ? {
+    noConnectionReuse: true,
     scenarios: {
       claimers: {
         executor: 'ramping-vus',
@@ -151,6 +154,7 @@ export function claimCoupon(data) {
 
   // idInTest는 execution segment가 적용된 두 실행기 전체에서 중복되지 않는다.
   const userId = userIdStart + exec.vu.idInTest - 1;
+  claimAttempts.add(1);
   const response = http.post(
     `${baseUrl}/api/v1/coupon-events/${data.couponEventId}`
       + `/occurrences/${data.couponEventOccurrenceId}/claims`,
@@ -191,7 +195,8 @@ export function claimCoupon(data) {
 
   claimSuccesses.add(success ? 1 : 0);
   claimSoldOuts.add(soldOut ? 1 : 0);
-  unexpectedClaims.add(expected ? 0 : 1);
+  // 전송 실패는 transport 지표로만 집계하고, HTTP 비정상 응답과 중복 집계하지 않는다.
+  unexpectedClaims.add(!transportFailure && !expected ? 1 : 0);
   expectedClaimResults.add(expected);
   expectedClaims.add(expected ? 1 : 0);
   check(response, {
