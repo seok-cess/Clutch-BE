@@ -145,4 +145,4 @@ Consumer와 통계 Consumer에서 각각 DLT로 발행될 수 있다. 현재 단
 - `com.clutch.coupon.claim.result`
 - `com.clutch.coupon.statistics`
 - `src/main/resources/db/migration/V17__coupon_issue_statistics.sql`
-- `docs/api/coupon-issue-statistics.md`
+- `docs/01-api/coupon-issue-statistics.md`

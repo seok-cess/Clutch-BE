@@ -340,3 +340,24 @@ docker compose down
 | `KAFKA_CONSUMER_GROUP` | `clutch-local` |
 
 MySQL root 비밀번호나 호스트 포트처럼 Docker Compose에서만 사용하는 값은 Spring Boot 설정이 아닙니다. 필요한 경우 셸 환경변수 또는 Git에 커밋되지 않는 `.env` 파일로 `compose.yaml`의 기본값을 변경할 수 있습니다.
+
+## 문서 구조
+
+`docs/`는 과제 요구사항부터 설계, 개발 규칙, 운영 및 검증 결과까지 순서대로 찾을 수 있도록 구성합니다. 상위 폴더의 번호는 문서의 중요도가 아니라 처음 프로젝트를 이해할 때의 탐색 순서를 의미합니다.
+
+```text
+docs/
+├── README.md
+├── 00-project/                 # 과제 원문과 확정 요구사항
+├── 01-api/                     # 기능별 HTTP API와 스트림 계약
+├── 02-domain/                  # 기능별 비즈니스 규칙
+├── 03-decisions/               # 중요한 기술 결정 기록(ADR)
+├── 04-conventions/             # 패키지, 데이터베이스, 파일, Git 규칙
+├── 05-architecture/            # 전체 시스템 구성과 핵심 데이터 흐름
+├── 06-operations/              # 실행, 모니터링, 장애 복구 절차
+├── 07-verification/            # 검증 방법, 스크립트, 실행 결과
+├── 08-troubleshooting/         # 개발 중 발생한 문제와 해결 기록
+└── assets/                     # 문서에서 사용하는 이미지
+```
+
+새로운 하위 분류가 필요하면 `01-01`, `01-02`처럼 상위 번호를 이어서 사용합니다. 일반 문서에는 번호를 붙이지 않고, ADR에는 결정 순서 번호를, 검증 결과에는 실행 날짜를 사용합니다. 세부 문서와 상황별 안내는 `docs/README.md`에서 관리합니다.

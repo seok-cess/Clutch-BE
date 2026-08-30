@@ -3,6 +3,8 @@ package com.clutch.betting.repository;
 import com.clutch.betting.domain.BetPointTransaction;
 import com.clutch.betting.domain.BetPointTransactionType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
 import java.util.List;
@@ -42,5 +44,18 @@ public interface BetPointTransactionRepository extends JpaRepository<BetPointTra
      * @return 해당 배팅의 포인트 원장 목록
      */
     List<BetPointTransaction> findAllByUserBetIdIn(Collection<Long> userBetIds);
+
+    /** 특정 사용자가 적중 배팅으로 한 번에 지급받은 최대 포인트를 조회한다. */
+    @Query("""
+            select coalesce(max(pointTransaction.pointDelta), 0)
+            from BetPointTransaction pointTransaction
+            join UserBet bet on bet.id = pointTransaction.userBetId
+            where bet.userId = :userId
+              and pointTransaction.transactionType = :transactionType
+            """)
+    long findMaxPointDeltaByUserIdAndTransactionType(
+            @Param("userId") Long userId,
+            @Param("transactionType") BetPointTransactionType transactionType
+    );
 
 }

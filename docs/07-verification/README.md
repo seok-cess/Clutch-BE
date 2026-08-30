@@ -24,7 +24,7 @@ Windows에서 MySQL CLI를 실행하는 예시는 다음과 같다. PowerShell�
 리디렉션 제약을 피하기 위해 `cmd.exe /c`로 실행한다.
 
 ```powershell
-cmd.exe /c "mysql --host=100.101.76.93 --port=3306 --user=clutch --password --database=clutch --default-character-set=utf8mb4 < docs\verification\coupon-integrity.sql"
+cmd.exe /c "mysql --host=100.101.76.93 --port=3306 --user=clutch --password --database=clutch --default-character-set=utf8mb4 < docs\07-verification\coupon-integrity.sql"
 ```
 
 MySQL Workbench에서는 원격 DB 연결을 선택하고 SQL 파일 전체를 실행한다.

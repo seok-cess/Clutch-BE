@@ -104,11 +104,11 @@
 - 관리자 운영 홈의 실패 수는 확정 발급 실패와 위 사전 거절을 합산한다. 거절 통계 발행
   실패가 기존 사용자 409·503 응답을 변경해서는 안 된다.
 - 관리자 발급 통계는 Kafka 전달 시점까지의 비동기 값이며 재고와 장애 복구 판단에는
-  사용하지 않는다. 상세 결정은 `docs/adr/004-kafka-coupon-issue-statistics.md`를 따른다.
+  사용하지 않는다. 상세 결정은 `docs/03-decisions/004-kafka-coupon-issue-statistics.md`를 따른다.
 - 기존 `coupon.claim.accepted` 소비 경로는 호환을 위해 유지하며 신규 발급 요청의 핵심 경로에서는 사용하지 않는다.
-- 상세 결정과 대안은 `docs/adr/001-synchronous-coupon-issuance.md`와
-  `docs/adr/003-async-coupon-success-count.md`,
-  `docs/adr/005-kafka-coupon-claim-rejection-statistics.md`를 따른다.
+- 상세 결정과 대안은 `docs/03-decisions/001-synchronous-coupon-issuance.md`와
+  `docs/03-decisions/003-async-coupon-success-count.md`,
+  `docs/03-decisions/005-kafka-coupon-claim-rejection-statistics.md`를 따른다.
 - 여러 애플리케이션 인스턴스가 실행되어도 성공 수량 집계는 MySQL named lock을
   획득한 한 인스턴스만 수행한다. 잠금을 얻지 못한 인스턴스는 해당 주기를 건너뛴다.
 
@@ -119,7 +119,7 @@
 - 재고 소진은 정상 상태로 `0`을 전달하고 Redis 키 누락 또는 조회 장애와 구분한다.
 - 발급에 따른 SSE 알림은 실제 쿠폰 발급 transaction이 commit된 뒤 전송한다.
 - SSE 재연결 시 Redis의 최신 스냅샷을 즉시 전달하여 연결 단절 중 놓친 상태를 복구한다.
-- 상세 HTTP와 SSE 계약은 `docs/api/coupon-stock.md`를 따른다.
+- 상세 HTTP와 SSE 계약은 [`../01-api/coupon.md`](../01-api/coupon.md)를 따른다.
 
 ## Redis 재고 장애 복구
 
@@ -130,7 +130,7 @@
 - 복구 전에 성공 발급 요청 수와 실제 쿠폰 수를 비교한다.
 - 값이 다르면 자동 복구를 중단하고 운영자 확인 전까지 발급을 재개하지 않는다.
 - 검증을 통과하면 Redis 재고와 회차별 발급 사용자 목록을 함께 재구축한다.
-- 상세 결정은 `docs/adr/002-redis-coupon-stock-recovery.md`를 따른다.
+- 상세 결정은 `docs/03-decisions/002-redis-coupon-stock-recovery.md`를 따른다.
 
 ## 관련 코드
 
