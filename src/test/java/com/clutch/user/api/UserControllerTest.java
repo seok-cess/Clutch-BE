@@ -3,6 +3,8 @@ package com.clutch.user.api;
 import com.clutch.user.exception.UserNotFoundException;
 import com.clutch.user.dto.PointRanking;
 import com.clutch.user.dto.MyPointRanking;
+import com.clutch.user.dto.PointTransactionHistory;
+import com.clutch.user.dto.PointTransactionType;
 import com.clutch.user.dto.UserPointSummary;
 import com.clutch.user.service.UserService;
 import org.junit.jupiter.api.Test;
@@ -11,6 +13,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.mockito.BDDMockito.given;
@@ -82,6 +85,33 @@ class UserControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.point").value(12450))
                 .andExpect(jsonPath("$.rank").value(24));
+    }
+
+    @Test
+    void getsCurrentUserPointTransactionHistory() throws Exception {
+        given(userService.getPointTransactionHistory(10L)).willReturn(List.of(
+                new PointTransactionHistory(
+                        "watch-20",
+                        PointTransactionType.WATCH_REWARD,
+                        100L,
+                        LocalDateTime.of(2026, 8, 31, 12, 0)
+                ),
+                new PointTransactionHistory(
+                        "bet-30",
+                        PointTransactionType.BET_STAKE,
+                        -3_000L,
+                        LocalDateTime.of(2026, 8, 31, 11, 50)
+                )
+        ));
+
+        mockMvc.perform(get("/api/users/me/point-transactions")
+                        .header("X-User-Id", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].transactionId").value("watch-20"))
+                .andExpect(jsonPath("$[0].type").value("WATCH_REWARD"))
+                .andExpect(jsonPath("$[0].pointDelta").value(100))
+                .andExpect(jsonPath("$[1].type").value("BET_STAKE"))
+                .andExpect(jsonPath("$[1].pointDelta").value(-3000));
     }
 
     @Test

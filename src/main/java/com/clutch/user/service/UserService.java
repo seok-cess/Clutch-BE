@@ -9,6 +9,8 @@ import com.clutch.user.domain.User;
 import com.clutch.user.domain.UserRole;
 import com.clutch.user.dto.MyPointRanking;
 import com.clutch.user.dto.PointRanking;
+import com.clutch.user.dto.PointTransactionHistory;
+import com.clutch.user.dto.PointTransactionType;
 import com.clutch.user.dto.UserPointSummary;
 import com.clutch.user.exception.UserNotFoundException;
 import com.clutch.user.repository.UserRepository;
@@ -18,7 +20,9 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Stream;
 
 /** 사용자 포인트 정보와 포인트 순위를 조회한다. */
 @Service
@@ -92,6 +96,53 @@ public class UserService {
     }
 
     /**
+     * 시청 수령과 승부예측으로 발생한 포인트 증감 원장을 최신 순으로 조회한다.
+     *
+     * @param userId 사용자 ID
+     * @return 시청 보상·배팅 차감·적중 지급·환불이 합쳐진 포인트 내역
+     * @throws UserNotFoundException 사용자를 찾을 수 없을 때
+     */
+    @Transactional(readOnly = true)
+    public List<PointTransactionHistory> getPointTransactionHistory(Long userId) {
+        getPoint(userId);
+
+        List<PointTransactionHistory> watchTransactions = watchPointTransactionRepository
+                .findAllByUserIdOrderByCreatedAtDescIdDesc(userId)
+                .stream()
+                .map(transaction -> new PointTransactionHistory(
+                        "watch-" + transaction.getId(),
+                        PointTransactionType.WATCH_REWARD,
+                        transaction.getAwardedPoint(),
+                        transaction.getCreatedAt()
+                ))
+                .toList();
+
+        List<Long> userBetIds = userBetRepository.findAllByUserIdOrderByCreatedAtDescIdDesc(userId)
+                .stream()
+                .map(userBet -> userBet.getId())
+                .toList();
+        if (userBetIds.isEmpty()) {
+            return watchTransactions;
+        }
+
+        List<PointTransactionHistory> betTransactions = betPointTransactionRepository
+                .findAllByUserBetIdIn(userBetIds)
+                .stream()
+                .map(transaction -> new PointTransactionHistory(
+                        "bet-" + transaction.getId(),
+                        toPointTransactionType(transaction.getTransactionType()),
+                        transaction.getPointDelta(),
+                        transaction.getCreatedAt()
+                ))
+                .toList();
+
+        return Stream.concat(watchTransactions.stream(), betTransactions.stream())
+                .sorted(Comparator.comparing(PointTransactionHistory::createdAt).reversed()
+                        .thenComparing(PointTransactionHistory::transactionId))
+                .toList();
+    }
+
+    /**
      * 보유 포인트 기준 전체 사용자 상위 10명을 조회한다. 동점은 사용자 ID 오름차순으로 정렬한다.
      * 공개 순위에는 개인정보 보호를 위해 사용자 이름을 마스킹해 반환한다.
      *
@@ -115,5 +166,13 @@ public class UserService {
             displayName = "익명 사용자";
         }
         return new PointRanking(rank, displayName, user.getPoint());
+    }
+
+    private PointTransactionType toPointTransactionType(BetPointTransactionType transactionType) {
+        return switch (transactionType) {
+            case STAKE -> PointTransactionType.BET_STAKE;
+            case PAYOUT -> PointTransactionType.BET_PAYOUT;
+            case REFUND -> PointTransactionType.BET_REFUND;
+        };
     }
 }
