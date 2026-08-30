@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <title>쿠폰 성공 수량 집계 안정성 개선 보고서</title>
+  <style>
+    @page { size: A4; margin: 17mm 16mm 18mm; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: #172033;
+      font-family: "Malgun Gothic", "Noto Sans KR", sans-serif;
+      font-size: 10.5pt;
+      line-height: 1.58;
+      word-break: keep-all;
+    }
+    h1, h2, h3 { margin: 0; color: #102a43; }
+    h1 { font-size: 25pt; line-height: 1.25; letter-spacing: -0.8px; }
+    h2 {
+      margin-top: 8mm;
+      padding-bottom: 2mm;
+      border-bottom: 2px solid #1d4ed8;
+      font-size: 16pt;
+    }
+    h3 { margin-top: 5mm; font-size: 12.5pt; }
+    p { margin: 2.5mm 0; }
+    ul, ol { margin: 2.5mm 0 2.5mm 6mm; padding-left: 5mm; }
+    li { margin: 1.2mm 0; }
+    code {
+      padding: 0.2mm 1mm;
+      border-radius: 3px;
+      background: #eef2ff;
+      color: #253b80;
+      font-family: Consolas, monospace;
+      font-size: 9pt;
+    }
+    .cover {
+      min-height: 250mm;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 12mm 8mm;
+      background: linear-gradient(145deg, #eff6ff 0%, #ffffff 60%);
+    }
+    .eyebrow { color: #1d4ed8; font-weight: 700; letter-spacing: 1.6px; }
+    .subtitle { margin-top: 5mm; color: #52606d; font-size: 14pt; }
+    .meta {
+      margin-top: 18mm;
+      padding: 5mm;
+      border-left: 4px solid #1d4ed8;
+      background: rgba(255,255,255,0.85);
+    }
+    .page-break { break-before: page; }
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 4mm;
+      margin-top: 5mm;
+    }
+    .card {
+      min-height: 27mm;
+      padding: 4mm;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      background: #f8fafc;
+    }
+    .card strong { display: block; margin-bottom: 1.5mm; color: #1e40af; }
+    .flow {
+      display: grid;
+      grid-template-columns: 1fr 9mm 1fr 9mm 1fr;
+      align-items: center;
+      margin: 5mm 0;
+    }
+    .flow-box {
+      padding: 4mm 2mm;
+      border: 1px solid #93c5fd;
+      border-radius: 7px;
+      background: #eff6ff;
+      text-align: center;
+      font-weight: 700;
+    }
+    .arrow { text-align: center; color: #2563eb; font-size: 18pt; }
+    table {
+      width: 100%;
+      margin: 4mm 0;
+      border-collapse: collapse;
+      font-size: 9.4pt;
+    }
+    th, td { padding: 2.2mm 2.5mm; border: 1px solid #cbd5e1; vertical-align: top; }
+    th { color: #1e3a8a; background: #eaf2ff; text-align: left; }
+    tr:nth-child(even) td { background: #f8fafc; }
+    .callout {
+      margin: 5mm 0;
+      padding: 4mm;
+      border-left: 4px solid #0f766e;
+      background: #ecfdf5;
+    }
+    .warning {
+      border-left-color: #d97706;
+      background: #fffbeb;
+    }
+    .check { color: #047857; font-weight: 700; }
+    .muted { color: #64748b; }
+    .small { font-size: 8.8pt; }
+    .file-list td:first-child { width: 44%; font-family: Consolas, monospace; font-size: 8.2pt; }
+    .footer-note { margin-top: 8mm; color: #64748b; font-size: 8.5pt; }
+  </style>
+</head>
+<body>
+  <section class="cover">
+    <div class="eyebrow">CLUTCH BACKEND · IMPLEMENTATION REPORT</div>
+    <h1>쿠폰 성공 수량 집계<br>안정성 개선 보고서</h1>
+    <p class="subtitle">상태 계약 · 계산형 만료 · 테스트 격리 · 운영 메트릭 · 다중 인스턴스 제어</p>
+    <div class="meta">
+      <div><strong>작성일</strong> 2026-08-26 (Asia/Seoul)</div>
+      <div><strong>최종 재검증</strong> 2026-08-27 (Asia/Seoul)</div>
+      <div><strong>작업 브랜치</strong> feat/CLUTCH-268</div>
+      <div><strong>기준 dev</strong> 5b81ad0</div>
+      <div><strong>검증</strong> Gradle clean build · 507 tests passed</div>
+      <div><strong>제외 범위</strong> k6 스크립트는 요청에 따라 수정하지 않음</div>
+    </div>
+  </section>
+
+  <section class="page-break">
+    <h2>1. 결론</h2>
+    <p>
+      쿠폰 발급의 핵심 Redis·MySQL 흐름은 유지하면서, 기존 데이터 조회 실패 가능성,
+      반복 테스트 충돌, 운영 가시성 부족, 다중 서버 중복 집계 문제를 개선했다.
+      데이터베이스 스키마는 이미 필요한 상태를 허용하므로 새 migration은 만들지 않았다.
+    </p>
+    <div class="summary-grid">
+      <div class="card">
+        <strong>상태 계약 일치</strong>
+        DB에 존재하는 요청 <code>CANCELLED</code>와 쿠폰 <code>EXPIRED</code>를
+        Java enum, JPA, 관리자 API가 안전하게 처리한다.
+      </div>
+      <div class="card">
+        <strong>반복 가능한 테스트</strong>
+        테스트 claim ID 충돌을 방지하고 테스트 커넥션 풀과 자동 집계를 격리했다.
+      </div>
+      <div class="card">
+        <strong>운영 메트릭</strong>
+        집계 시간, 실패, 락 스킵, 비교 항목, 갱신 항목을 Prometheus에서 확인한다.
+      </div>
+      <div class="card">
+        <strong>다중 인스턴스 안전성</strong>
+        MySQL named lock을 즉시 획득한 한 인스턴스만 전체 집계를 실행한다.
+      </div>
+    </div>
+
+    <h2>2. 변경 전 확인된 문제</h2>
+    <table>
+      <thead><tr><th>영역</th><th>문제</th><th>위험</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>상태 계약</td>
+          <td>DB는 요청 <code>CANCELLED</code>, 쿠폰 <code>EXPIRED</code>를 허용하지만 Java enum에 없음</td>
+          <td>JPA 조회·관리자 응답 변환 중 예외 가능</td>
+        </tr>
+        <tr>
+          <td>테스트 데이터</td>
+          <td><code>claimId=2001/3001/8001</code>을 반복 사용</td>
+          <td>공유 로컬 DB의 기존 데이터와 충돌하여 clean build 실패</td>
+        </tr>
+        <tr>
+          <td>운영 관측</td>
+          <td>집계 성공 여부와 실행 시간을 알 수 없음</td>
+          <td>지연·실패·불필요한 반복 실행을 탐지하기 어려움</td>
+        </tr>
+        <tr>
+          <td>서버 확장</td>
+          <td><code>@Scheduled</code>가 인스턴스마다 동일 전체 집계를 실행</td>
+          <td>서버 수에 비례해 MySQL 전체 집계 부하 증가</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="page-break">
+    <h2>3. 상태 계약 개선</h2>
+    <h3>3.1 정확히 바꾼 내용</h3>
+    <ul>
+      <li><code>ClaimRequestStatus</code>에 <code>CANCELLED</code> 추가</li>
+      <li><code>UserCouponStatus</code>에 <code>EXPIRED</code> 추가</li>
+      <li>관리자 발급 내역의 문자열 변환이 두 상태를 정상 응답하도록 테스트 추가</li>
+      <li>JPA가 DB의 <code>CANCELLED</code> 요청과 <code>EXPIRED</code> 쿠폰을 역직렬화하는 통합 테스트 추가</li>
+      <li><code>ISSUED</code> 쿠폰은 기준 시각이 <code>expiresAt</code> 이상이면 사용자·관리자 응답에서 <code>EXPIRED</code>로 계산</li>
+      <li><code>ISSUED</code>/<code>EXPIRED</code> 필터도 저장 상태와 만료 시각을 함께 사용하도록 통일</li>
+      <li>쿠폰 사용과 관리자 취소를 모두 만료 시각 이전의 <code>ISSUED</code> 상태에서만 조건부 갱신</li>
+    </ul>
+    <div class="callout warning">
+      <strong>범위 통제:</strong> 발급 요청 <code>CANCELLED</code>는 기존 DB 값을 안전하게 읽는
+      호환성 범위로 유지한다. 쿠폰 <code>EXPIRED</code>는 배치로 대량 갱신하지 않고
+      <code>expiresAt</code>을 기준으로 계산해 배치 지연 없이 같은 결과를 반환한다.
+    </div>
+
+    <h3>3.2 상태 계약</h3>
+    <table>
+      <thead><tr><th>대상</th><th>허용 상태</th><th>현재 생성 경로</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>coupon_claim_request</td>
+          <td>PENDING, SUCCEEDED, FAILED, CANCELLED</td>
+          <td>PENDING → SUCCEEDED 또는 FAILED</td>
+        </tr>
+        <tr>
+          <td>user_coupon</td>
+          <td>ISSUED, USED, EXPIRED, CANCELLED</td>
+          <td>ISSUED → USED 또는 CANCELLED, 만료 시각부터 유효 상태 EXPIRED</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>4. 테스트 격리 개선</h2>
+    <ul>
+      <li><code>UserCouponRepositoryTest</code>는 최신 <code>dev</code>의 충돌 방지용 <code>CLAIM_BASE</code> 대역을 유지</li>
+      <li><code>CouponIssuanceServiceFailureTest</code>의 claim ID를 UUID 기반으로 생성</li>
+      <li>테스트 설정에서 성공 수량 자동 스케줄러를 비활성화하고 테스트가 필요한 경우 서비스를 직접 호출</li>
+      <li>일반 테스트 Hikari 풀을 4개로 제한해 Spring context 누적으로 MySQL 151 연결 한도를 넘지 않도록 조정</li>
+      <li>실제 동시성 테스트는 기존 클래스 설정의 30개 풀을 유지</li>
+    </ul>
+    <p>
+      첫 전체 실행에서 신규 테스트 context가 추가되면서 MySQL <code>Too many connections</code>가
+      재현됐다. 이를 숨기지 않고 테스트 전용 풀 제한을 적용한 뒤 전체 빌드를 다시 실행해 통과시켰다.
+    </p>
+  </section>
+
+  <section class="page-break">
+    <h2>5. 다중 인스턴스 집계 제어</h2>
+    <div class="flow">
+      <div class="flow-box">각 앱 인스턴스<br>5초 스케줄</div>
+      <div class="arrow">→</div>
+      <div class="flow-box">GET_LOCK(name, 0)<br>즉시 획득 시도</div>
+      <div class="arrow">→</div>
+      <div class="flow-box">획득한 1대만<br>GROUP BY 집계</div>
+    </div>
+    <ul>
+      <li>락 이름: <code>clutch:coupon-success-count-synchronization</code></li>
+      <li>공유 MySQL 서버에서는 <code>COUPON_SUCCESS_COUNT_SYNC_LOCK_NAME</code>으로 환경별 이름 지정</li>
+      <li>대기 시간: 0초. 다른 인스턴스가 실행 중이면 해당 주기를 즉시 건너뜀</li>
+      <li>정상·예외 종료 모두 <code>RELEASE_LOCK</code> 실행</li>
+      <li>DB 연결이 물리적으로 종료되어도 MySQL이 named lock을 자동 해제</li>
+      <li>락 보유 중 실제 집계는 기존 <code>@Transactional</code> 서비스에서 수행</li>
+    </ul>
+    <p>
+      스케줄 책임을 <code>CouponSuccessCountSynchronizationScheduler</code>로 분리하고,
+      실제 데이터 보정은 <code>CouponSuccessCountSynchronizer</code>가 담당한다.
+      집계 서비스는 비교 항목 수와 갱신 항목 수를 결과 객체로 반환한다.
+    </p>
+
+    <h3>5.1 잠금 검증</h3>
+    <ul>
+      <li>한 DB 연결이 락을 가진 동안 다른 연결의 작업이 실행되지 않음을 통합 테스트로 확인</li>
+      <li>작업 종료 후 다음 실행이 동일 락을 다시 획득함을 확인</li>
+      <li>스케줄러 단위 테스트에서 성공·스킵·실패 세 경로를 모두 확인</li>
+    </ul>
+
+    <h2>6. 추가한 운영 메트릭</h2>
+    <table>
+      <thead><tr><th>Prometheus 이름</th><th>의미</th></tr></thead>
+      <tbody>
+        <tr><td><code>clutch_coupon_success_count_synchronization_duration_seconds</code></td><td>outcome(success/skipped/failure)별 실행 시간</td></tr>
+        <tr><td><code>clutch_coupon_success_count_synchronization_failures_total</code></td><td>집계 예외 누적 횟수</td></tr>
+        <tr><td><code>clutch_coupon_success_count_synchronization_lock_skipped_total</code></td><td>다른 인스턴스 실행 때문에 건너뛴 누적 횟수</td></tr>
+        <tr><td><code>clutch_coupon_success_count_synchronization_items_scanned</code></td><td>실행당 비교한 이벤트 항목 수</td></tr>
+        <tr><td><code>clutch_coupon_success_count_synchronization_items_updated</code></td><td>실행당 실제 갱신한 이벤트 항목 수</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="page-break">
+    <h2>7. 검증 결과</h2>
+    <h3>7.1 자동화 테스트</h3>
+    <table>
+      <thead><tr><th>검증</th><th>결과</th></tr></thead>
+      <tbody>
+        <tr><td>상태 정책 관련 테스트 6개 클래스</td><td class="check">16 tests · 0 failures</td></tr>
+        <tr><td><code>gradlew.bat clean build</code></td><td class="check">507 tests · 0 failures · 0 errors · 0 skipped</td></tr>
+        <tr><td>컴파일·bootJar·check·build</td><td class="check">BUILD SUCCESSFUL (1m 57s)</td></tr>
+        <tr><td>Flyway / Hibernate validate</td><td class="check">MySQL 8.4에서 통과</td></tr>
+      </tbody>
+    </table>
+
+    <h3>7.2 실행 중 메트릭 확인</h3>
+    <p>최신 이미지를 로컬 Docker Compose에 기동하고 <code>/actuator/prometheus</code>에서 확인했다.</p>
+    <table>
+      <thead><tr><th>관측값</th><th>결과</th></tr></thead>
+      <tbody>
+        <tr><td>성공 실행 수</td><td>관측 시점 6회</td></tr>
+        <tr><td>실행 시간 합계 / 최대</td><td>137.96 ms / 64.13 ms</td></tr>
+        <tr><td>실행당 비교 항목</td><td>8개</td></tr>
+        <tr><td>실제 갱신 항목</td><td>0개 — 이미 정합한 상태</td></tr>
+        <tr><td>실패 / 락 스킵</td><td>0 / 0</td></tr>
+      </tbody>
+    </table>
+
+    <h3>7.3 관련 테스트 구성</h3>
+    <ul class="small">
+      <li>상태 JPA 호환: CouponClaimRequestRepositoryTest, UserCouponRepositoryTest</li>
+      <li>계산형 만료 경계: UserCouponTest, CouponQueryServiceTest</li>
+      <li>만료 후 취소 차단: AdminCouponServiceTest, UserCouponRepositoryTest</li>
+      <li>유효 상태 필터: UserCouponRepositoryTest, AdminCouponClaimQueryRepositoryTest</li>
+      <li>관리자 응답 호환: AdminCouponClaimServiceTest</li>
+      <li>집계 결과: CouponSuccessCountSynchronizerTest</li>
+      <li>메트릭 세 경로: CouponSuccessCountSynchronizationSchedulerTest</li>
+      <li>실제 MySQL 락 경쟁·해제: MySqlCouponSuccessCountSynchronizationLockTest</li>
+      <li>Outbox 격리: CouponIssuanceServiceFailureTest</li>
+    </ul>
+  </section>
+
+  <section class="page-break">
+    <h2>8. 변경 파일</h2>
+    <table class="file-list">
+      <thead><tr><th>파일</th><th>변경 내용</th></tr></thead>
+      <tbody>
+        <tr><td>ClaimRequestStatus.java</td><td>CANCELLED 조회 호환 상태 추가</td></tr>
+        <tr><td>UserCouponStatus.java</td><td>EXPIRED 조회 호환 상태 추가</td></tr>
+        <tr><td>UserCoupon.java / CouponResponse.java</td><td>저장 상태와 만료 시각을 반영한 유효 상태 계산</td></tr>
+        <tr><td>UserCouponRepository.java</td><td>유효 상태 목록 필터와 만료 후 취소 차단</td></tr>
+        <tr><td>CouponQueryService.java</td><td>한 기준 시각으로 목록·단건 응답 상태 계산</td></tr>
+        <tr><td>CouponUseService.java / AdminCouponService.java</td><td>사용·취소 실패 사유를 동일한 유효 상태로 판정</td></tr>
+        <tr><td>AdminCouponClaimQueryRepository.java</td><td>관리자 응답·필터에 계산형 EXPIRED 적용</td></tr>
+        <tr><td>CouponSuccessCountSynchronizer.java</td><td>스케줄 책임 분리, 처리 결과 반환</td></tr>
+        <tr><td>CouponSuccessCountSynchronizationResult.java</td><td>비교·갱신 항목 수 결과 계약</td></tr>
+        <tr><td>CouponSuccessCountSynchronizationScheduler.java</td><td>스케줄, 잠금, Micrometer 메트릭</td></tr>
+        <tr><td>CouponSuccessCountSynchronizationLock.java</td><td>중복 실행 제어 인터페이스</td></tr>
+        <tr><td>MySqlCouponSuccessCountSynchronizationLock.java</td><td>GET_LOCK/RELEASE_LOCK 구현</td></tr>
+        <tr><td>application.example.yaml</td><td>COUPON_SUCCESS_COUNT_SYNC_ENABLED 설정 추가</td></tr>
+        <tr><td>src/test/resources/application.properties</td><td>자동 집계 비활성화, 테스트 풀 4개 제한</td></tr>
+        <tr><td>관련 테스트</td><td>상태 경계·필터·취소, 잠금, 메트릭, 고정 ID 충돌 검증</td></tr>
+        <tr><td>docs/02-domain/coupon.md</td><td>상태 계약과 단일 집계 규칙 확정</td></tr>
+        <tr><td>docs/07-verification/coupon-integrity.sql / README.md</td><td>현재 enum 계약 반영, 계산형 만료 건수를 INFO로 분류</td></tr>
+        <tr><td>docs/03-decisions/003-async-coupon-success-count.md</td><td>락·메트릭 결정과 결과 기록</td></tr>
+        <tr><td>쿠폰 정합성 결과 문서</td><td>기존 WARN 후속 조치 완료 기록</td></tr>
+      </tbody>
+    </table>
+
+    <h2>9. 운영 적용과 확인</h2>
+    <ol>
+      <li>기본값은 <code>COUPON_SUCCESS_COUNT_SYNC_ENABLED=true</code>이며 5초마다 실행한다.</li>
+      <li>같은 MySQL 서버를 여러 환경이 공유하면 lock name을 환경별로 다르게 설정한다.</li>
+      <li>긴급 비활성화가 필요하면 환경변수를 false로 설정한다.</li>
+      <li>Grafana에서 duration max, failures total, lock skipped total을 우선 대시보드에 배치한다.</li>
+      <li>다중 인스턴스 배포 후 한 인스턴스의 success와 나머지 인스턴스의 skipped 증가를 확인한다.</li>
+      <li>failure 증가 시 MySQL 연결, GROUP BY 실행 계획, 락 연결 상태를 함께 확인한다.</li>
+    </ol>
+    <div class="callout">
+      <strong>판정:</strong> 요청한 k6 외 개선 범위는 구현과 자동화 검증을 완료했다.
+      발급 허용 여부는 계속 Redis가 결정하며, 이번 변경은 그 핵심 경로의 의미를 바꾸지 않는다.
+    </div>
+    <p class="footer-note">
+      이 보고서는 저장소의 실제 diff, Gradle XML 테스트 결과, 실행 중 Prometheus 응답을 기준으로 작성했다.
+    </p>
+  </section>
+</body>
+</html>
