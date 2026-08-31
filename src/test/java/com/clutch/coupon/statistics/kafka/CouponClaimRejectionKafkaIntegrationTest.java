@@ -42,6 +42,7 @@ class CouponClaimRejectionKafkaIntegrationTest {
             LocalDateTime.of(2099, 1, 1, 15, 0);
     private static final LocalDateTime END_UTC =
             LocalDateTime.of(2099, 1, 2, 15, 0);
+    private static final long REJECTION_EVENT_ID = 9_910_001L;
 
     @Autowired
     private KafkaTemplate<String, String> kafkaTemplate;
@@ -70,13 +71,35 @@ class CouponClaimRejectionKafkaIntegrationTest {
     @AfterEach
     void tearDown() {
         if (messageId != null) {
-            jdbcTemplate.update("""
+            int deleted = jdbcTemplate.update("""
                     DELETE FROM coupon_claim_rejection_message
                      WHERE message_id = :messageId
                     """, new MapSqlParameterSource(
                     "messageId",
                     messageId
             ));
+            if (deleted == 1) {
+                jdbcTemplate.update("""
+                        UPDATE coupon_issue_daily_statistics
+                           SET rejection_count = rejection_count - 1
+                         WHERE coupon_event_id = :couponEventId
+                           AND statistics_date = '2099-01-02'
+                        """, new MapSqlParameterSource(
+                        "couponEventId",
+                        REJECTION_EVENT_ID
+                ));
+                jdbcTemplate.update("""
+                        DELETE FROM coupon_issue_daily_statistics
+                         WHERE coupon_event_id = :couponEventId
+                           AND statistics_date = '2099-01-02'
+                           AND success_count = 0
+                           AND failure_count = 0
+                           AND rejection_count = 0
+                        """, new MapSqlParameterSource(
+                        "couponEventId",
+                        REJECTION_EVENT_ID
+                ));
+            }
         }
     }
 
@@ -89,7 +112,7 @@ class CouponClaimRejectionKafkaIntegrationTest {
         CouponClaimRejectedEvent event = new CouponClaimRejectedEvent(
                 1,
                 messageId,
-                9_910_001L,
+                REJECTION_EVENT_ID,
                 9_910_002L,
                 "COUPON_ALREADY_CLAIMED",
                 Instant.parse("2099-01-02T01:00:00Z")

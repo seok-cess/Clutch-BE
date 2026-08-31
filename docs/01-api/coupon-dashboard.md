@@ -22,9 +22,11 @@ X-User-Id: 1
 | `todaySuccessRate` | 성공을 성공과 실패 합계로 나눈 비율 |
 | `issuanceTrend[].failedCount` | 날짜별 발급 처리 실패와 사전 거절의 합계 |
 
-사전 거절은 `coupon.claim.rejected` Kafka 이벤트가 Consumer에 도달한 뒤 반영되므로 잠시
-지연될 수 있다. 배포 전에 발생한 거절은 원본이 없어 소급 집계되지 않는다. Kafka 발행
-자체가 실패한 거절도 사용자 요청 보호를 위해 재시도 Outbox를 두지 않으므로 누락될 수 있다.
+발급 성공·실패와 사전 거절은 Kafka Consumer가 KST 일별 통계에 누적한 값을
+조회한다. 따라서 결과나 `coupon.claim.rejected` 이벤트가 Consumer에 도달하기 전에는
+잠시 지연될 수 있다. 배포 전에 발생한 Claim과 저장된 거절은 Flyway에서 한 번
+선집계한다. Kafka 발행 자체가 실패한 거절은 사용자 요청 보호를 위해 재시도
+Outbox를 두지 않으므로 누락될 수 있다.
 
 K6 등 부하 테스트 데이터는 이름으로 자동 제외하지 않는다. 운영 통계와 분리하려면 테스트
 전용 데이터베이스를 사용하거나 별도 데이터 분류 계약을 먼저 정해야 한다.

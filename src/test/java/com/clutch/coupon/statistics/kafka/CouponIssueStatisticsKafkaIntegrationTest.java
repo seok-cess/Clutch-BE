@@ -121,6 +121,10 @@ class CouponIssueStatisticsKafkaIntegrationTest {
                  WHERE coupon_event_id = :couponEventId
                 """, parameters);
         jdbcTemplate.update("""
+                DELETE FROM coupon_issue_daily_statistics
+                 WHERE coupon_event_id = :couponEventId
+                """, parameters);
+        jdbcTemplate.update("""
                 DELETE FROM coupon_event
                  WHERE coupon_event_id = :couponEventId
                 """, parameters);
