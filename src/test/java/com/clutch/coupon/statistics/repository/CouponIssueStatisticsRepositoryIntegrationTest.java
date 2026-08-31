@@ -14,6 +14,7 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
@@ -75,6 +76,10 @@ class CouponIssueStatisticsRepositoryIntegrationTest {
                 new MapSqlParameterSource("couponEventId", couponEventId);
         jdbcTemplate.update("""
                 DELETE FROM coupon_kafka_processing_error
+                 WHERE coupon_event_id = :couponEventId
+                """, parameters);
+        jdbcTemplate.update("""
+                DELETE FROM coupon_issue_daily_statistics
                  WHERE coupon_event_id = :couponEventId
                 """, parameters);
         jdbcTemplate.update("""
@@ -142,5 +147,16 @@ class CouponIssueStatisticsRepositoryIntegrationTest {
         assertThat(eventRow.successCount()).isEqualTo(1);
         assertThat(eventRow.failureCount()).isZero();
         assertThat(eventRow.processingErrorCount()).isEqualTo(1);
+
+        MapSqlParameterSource dailyParameters = new MapSqlParameterSource()
+                .addValue("couponEventId", couponEventId)
+                .addValue("statisticsDate", LocalDate.of(2026, 8, 28));
+        Long dailySuccessCount = jdbcTemplate.queryForObject("""
+                SELECT success_count
+                  FROM coupon_issue_daily_statistics
+                 WHERE coupon_event_id = :couponEventId
+                   AND statistics_date = :statisticsDate
+                """, dailyParameters, Long.class);
+        assertThat(dailySuccessCount).isEqualTo(1L);
     }
 }

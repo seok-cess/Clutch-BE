@@ -25,6 +25,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 })
 class AdminCouponDashboardQueryRepositoryIntegrationTest {
 
+    private static final long REJECTION_EVENT_ID = 9_900_001L;
+
     private static final LocalDateTime START_UTC =
             LocalDateTime.of(2088, 3, 14, 15, 0);
     private static final LocalDateTime END_UTC =
@@ -56,6 +58,13 @@ class AdminCouponDashboardQueryRepositoryIntegrationTest {
                     "messageId",
                     messageId
             ));
+            jdbcTemplate.update("""
+                    DELETE FROM coupon_issue_daily_statistics
+                     WHERE coupon_event_id = :couponEventId
+                       AND statistics_date = :statisticsDate
+                    """, new MapSqlParameterSource()
+                    .addValue("couponEventId", REJECTION_EVENT_ID)
+                    .addValue("statisticsDate", TARGET_DATE));
         }
     }
 
@@ -69,7 +78,7 @@ class AdminCouponDashboardQueryRepositoryIntegrationTest {
         CouponClaimRejectedEvent event = new CouponClaimRejectedEvent(
                 1,
                 messageId,
-                9_900_001L,
+                REJECTION_EVENT_ID,
                 9_900_002L,
                 "COUPON_STOCK_EXHAUSTED",
                 Instant.parse("2088-03-15T01:00:00Z")
