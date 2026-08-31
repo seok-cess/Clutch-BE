@@ -2,11 +2,11 @@ import exec from 'k6/execution';
 import { sleep } from 'k6';
 import { Counter } from 'k6/metrics';
 import {
+  claimThresholds,
   claimCouponForUser,
-  setup,
-  teardown,
-  thresholds as couponThresholds,
-} from '../burst/coupon-burst.js';
+  setupCouponTest,
+  teardownCouponTest,
+} from '../common/coupon-claim.js';
 
 // 한 프로세스가 이벤트를 한 번 생성·오픈한 뒤 VU를 0명에서 목표 인원까지 선형적으로 늘린다.
 // 각 VU는 고유한 사용자 ID로 정확히 한 번만 신청하므로 20,000 VU는 중복 없는 20,000명을 의미한다.
@@ -22,6 +22,7 @@ const finalVerificationTimeoutSeconds = positiveNumber(
 const claimAttempts = new Counter('coupon_claim_attempt_total');
 
 export const options = {
+  noConnectionReuse: true,
   scenarios: {
     claimers: {
       executor: 'ramping-vus',
@@ -36,13 +37,19 @@ export const options = {
     },
   },
   thresholds: {
-    ...couponThresholds,
+    ...claimThresholds,
     coupon_claim_attempt_total: [`count==${totalUsers}`],
   },
   teardownTimeout: `${Math.ceil(finalVerificationTimeoutSeconds) + 10}s`,
 };
 
-export { setup, teardown };
+export function setup() {
+  return setupCouponTest();
+}
+
+export function teardown(data) {
+  teardownCouponTest(data);
+}
 
 export function claimCoupon(data) {
   // ramping-vus는 같은 VU를 반복 실행하므로 각 VU의 첫 번째 신청만 전송한다.

@@ -183,7 +183,9 @@ docker compose --profile app up -d --build --wait app
 
 ## k6 테스트 실행
 
-k6는 계속 실행되는 서버가 아닙니다. 테스트 명령을 수행할 때만 임시 컨테이너가 생성되고, 테스트가 끝나면 `--rm` 옵션으로 자동 삭제됩니다.
+k6는 계속 실행되는 서버가 아니라 테스트할 때만 사용하는 부하 발생기입니다. 기본 smoke
+테스트는 Docker 컨테이너를 사용하고, 쿠폰 20,000 VU Ramp 테스트는 Docker NAT 경로를
+제외하기 위해 Windows에 설치한 네이티브 k6를 사용합니다.
 
 ### 로컬에서 실행한 Spring Boot 테스트
 
@@ -210,11 +212,12 @@ SMOKE_VUS=20 SMOKE_DURATION=30s docker compose run --rm k6
 
 테스트 스크립트는 `k6/smoke/smoke.js`에 있습니다. HTTP 성공 여부, 애플리케이션의 `UP` 상태, 실패율, 95 백분위 응답 시간을 검사합니다.
 
-### 쿠폰 선착순 100명 테스트
+### 쿠폰 20,000 VU Ramp 테스트
 
-`k6/burst/coupon-burst.js`는 `setup` 단계에서 테스트 이벤트를 생성하고 즉시 수동 오픈합니다. 오픈이 성공하면 반환된 이벤트 ID와 회차 ID를 사용자 VU에 전달하고, 설정한 램프업 시간 동안 사용자를 늘리면서 모든 사용자가 쿠폰을 한 번씩 신청합니다. 관리자 페이지에서 이벤트를 미리 만들거나 열 필요가 없습니다. 기본 쿠폰 수량은 사용자 수의 절반인 50개입니다.
-
-준비 단계와 사용자 부하 단계는 별도 파일이 아니라 하나의 스크립트 안에서 분리합니다. 별도 k6 프로세스는 이벤트 ID와 회차 ID를 자동으로 공유할 수 없지만, 한 파일에서는 `setup` 반환값을 모든 VU에 안전하게 전달할 수 있습니다. 또한 이벤트 생성이나 오픈에 실패하면 사용자 부하가 시작되기 전에 전체 테스트를 중단할 수 있습니다.
+`k6/ramp/run-coupon-ramp.ps1`이 환경변수, Test ID, 로그와 Prometheus 출력을 설정하고
+`k6/ramp/coupon-ramp.js`를 Windows 네이티브 k6로 실행합니다. 시나리오는 테스트 이벤트를
+생성하고 즉시 수동 오픈한 뒤, 60초 동안 VU를 20,000명까지 늘립니다. 각 VU는 서로 다른
+가상 회원 ID로 쿠폰을 정확히 한 번 신청합니다.
 
 테스트 전에 다음 조건을 확인합니다.
 
@@ -223,33 +226,29 @@ SMOKE_VUS=20 SMOKE_DURATION=30s docker compose run --rm k6
 - 이름이 `[K6] 10%`이고 할인 유형과 값이 `RATE`, `10`인 활성 쿠폰 종류가 존재한다.
 - MySQL, Redis와 Kafka가 정상 실행 중이다.
 
-PowerShell에서 기본 테스트를 실행합니다.
+Windows에 k6를 설치한 뒤 PowerShell 실행 정책을 현재 프로세스에만 허용합니다.
 
 ```powershell
-.\k6\ramp\run-coupon-ramp.ps1 `
-  -TotalVus 100 `
-  -CouponQuantity 50 `
-  -RampUpSeconds 60
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
 ```
 
-### 부하 테스트 모니터링
-
-부하 테스트 지표는 별도 모니터링 컴퓨터에서 실행 중인 Prometheus와 Grafana를 사용합니다. 백엔드 서버가 `100.101.76.93`, 모니터링 서버가 `100.105.168.7`인 경우에는 다음 명령을 사용합니다.
+저장소 루트에서 실행합니다. 기본 백엔드와 Prometheus 주소를 사용하므로 주소가 다른 경우에만
+`BaseUrl`과 `PrometheusUrl`을 추가로 지정합니다.
 
 ```powershell
 .\k6\ramp\run-coupon-ramp.ps1 `
-  -BaseUrl "http://100.101.76.93:8080" `
-  -PrometheusUrl "http://100.105.168.7:9090/api/v1/write" `
   -TotalVus 20000 `
   -CouponQuantity 10000 `
   -RampUpSeconds 60
 ```
 
-실행 스크립트는 `k6/ramp/coupon-ramp.js`의 `ramping-vus`를 사용해 VU를 0명에서 20,000명까지 60초 동안 선형적으로 늘린 뒤 1초간 유지한다. 각 VU는 가상 회원 ID를 하나씩 할당받아 정확히 한 번만 신청하므로 중복 없는 20,000명의 요청을 재현한다. 전체 실제 신청 횟수가 20,000건이 아니면 테스트를 실패 처리한다. 실행할 때 `TestId`를 생략하면 실행 시각을 포함한 값이 자동 생성된다. 터미널 출력 전체는 `k6/logs/<TestId>.log`에 저장된다.
+Test ID를 생략하면 실행 시각을 포함한 값이 자동 생성됩니다. 터미널 출력 전체는
+`k6/logs/<TestId>.log`에 저장되고 같은 Test ID가 Prometheus 태그로 기록됩니다.
 
-이 경우 Grafana는 테스트 PC에서 `http://100.105.168.7:3000`으로 접속합니다. 모니터링 서버 방화벽에서는 테스트 PC가 사용하는 주소에만 3000번과 9090번 포트를 허용합니다.
-
-테스트는 설정한 재고만큼의 발급 성공, 나머지 사용자의 정상 품절, 예상하지 않은 오류 0건을 합격 기준으로 사용합니다. `VERIFY_INDIVIDUAL_PERSISTENCE=false`가 기본값이며 대규모 신청 부하에서는 개별 조회를 실행하지 않습니다. 개별 저장까지 확인하는 소규모 정합성 테스트에서만 값을 `true`로 지정합니다. 신청이 끝난 뒤 `teardown`은 비동기 발급 집계가 완료될 때까지 기본 120초 동안 재조회합니다. 같은 날 다시 실행해도 수동 테스트 트리거에는 새로운 순번이 자동으로 부여되지만, 이벤트와 발급 데이터는 데이터베이스에 계속 남습니다.
+상세 매개변수, 합격 기준과 지표 해석은 [쿠폰 Ramp 테스트 가이드](k6/ramp/README.md),
+Docker TCP 실패와 네이티브 전환 과정은
+[쿠폰 20,000 VU 부하 테스트 트러블슈팅](docs/08-troubleshooting/coupon-20000-vu-load-test-troubleshooting.md)을
+참고합니다.
 
 ## 기본 접속 정보
 

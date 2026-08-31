@@ -1,6 +1,7 @@
 package com.clutch.user.api;
 
 import com.clutch.user.dto.response.PointRankingResponse;
+import com.clutch.user.dto.response.PointTransactionHistoryResponse;
 import com.clutch.user.dto.response.MyPointRankingResponse;
 import com.clutch.user.dto.response.UserPointResponse;
 import com.clutch.user.dto.response.UserPointSummaryResponse;
@@ -54,6 +55,16 @@ public class UserController {
         return ResponseEntity.ok(MyPointRankingResponse.from(
                 userService.getMyPointRanking(userId)
         ));
+    }
+
+    /** 현재 사용자의 시청·승부예측 포인트 증감 이력을 최신 순으로 조회한다. */
+    @GetMapping("/me/point-transactions")
+    public ResponseEntity<List<PointTransactionHistoryResponse>> getPointTransactionHistory(
+            @CurrentUserId Long userId
+    ) {
+        return ResponseEntity.ok(userService.getPointTransactionHistory(userId).stream()
+                .map(PointTransactionHistoryResponse::from)
+                .toList());
     }
 
     /** 전체 사용자 보유 포인트 상위 10명을 조회한다. */
