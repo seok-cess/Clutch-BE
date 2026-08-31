@@ -13,7 +13,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.List;
 
@@ -21,6 +23,8 @@ import java.util.List;
 @Repository
 @RequiredArgsConstructor
 public class CouponIssueStatisticsRepository {
+
+    private static final ZoneId OPERATION_ZONE = ZoneId.of("Asia/Seoul");
 
     private static final String UPSERT_STATISTICS = """
             INSERT INTO coupon_issue_statistics (
@@ -53,6 +57,25 @@ public class CouponIssueStatisticsRepository {
                     WHEN last_error_at IS NULL THEN VALUES(last_error_at)
                     ELSE GREATEST(last_error_at, VALUES(last_error_at))
                 END
+            """;
+
+    private static final String UPSERT_DAILY_STATISTICS = """
+            INSERT INTO coupon_issue_daily_statistics (
+                statistics_date,
+                coupon_event_id,
+                success_count,
+                failure_count,
+                rejection_count
+            ) VALUES (
+                :statisticsDate,
+                :couponEventId,
+                :successIncrement,
+                :failureIncrement,
+                0
+            )
+            ON DUPLICATE KEY UPDATE
+                success_count = success_count + VALUES(success_count),
+                failure_count = failure_count + VALUES(failure_count)
             """;
 
     private final NamedParameterJdbcTemplate jdbcTemplate;
@@ -101,6 +124,12 @@ public class CouponIssueStatisticsRepository {
                 0,
                 occurredAt,
                 null
+        );
+        upsertDailyStatistics(
+                statisticsDate(claimRequest, event),
+                claimRequest.getCouponEventId(),
+                succeeded ? 1 : 0,
+                succeeded ? 0 : 1
         );
         return true;
     }
@@ -264,6 +293,35 @@ public class CouponIssueStatisticsRepository {
                         .addValue("lastResultAt", lastResultAt)
                         .addValue("lastErrorAt", lastErrorAt)
         );
+    }
+
+    private void upsertDailyStatistics(
+            LocalDate statisticsDate,
+            Long couponEventId,
+            long successIncrement,
+            long failureIncrement
+    ) {
+        jdbcTemplate.update(
+                UPSERT_DAILY_STATISTICS,
+                new MapSqlParameterSource()
+                        .addValue("statisticsDate", statisticsDate)
+                        .addValue("couponEventId", couponEventId)
+                        .addValue("successIncrement", successIncrement)
+                        .addValue("failureIncrement", failureIncrement)
+        );
+    }
+
+    private LocalDate statisticsDate(
+            CouponClaimRequest claimRequest,
+            CouponIssueResultEvent event
+    ) {
+        if (claimRequest.getCreatedAt() == null) {
+            return LocalDate.ofInstant(event.occurredAt(), OPERATION_ZONE);
+        }
+        return claimRequest.getCreatedAt()
+                .atOffset(ZoneOffset.UTC)
+                .atZoneSameInstant(OPERATION_ZONE)
+                .toLocalDate();
     }
 
     private CouponIssueStatisticsSummaryRow mapSummaryRow(

@@ -105,6 +105,9 @@
   실패가 기존 사용자 409·503 응답을 변경해서는 안 된다.
 - 관리자 발급 통계는 Kafka 전달 시점까지의 비동기 값이며 재고와 장애 복구 판단에는
   사용하지 않는다. 상세 결정은 `docs/03-decisions/004-kafka-coupon-issue-statistics.md`를 따른다.
+- 관리자 운영 홈의 오늘 요약과 1~30일 발급 추이는 Kafka Consumer가 멱등하게
+  누적한 KST 일별 통계를 조회한다. 상세 결정은
+  `docs/03-decisions/007-kafka-coupon-daily-dashboard-statistics.md`를 따른다.
 - 기존 `coupon.claim.accepted` 소비 경로는 호환을 위해 유지하며 신규 발급 요청의 핵심 경로에서는 사용하지 않는다.
 - 상세 결정과 대안은 `docs/03-decisions/001-synchronous-coupon-issuance.md`와
   `docs/03-decisions/003-async-coupon-success-count.md`,

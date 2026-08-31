@@ -37,7 +37,13 @@ public class AdminCouponDashboardQueryRepository {
         return count == null ? 0L : count;
     }
 
-    /** 관리자 운영 홈의 지정 UTC 범위 발급 요청 상태를 한 번에 집계한다. */
+    /**
+     * 관리자 운영 홈의 지정 UTC 범위 발급 요청 상태를 조회한다.
+     *
+     * <p>완료된 발급과 사전 거절은 Kafka Consumer가 누적한
+     * KST 일별 통계를 사용하고, 아직 완료되지 않은 Claim만 원본에서
+     * 조회한다.</p>
+     */
     @Transactional(readOnly = true)
     public CouponDashboardAggregateRow findAggregate(
             LocalDateTime startUtc,
@@ -45,74 +51,64 @@ public class AdminCouponDashboardQueryRepository {
     ) {
         MapSqlParameterSource parameters = rangeParameters(startUtc, endUtc);
         return jdbcTemplate.queryForObject("""
-                SELECT claim.request_count + rejection.rejection_count
-                           AS request_count,
-                       claim.issued_count AS issued_count,
-                       claim.failed_count + rejection.rejection_count
+                SELECT daily.success_count
+                           + daily.failure_count
+                           + daily.rejection_count
+                           + claim.unfinished_count AS request_count,
+                       daily.success_count AS issued_count,
+                       daily.failure_count + daily.rejection_count
                            AS failed_count,
                        claim.pending_count AS pending_count
                   FROM (
-                      SELECT COUNT(*) AS request_count,
-                             COALESCE(SUM(CASE
-                                 WHEN request_status = 'SUCCEEDED'
-                                 THEN 1 ELSE 0
-                             END), 0) AS issued_count,
-                             COALESCE(SUM(CASE
-                                 WHEN request_status = 'FAILED'
-                                 THEN 1 ELSE 0
-                             END), 0) AS failed_count,
-                             COALESCE(SUM(CASE
+                      SELECT COALESCE(SUM(CASE
                                  WHEN request_status = 'PENDING'
                                  THEN 1 ELSE 0
-                             END), 0) AS pending_count
-                        FROM coupon_claim_request
-                       WHERE created_at >= :startUtc
-                         AND created_at < :endUtc
+                             END), 0) AS pending_count,
+                             COUNT(*) AS unfinished_count
+                        FROM coupon_claim_request claim
+                        LEFT JOIN coupon_issue_statistics_message message
+                          ON message.claim_id = claim.coupon_claim_request_id
+                       WHERE claim.created_at >= :startUtc
+                         AND claim.created_at < :endUtc
+                         AND claim.request_status NOT IN (
+                             'SUCCEEDED', 'FAILED'
+                         )
+                         AND message.message_id IS NULL
                   ) claim
                   CROSS JOIN (
-                      SELECT COUNT(*) AS rejection_count
-                        FROM coupon_claim_rejection_message
-                       WHERE occurred_at >= :startUtc
-                         AND occurred_at < :endUtc
-                  ) rejection
+                      SELECT COALESCE(SUM(success_count), 0)
+                                 AS success_count,
+                             COALESCE(SUM(failure_count), 0)
+                                 AS failure_count,
+                             COALESCE(SUM(rejection_count), 0)
+                                 AS rejection_count
+                        FROM coupon_issue_daily_statistics
+                       WHERE statistics_date = DATE(
+                           DATE_ADD(:startUtc, INTERVAL 9 HOUR)
+                       )
+                  ) daily
                 """, parameters, this::mapAggregateRow);
     }
 
-    /** 관리자 운영 홈 차트의 KST 날짜별 성공·실패 발급 수를 조회한다. */
+    /** Kafka Consumer가 누적한 KST 날짜별 성공·실패 발급 수를 조회한다. */
     @Transactional(readOnly = true)
     public List<DailyIssuanceRow> findDailyIssuance(
             LocalDateTime startUtc,
             LocalDateTime endUtc
     ) {
         return jdbcTemplate.query("""
-                SELECT daily.issuance_date,
-                       SUM(daily.issued_count) AS issued_count,
-                       SUM(daily.failed_count) AS failed_count
-                  FROM (
-                      SELECT DATE(DATE_ADD(created_at, INTERVAL 9 HOUR))
-                                 AS issuance_date,
-                             SUM(request_status = 'SUCCEEDED')
-                                 AS issued_count,
-                             SUM(request_status = 'FAILED')
-                                 AS failed_count
-                        FROM coupon_claim_request
-                       WHERE created_at >= :startUtc
-                         AND created_at < :endUtc
-                       GROUP BY issuance_date
-
-                      UNION ALL
-
-                      SELECT DATE(DATE_ADD(occurred_at, INTERVAL 9 HOUR))
-                                 AS issuance_date,
-                             0 AS issued_count,
-                             COUNT(*) AS failed_count
-                        FROM coupon_claim_rejection_message
-                       WHERE occurred_at >= :startUtc
-                         AND occurred_at < :endUtc
-                       GROUP BY issuance_date
-                  ) daily
-                 GROUP BY daily.issuance_date
-                 ORDER BY issuance_date
+                SELECT statistics_date AS issuance_date,
+                       SUM(success_count) AS issued_count,
+                       SUM(failure_count + rejection_count) AS failed_count
+                  FROM coupon_issue_daily_statistics
+                 WHERE statistics_date >= DATE(
+                           DATE_ADD(:startUtc, INTERVAL 9 HOUR)
+                       )
+                   AND statistics_date < DATE(
+                           DATE_ADD(:endUtc, INTERVAL 9 HOUR)
+                       )
+                 GROUP BY statistics_date
+                 ORDER BY statistics_date
                 """, rangeParameters(startUtc, endUtc), this::mapDailyRow);
     }
 
