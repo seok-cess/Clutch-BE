@@ -87,6 +87,7 @@
 ### 기술 결정과 개발 규칙
 
 - [ADR 작성 방법과 목록](03-decisions/README.md)
+- [운영자 제어형 외부 데이터 소스 전환](03-decisions/008-runtime-external-source-switching.md)
 - [Redis 쿠폰 재고 복구 결정](03-decisions/002-redis-coupon-stock-recovery.md)
 - [Kafka 발급 결과 통계 결정](03-decisions/004-kafka-coupon-issue-statistics.md)
 - [Kafka 쿠폰 신청 거절 통계 결정](03-decisions/005-kafka-coupon-claim-rejection-statistics.md)
@@ -108,6 +109,9 @@
 - [쿠폰 대량 발급 행 잠금 문제](08-troubleshooting/coupon-claim-lock-contention-troubleshooting.md)
 - [새 쿠폰 회차 첫 발급 실패 문제](08-troubleshooting/coupon-first-claim-initialization-troubleshooting.md)
 - [쿠폰 20,000 VU 부하 테스트 문제](08-troubleshooting/coupon-20000-vu-load-test-troubleshooting.md)
+- [관리자 쿠폰 발급 내역 조회와 개인정보 보호](08-troubleshooting/admin-coupon-claim-query-and-privacy.md)
+- [외부 경기 피드의 지연된 종료 상태](08-troubleshooting/lolesports-delayed-match-end.md)
+- [시청 heartbeat와 포인트 수령 경합](08-troubleshooting/watch-heartbeat-and-point-claim-race.md)
 
 ## 문서별 역할
 

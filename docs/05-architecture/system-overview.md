@@ -31,7 +31,9 @@
 이 그림은 전체 흐름을 설명하기 위한 아키텍처 초안이다. 다음 표기는 현재 저장소와 다르므로
 그림을 최종본으로 사용할 때 수정해야 한다.
 
-- Flyway migration은 그림의 `V1~V15`가 아니라 현재 `V1~V16`까지 존재한다.
+- Flyway migration은 그림의 `V1~V15`가 아니라 현재 `V1~V22`까지 존재한다.
+  `V17~V19`는 쿠폰 통계·거절 통계·정합성 검증 테이블, `V20~V21`은 사용자 포인트
+  순위 인덱스, `V22`는 쿠폰 일별 발급 통계 테이블을 추가하거나 최적화한다.
 - 현재 Kafka 토픽은 `coupon.claim.accepted`, `coupon.issue.result` 두 개다.
 - 그림의 `coupon.claim.outbox`, `wallet.outbox`는 Kafka 토픽이 아니라 MySQL Outbox
   테이블을 의미한다.
@@ -154,7 +156,7 @@ Redis는 빠른 재고 제어에 사용하지만 최종 발급 사실의 기준�
 - STUB 모드에서도 배팅, 포인트, 쿠폰 처리는 실제 애플리케이션과 저장소를 사용한다.
 
 자세한 전환 정책은
-[운영자 제어형 외부 데이터 소스 전환](../03-decisions/001-runtime-external-source-switching.md)을 따른다.
+[운영자 제어형 외부 데이터 소스 전환](../03-decisions/008-runtime-external-source-switching.md)을 따른다.
 
 ## 실행 구성
 
