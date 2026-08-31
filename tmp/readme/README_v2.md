@@ -14,17 +14,18 @@
 ## 목차
 
 1. [프로젝트 소개](#1-프로젝트-소개)
-2. [핵심 기능](#2-핵심-기능)
-3. [기술 스택](#3-기술-스택)
-4. [아키텍처](#4-아키텍처)
-5. [ERD / 데이터 모델](#5-erd--데이터-모델)
-6. [API 문서](#6-api-문서)
-7. [트러블슈팅 / 기술적 의사결정](#7-트러블슈팅--기술적-의사결정)
-8. [테스트](#8-테스트)
-9. [실행 방법](#9-실행-방법)
-10. [디렉토리 구조](#10-디렉토리-구조)
-11. [화면](#11-화면)
-12. [회고 / 개선 계획](#12-회고--개선-계획)
+2. [협업 및 개발 방식](#2-협업-및-개발-방식)
+3. [핵심 기능](#3-핵심-기능)
+4. [기술 스택](#4-기술-스택)
+5. [아키텍처](#5-아키텍처)
+6. [ERD / 데이터 모델](#6-erd--데이터-모델)
+7. [API 문서](#7-api-문서)
+8. [트러블슈팅 / 기술적 의사결정](#8-트러블슈팅--기술적-의사결정)
+9. [테스트](#9-테스트)
+10. [실행 방법](#10-실행-방법)
+11. [디렉토리 구조](#11-디렉토리-구조)
+12. [화면](#12-화면)
+13. [회고 / 개선 계획](#13-회고--개선-계획)
 
 ## 1. 프로젝트 소개
 
@@ -63,7 +64,29 @@ CLUTCH는 LoL Esports 경기 중 발생하는 사건과 시청 경험을 선착�
 | 전민규 | 쿠폰 발급 | Redis 원자 제어 기반 선착순 발급, 중복 방지와 발급 결과 저장을 구현했습니다. |
 | 최민혁 | 포인트 및 승패 예측 | 시청 세션·포인트 수령과 세트 승패 배팅·정산·환불을 구현했습니다. |
 
-## 2. 핵심 기능
+## 2. 협업 및 개발 방식
+
+Jira 이슈 하나를 하나의 Pull Request 단위로 관리하며, `dev`를 기준으로 작업 브랜치를 생성합니다.
+
+```text
+Jira Task
+→ 작업 브랜치 자동 생성
+→ 개발
+→ Pull Request
+→ CI·리뷰
+→ Squash and merge
+```
+
+- 브랜치: `<type>/CLUTCH-<issue>`
+- 커밋: Conventional Commits 형식의 한글 메시지
+- PR 제목: `<type>:[CLUTCH-<issue>] <작업 내용>`
+- PR 대상: `dev`
+- 병합 조건: Backend CI 성공과 1명 이상 승인
+- 기술 결정 변경 시 코드와 관련 문서를 함께 갱신
+
+상세 규칙은 [Git 컨벤션](docs/04-conventions/git-convention.md), [Jira–GitHub 워크플로](docs/04-conventions/jira-github-workflow.md), [개발 가이드](AGENTS.md)를 따릅니다.
+
+## 3. 핵심 기능
 
 ### 트리거 기반 선착순 쿠폰
 
@@ -102,7 +125,7 @@ CLUTCH는 LoL Esports 경기 중 발생하는 사건과 시청 경험을 선착�
 - 100만 사용자와 300만 건 이상의 발급 요청 이력을 전체 집계하는 읽기 전용 검증 수단을 제공합니다.
 - 검증 실행 이력과 항목별 판정을 영속화하며 여러 인스턴스의 중복 실행을 MySQL named lock으로 막습니다.
 
-## 3. 기술 스택
+## 4. 기술 스택
 
 | 구분 | 기술 | 사용 목적 |
 |---|---|---|
@@ -118,9 +141,9 @@ CLUTCH는 LoL Esports 경기 중 발생하는 사건과 시청 경험을 선착�
 | Observability | Actuator, Micrometer, Prometheus, Grafana | 애플리케이션·DB·Redis·부하 지표 관측 |
 | Build / Runtime | Gradle 9.5.1, Docker Compose | 빌드와 로컬 인프라 실행 |
 
-## 4. 아키텍처
+## 5. 아키텍처
 
-![CLUTCH 시스템 아키텍처](docs/assets/system-architecture-overview.png)
+![CLUTCH 전체 아키텍처](docs/assets/clutch-system-architecture-v2.png)
 
 CLUTCH는 기능을 도메인별 패키지로 분리하지만 하나의 애플리케이션과 JVM에서 실행하는 모듈형 모놀리스입니다.
 
@@ -179,7 +202,7 @@ Repository
 
 세부 구성과 데이터 흐름은 [시스템 아키텍처 문서](docs/05-architecture/system-overview.md), 패키지 책임은 [패키지 구조 문서](docs/04-conventions/package-structure.md)를 따릅니다.
 
-## 5. ERD / 데이터 모델
+## 6. ERD / 데이터 모델
 
 아래 그림은 전체 테이블의 모든 컬럼을 나열하는 물리 ERD가 아니라, Flyway 스키마에서 핵심 도메인 관계만 추린 논리 데이터 모델입니다.
 
@@ -224,7 +247,7 @@ erDiagram
 
 중복 발급은 Redis에서 선제적으로 거절하고, MySQL의 사용자·회차 기준 유일성 제약으로 최종 방어합니다. 스키마는 [`src/main/resources/db/migration`](src/main/resources/db/migration)의 Flyway migration을 기준으로 하며 Hibernate는 `ddl-auto: validate`로 매핑을 검증합니다.
 
-## 6. API 문서
+## 7. API 문서
 
 ### 대표 엔드포인트
 
@@ -262,9 +285,9 @@ erDiagram
 
 현재 저장소에는 공개된 Swagger UI 또는 Spring REST Docs 정적 사이트가 없습니다. 따라서 이 문서에서는 실제 Controller와 `docs/01-api` 문서를 기준으로 API를 안내합니다.
 
-## 7. 트러블슈팅 / 기술적 의사결정
+## 8. 트러블슈팅 / 기술적 의사결정
 
-### 7.1 공통 성공 수량 행의 잠금 병목 제거
+### 8.1 공통 성공 수량 행의 잠금 병목 제거
 
 **문제 상황**
 
@@ -285,7 +308,7 @@ erDiagram
 
 행 잠금 병목이 줄었고, 동일 환경에서 풀 크기 100일 때 연결 대기가 거의 발생하지 않았습니다. 이 결정은 [ADR-003](docs/03-decisions/003-async-coupon-success-count.md)에 기록했습니다.
 
-### 7.2 Docker k6의 6,216건 전송 실패 해결
+### 8.2 Docker k6의 6,216건 전송 실패 해결
 
 **문제 상황**
 
@@ -303,7 +326,7 @@ Docker 컨테이너에서 20,000 VU Ramp 테스트를 실행했을 때 발급 �
 
 전송 실패가 6,216건에서 0건으로 감소했고, 성공 10,000건과 정상 품절 10,000건으로 모든 신청이 애플리케이션 응답을 받았습니다. Claim p95는 1.84초에서 951.19ms로 감소했습니다. 상세 분석은 [부하 테스트 트러블슈팅](docs/08-troubleshooting/coupon-20000-vu-load-test-troubleshooting.md)에 기록했습니다.
 
-### 7.3 Redis를 최종 기준으로 사용하지 않는 재고 복구
+### 8.3 Redis를 최종 기준으로 사용하지 않는 재고 복구
 
 **문제 상황**
 
@@ -317,7 +340,7 @@ Redis 초기화·유실이나 발급 중 장애가 발생하면 Redis 재고와 
 
 이 선택은 Redis의 처리 성능을 활용하면서도 복구 기준을 영속 데이터에 두기 위한 것입니다. 자세한 근거와 대안은 [ADR-002](docs/03-decisions/002-redis-coupon-stock-recovery.md)와 [Redis 재고 복구 운영 문서](docs/06-operations/coupon-redis-recovery.md)에서 확인할 수 있습니다.
 
-### 7.4 관리자 일별 통계의 원본 집계 제거
+### 8.4 관리자 일별 통계의 원본 집계 제거
 
 **문제 상황**
 
@@ -331,6 +354,24 @@ Kafka Consumer가 발급 성공·실패를 KST 일별 통계 테이블에 멱등
 
 동일한 로컬 MySQL 세션의 병목 쿼리 비교에서 634,917행 집계 447ms가 7행 조회 0.0296ms로 감소했습니다. 이는 쿼리 구간 측정이며 원격 API 전체 응답 시간이 같은 비율로 개선됐다는 의미는 아닙니다. 검증 범위는 [일별 통계 검증 결과](docs/07-verification/results/2026-08-31-coupon-dashboard-daily-statistics.md)에 명시했습니다.
 
+### 8.5 관리자 발급 내역 조회와 개인정보 보호
+
+대량 이력의 전체 상세 테이블을 먼저 조인하지 않고, 현재 페이지의 발급 요청 ID를 확정한 뒤 해당 ID만 상세 조인합니다. 검색 조건에 필요한 테이블만 동적으로 추가하고, 관리자 응답의 이름·이메일·전화번호는 서비스 계층에서 마스킹합니다.
+
+문제 원인, 2단계 조회와 검증 방법은 [관리자 발급 내역 조회와 개인정보 보호 트러블슈팅](docs/08-troubleshooting/admin-coupon-claim-query-and-privacy.md)에 정리했습니다.
+
+### 8.6 외부 경기 피드의 지연된 종료 상태
+
+외부 피드는 세트 종료, `gameWins`와 매치 종료 상태를 서로 다른 시점에 갱신합니다. CLUTCH는 세트 종료 신호와 승자 확정을 분리하고, 한 팀이 다전제 과반 승수에 도달한 경우 외부 매치 상태와 관계없이 내부 매치를 종료로 판정합니다.
+
+상태 분리 기준과 테스트는 [외부 경기 피드의 지연된 종료 상태 트러블슈팅](docs/08-troubleshooting/lolesports-delayed-match-end.md)에서 확인할 수 있습니다.
+
+### 8.7 시청 heartbeat와 포인트 수령 경합
+
+Redis Lua Script가 활성 세션·최신 `sessionKey`·heartbeat 순번과 서버 수신 시각을 원자적으로 검증합니다. 포인트 수령은 Redis 선점, MySQL 사용자 행 잠금과 `(watch_session_id, reward_sequence)` 유일성 제약을 결합해 같은 회차의 중복 지급을 막습니다.
+
+재시도와 저장소 간 경합 처리 과정은 [시청 heartbeat와 포인트 수령 경합 트러블슈팅](docs/08-troubleshooting/watch-heartbeat-and-point-claim-race.md)에 기록했습니다.
+
 ### 주요 ADR
 
 | 결정 | 선택 |
@@ -342,7 +383,7 @@ Kafka Consumer가 발급 성공·실패를 KST 일별 통계 테이블에 멱등
 | [비동기 정합성 검증](docs/03-decisions/006-async-coupon-integrity-check.md) | 관리자 요청과 대량 집계를 분리하고 결과 영속화 |
 | [운영자 제어형 외부 소스 전환](docs/03-decisions/001-runtime-external-source-switching.md) | 외부 장애로 자동 전환하지 않고 운영자가 `REAL`·`STUB` 선택 |
 
-## 8. 테스트
+## 9. 테스트
 
 ### 테스트 전략
 
@@ -402,7 +443,7 @@ Kafka Consumer가 발급 성공·실패를 KST 일별 통계 테이블에 멱등
 
 MySQL, Redis 또는 Kafka를 사용하는 통합 테스트에 인프라가 필요하면 먼저 `docker compose up -d --wait`를 실행합니다.
 
-## 9. 실행 방법
+## 10. 실행 방법
 
 ### 사전 준비
 
@@ -465,6 +506,21 @@ docker compose -f monitoring/compose.yaml up -d
 20,000 VU Ramp 테스트는 Docker NAT의 연결 한계를 피하기 위해 Windows 네이티브 k6로 실행합니다.
 
 ```powershell
+# 한글 출력 설정
+chcp 65001 > $null
+
+$Utf8 = [System.Text.UTF8Encoding]::new($false)
+[Console]::InputEncoding = $Utf8
+[Console]::OutputEncoding = $Utf8
+$OutputEncoding = $Utf8
+
+# 현재 PowerShell 프로세스에서만 스크립트 실행 허용
+Set-ExecutionPolicy `
+  -Scope Process `
+  -ExecutionPolicy Bypass `
+  -Force
+
+# 20,000 VU Ramp 테스트 실행
 .\k6\ramp\run-coupon-ramp.ps1 `
   -TotalVus 20000 `
   -CouponQuantity 10000 `
@@ -473,7 +529,7 @@ docker compose -f monitoring/compose.yaml up -d
 
 필요한 테스트 데이터, 환경변수, 로그와 합격 기준은 [Ramp 테스트 실행 가이드](k6/ramp/README.md)를 따릅니다.
 
-## 10. 디렉토리 구조
+## 11. 디렉토리 구조
 
 ```text
 Clutch-BE/
@@ -512,16 +568,16 @@ Clutch-BE/
 
 세부 패키지 책임과 의존 규칙은 [패키지 구조 문서](docs/04-conventions/package-structure.md)를 참고합니다.
 
-## 11. 화면
+## 12. 화면
 
 백엔드 저장소에는 사용자 웹과 관리자 콘솔의 확정된 화면 캡처가 포함되어 있지 않아 임의의 화면을 첨부하지 않았습니다. 현재 확인 가능한 시각 자료는 다음과 같습니다.
 
-- [시스템 아키텍처 원본](docs/assets/system-architecture-overview.png)
+- [전체 시스템 아키텍처](docs/assets/clutch-system-architecture-v2.png)
 - [20,000 VU 테스트 Grafana Snapshot](https://snapshots.raintank.io/dashboard/snapshot/2MIwOJ8W0waN3et76PI0OQvDKVZWVHuT)
 
 화면 자료를 추가할 때는 핵심 기능별 사용자 흐름, 관리자 운영 화면과 부하 테스트 대시보드를 중심으로 구성하는 것이 적절합니다.
 
-## 12. 회고 / 개선 계획
+## 13. 회고 / 개선 계획
 
 ### 확인한 성과
 
