@@ -1,0 +1,1537 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="7120" height="5040" viewBox="0 0 7120 5040">
+<rect width="100%" height="100%" fill="#202124" />
+<style>
+text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Apple SD Gothic Neo","Noto Sans KR",sans-serif}
+.group-title{font-size:26px;font-weight:800;letter-spacing:.4px}
+.ko{font-size:21px;font-weight:800;fill:#f3f5f8}
+.table-name{font-size:15px;font-weight:600;fill:#9ca3af}
+.badge{font-size:12px;font-weight:800;text-anchor:middle;dominant-baseline:middle}
+.column{font-size:16px;font-weight:650;fill:#e6e9ef}
+.type{font-size:15px;font-weight:550;fill:#b4bbc6;text-anchor:end}
+.flag{font-size:12px;font-weight:750;fill:#7f8793;text-anchor:end}
+.fk-title{font-size:13px;font-weight:800;fill:#8d96a3}
+.fk-line{font-size:12px;font-weight:600;fill:#abb2bd}
+</style>
+<rect x="125" y="595" width="2110" height="1382" rx="20" fill="#16152a" stroke="#8b7cff" stroke-width="3" />
+<rect x="2505" y="195" width="2110" height="2223" rx="20" fill="#111d2b" stroke="#48a7ff" stroke-width="3" />
+<rect x="4885" y="245" width="2110" height="2148" rx="20" fill="#251a12" stroke="#f2a65a" stroke-width="3" />
+<rect x="5245" y="3990" width="1750" height="477" rx="20" fill="#281417" stroke="#ef767a" stroke-width="3" />
+<rect x="4885" y="3395" width="2110" height="1297" rx="20" fill="#10241f" stroke="#55c6a9" stroke-width="3" transform="translate(-2195 0)" />
+<rect x="125" y="3495" width="2110" height="1010" rx="20" fill="#211329" stroke="#d48cff" stroke-width="3" transform="translate(355 0)" />
+<text class="group-title" x="1180" y="637" text-anchor="middle" fill="#8b7cff">사용자 · 시청 · 승부예측</text>
+<text class="group-title" x="3560" y="237" text-anchor="middle" fill="#48a7ff">LoL Esports</text>
+<text class="group-title" x="5940" y="287" text-anchor="middle" fill="#f2a65a">쿠폰</text>
+<text class="group-title" x="6120" y="4032" text-anchor="middle" fill="#ef767a">아웃박스</text>
+<text class="group-title" x="5940" y="3437" text-anchor="middle" fill="#55c6a9" transform="translate(-2195 0)">통계 · 메시지</text>
+<text class="group-title" x="1180" y="3537" text-anchor="middle" fill="#d48cff" transform="translate(355 0)">검증</text>
+<path d="M 570 1028 V 1073 H 570 V 1118" data-relation="user-&gt;watch_session" fill="none" stroke="#d4dce8" stroke-width="4" stroke-opacity=".96" stroke-linejoin="round" /><path d="M 570 1028 V 1318 H 570 V 1594" data-relation="user-&gt;watch_point_transaction" fill="none" stroke="#d4dce8" stroke-width="4" stroke-opacity=".96" stroke-linejoin="round" /><path d="M 570 1504 V 1563 H 570 V 1594" data-relation="watch_session-&gt;watch_point_transaction" fill="none" stroke="#d4dce8" stroke-width="4" stroke-opacity=".96" stroke-linejoin="round" /><path d="M 1790 1144 V 1210 H 1790 V 1234" data-relation="betting_event-&gt;user_bet" fill="none" stroke="#d4dce8" stroke-width="4" stroke-opacity=".96" stroke-linejoin="round" /><path d="M 960 864 H 1228 V 1398 H 1400" data-relation="user-&gt;user_bet" fill="none" stroke="#d4dce8" stroke-width="4" stroke-opacity=".96" stroke-linejoin="round" /><path d="M 1790 1562 V 1642 H 1790 V 1652" data-relation="user_bet-&gt;bet_point_transaction" fill="none" stroke="#d4dce8" stroke-width="4" stroke-opacity=".96" stroke-linejoin="round" /><path d="M 6550 649 V 694 H 6550 V 739" data-relation="coupon_type-&gt;coupon_event_item" fill="none" stroke="#d4dce8" stroke-width="4" stroke-opacity=".96" stroke-linejoin="round" /><path d="M 5330 707 V 759 H 5330 V 797" data-relation="coupon_event-&gt;coupon_event_phase" fill="none" stroke="#d4dce8" stroke-width="4" stroke-opacity=".96" stroke-linejoin="round" /><path d="M 6160 888.5 H 5964 V 946.5 H 5720" data-relation="coupon_event_item-&gt;coupon_event_phase" fill="none" stroke="#d4dce8" stroke-width="4" stroke-opacity=".96" stroke-linejoin="round" /><path d="M 5330 707 V 967.5 H 5330 V 1186" data-relation="coupon_event-&gt;coupon_event_occurrence" fill="none" stroke="#d4dce8" stroke-width="4" stroke-opacity=".96" stroke-linejoin="round" /><path d="M 5720 1437 H 5988 V 1335.5 H 6160" data-relation="coupon_event_occurrence-&gt;coupon_claim_request" fill="none" stroke="#d4dce8" stroke-width="4" stroke-opacity=".96" stroke-linejoin="round" /><path d="M 5330 1688 V 1768 H 5330 V 1778" data-relation="coupon_event_occurrence-&gt;user_coupon" fill="none" stroke="#d4dce8" stroke-width="4" stroke-opacity=".96" stroke-linejoin="round" /><path d="M 960 4025 H 1180 V 3764 H 1400" data-relation="coupon_integrity_check-&gt;coupon_integrity_check_result" fill="none" stroke="#d4dce8" stroke-width="4" stroke-opacity=".96" stroke-linejoin="round" transform="translate(355 0)" /><path d="M 2560 522 H 2300 V 1180 H 1120 M 1120 1180 V 1311 H 960 M 1120 1180 V 1758 H 960" data-relations="esports_match-&gt;watch_session,esports_match-&gt;watch_point_transaction" fill="none" stroke="#aeb9c9" stroke-width="3.4" stroke-opacity=".82" stroke-linejoin="round" /><path d="M 3340 522 H 4140 V 528.5 H 4940" data-relation="esports_match-&gt;coupon_event" fill="none" stroke="#aeb9c9" stroke-width="3.4" stroke-opacity=".82" stroke-linejoin="round" /><path d="M 4560 1909 H 4750 V 1437 H 4940" data-relation="esports_match_event-&gt;coupon_event_occurrence" fill="none" stroke="#aeb9c9" stroke-width="3.4" stroke-opacity=".82" stroke-linejoin="round" /><path d="M 570 1028 V 3200 H 925 V 3600" data-relation="user-&gt;coupon_integrity_check" fill="none" stroke="#aeb9c9" stroke-width="3.4" stroke-opacity=".82" stroke-linejoin="round" /><path d="M 5330 707 V 750 H 4840 V 3515 H 3745 M 3745 3515 H 3135 V 3560 M 3745 3515 H 4355 V 3560 M 4840 3515 V 3920 H 4355" data-relations="coupon_event-&gt;coupon_issue_statistics,coupon_event-&gt;coupon_issue_statistics_message,coupon_event-&gt;coupon_kafka_processing_error" fill="none" stroke="#aeb9c9" stroke-width="3.4" stroke-opacity=".82" stroke-linejoin="round" /><path d="M 3340 480 H 3780" data-relation="esports_match-&gt;match_team" fill="none" stroke="#d8e1ee" stroke-width="4.4" stroke-opacity=".98" stroke-linejoin="round" stroke-linecap="round" /><path d="M 3340 1253 H 3780" data-relation="esports_game-&gt;game_player_stat" fill="none" stroke="#d8e1ee" stroke-width="4.4" stroke-opacity=".98" stroke-linejoin="round" stroke-linecap="round" /><path d="M 3340 954 H 3450 V 690 H 3780" data-relation="match_team-&gt;esports_game" fill="none" stroke="#d8e1ee" stroke-width="4.4" stroke-opacity=".98" stroke-linejoin="round" stroke-linecap="round" /><path d="M 3090.4 300 V 275 H 4585 V 1815 H 4560" data-relation="esports_match-&gt;esports_match_event" fill="none" stroke="#d8e1ee" stroke-width="4.4" stroke-opacity=".98" stroke-linejoin="round" stroke-linecap="round" /><path d="M 2950 744 V 834" data-relation="esports_match-&gt;esports_game" fill="none" stroke="#d8e1ee" stroke-width="4.4" stroke-opacity=".98" stroke-linejoin="round" stroke-linecap="round" /><path d="M 4170 773 V 863" data-relation="match_team-&gt;game_player_stat" fill="none" stroke="#d8e1ee" stroke-width="4.4" stroke-opacity=".98" stroke-linejoin="round" stroke-linecap="round" /><path d="M 2950 1974 V 2064" data-relation="esports_game-&gt;game_timeline_point" fill="none" stroke="#d8e1ee" stroke-width="4.4" stroke-opacity=".98" stroke-linejoin="round" stroke-linecap="round" /><rect x="180" y="700" width="780" height="328" rx="12" fill="#1c1f25" stroke="#555b66" stroke-width="2" />
+<rect x="180" y="700" width="780" height="6" rx="3" fill="#8b7cff" />
+<text class="ko" x="204" y="735">사용자</text>
+<text class="table-name" x="204" y="759">user</text>
+<line x1="180" y1="778" x2="960" y2="778" stroke="#414650" />
+<rect x="190" y="788" width="34" height="20" rx="5" fill="#d7a725" />
+<text class="badge" x="207" y="798" fill="#191919">PK</text>
+<text class="column" x="262" y="802">user_id</text>
+<text class="flag" x="730" y="802">NN · AI</text>
+<text class="type" x="942" y="802">BIGINT</text>
+<line x1="192" y1="807" x2="948" y2="807" stroke="#30343b" />
+<text class="column" x="262" y="831">role</text>
+<text class="flag" x="730" y="831">NN</text>
+<text class="type" x="942" y="831">VARCHAR(20)</text>
+<line x1="192" y1="836" x2="948" y2="836" stroke="#30343b" />
+<text class="column" x="262" y="860">email</text>
+<text class="flag" x="730" y="860">NN</text>
+<text class="type" x="942" y="860">VARCHAR(255)</text>
+<line x1="192" y1="865" x2="948" y2="865" stroke="#30343b" />
+<text class="column" x="262" y="889">name</text>
+<text class="flag" x="730" y="889">NULL</text>
+<text class="type" x="942" y="889">VARCHAR(50)</text>
+<line x1="192" y1="894" x2="948" y2="894" stroke="#30343b" />
+<text class="column" x="262" y="918">phone_number</text>
+<text class="flag" x="730" y="918">NULL</text>
+<text class="type" x="942" y="918">VARCHAR(20)</text>
+<line x1="192" y1="923" x2="948" y2="923" stroke="#30343b" />
+<text class="column" x="262" y="947">point</text>
+<text class="flag" x="730" y="947">NN</text>
+<text class="type" x="942" y="947">BIGINT</text>
+<line x1="192" y1="952" x2="948" y2="952" stroke="#30343b" />
+<text class="column" x="262" y="976">created_at</text>
+<text class="flag" x="730" y="976">NN</text>
+<text class="type" x="942" y="976">DATETIME(6)</text>
+<line x1="192" y1="981" x2="948" y2="981" stroke="#30343b" />
+<text class="column" x="262" y="1005">updated_at</text>
+<text class="flag" x="730" y="1005">NN</text>
+<text class="type" x="942" y="1005">DATETIME(6)</text>
+<line x1="192" y1="1010" x2="948" y2="1010" stroke="#30343b" />
+<rect x="180" y="1118" width="780" height="386" rx="12" fill="#1c1f25" stroke="#555b66" stroke-width="2" />
+<rect x="180" y="1118" width="780" height="6" rx="3" fill="#8b7cff" />
+<text class="ko" x="204" y="1153">시청 세션</text>
+<text class="table-name" x="204" y="1177">watch_session</text>
+<line x1="180" y1="1196" x2="960" y2="1196" stroke="#414650" />
+<rect x="190" y="1206" width="34" height="20" rx="5" fill="#d7a725" />
+<text class="badge" x="207" y="1216" fill="#191919">PK</text>
+<text class="column" x="262" y="1220">watch_session_id</text>
+<text class="flag" x="730" y="1220">NN · AI</text>
+<text class="type" x="942" y="1220">BIGINT</text>
+<line x1="192" y1="1225" x2="948" y2="1225" stroke="#30343b" />
+<text class="column" x="262" y="1249">session_key</text>
+<text class="flag" x="730" y="1249">NN</text>
+<text class="type" x="942" y="1249">VARCHAR(36)</text>
+<line x1="192" y1="1254" x2="948" y2="1254" stroke="#30343b" />
+<rect x="190" y="1264" width="34" height="20" rx="5" fill="#31a8df" />
+<text class="badge" x="207" y="1274" fill="#101820">FK</text>
+<text class="column" x="262" y="1278">user_id</text>
+<text class="flag" x="730" y="1278">NN</text>
+<text class="type" x="942" y="1278">BIGINT</text>
+<line x1="192" y1="1283" x2="948" y2="1283" stroke="#30343b" />
+<rect x="190" y="1293" width="34" height="20" rx="5" fill="#31a8df" />
+<text class="badge" x="207" y="1303" fill="#101820">FK</text>
+<text class="column" x="262" y="1307">esports_match_id</text>
+<text class="flag" x="730" y="1307">NN</text>
+<text class="type" x="942" y="1307">BIGINT</text>
+<line x1="192" y1="1312" x2="948" y2="1312" stroke="#30343b" />
+<text class="column" x="262" y="1336">entered_at</text>
+<text class="flag" x="730" y="1336">NN</text>
+<text class="type" x="942" y="1336">DATETIME(6)</text>
+<line x1="192" y1="1341" x2="948" y2="1341" stroke="#30343b" />
+<text class="column" x="262" y="1365">last_seen_at</text>
+<text class="flag" x="730" y="1365">NN</text>
+<text class="type" x="942" y="1365">DATETIME(6)</text>
+<line x1="192" y1="1370" x2="948" y2="1370" stroke="#30343b" />
+<text class="column" x="262" y="1394">eligible_milliseconds</text>
+<text class="flag" x="730" y="1394">NN</text>
+<text class="type" x="942" y="1394">BIGINT</text>
+<line x1="192" y1="1399" x2="948" y2="1399" stroke="#30343b" />
+<text class="column" x="262" y="1423">status</text>
+<text class="flag" x="730" y="1423">NN</text>
+<text class="type" x="942" y="1423">VARCHAR(20)</text>
+<line x1="192" y1="1428" x2="948" y2="1428" stroke="#30343b" />
+<text class="column" x="262" y="1452">created_at</text>
+<text class="flag" x="730" y="1452">NN</text>
+<text class="type" x="942" y="1452">DATETIME(6)</text>
+<line x1="192" y1="1457" x2="948" y2="1457" stroke="#30343b" />
+<text class="column" x="262" y="1481">updated_at</text>
+<text class="flag" x="730" y="1481">NN</text>
+<text class="type" x="942" y="1481">DATETIME(6)</text>
+<line x1="192" y1="1486" x2="948" y2="1486" stroke="#30343b" />
+<rect x="180" y="1594" width="780" height="328" rx="12" fill="#1c1f25" stroke="#555b66" stroke-width="2" />
+<rect x="180" y="1594" width="780" height="6" rx="3" fill="#8b7cff" />
+<text class="ko" x="204" y="1629">시청 포인트 지급</text>
+<text class="table-name" x="204" y="1653">watch_point_transaction</text>
+<line x1="180" y1="1672" x2="960" y2="1672" stroke="#414650" />
+<rect x="190" y="1682" width="34" height="20" rx="5" fill="#d7a725" />
+<text class="badge" x="207" y="1692" fill="#191919">PK</text>
+<text class="column" x="262" y="1696">watch_point_transaction_id</text>
+<text class="flag" x="730" y="1696">NN · AI</text>
+<text class="type" x="942" y="1696">BIGINT</text>
+<line x1="192" y1="1701" x2="948" y2="1701" stroke="#30343b" />
+<rect x="190" y="1711" width="34" height="20" rx="5" fill="#31a8df" />
+<text class="badge" x="207" y="1721" fill="#101820">FK</text>
+<text class="column" x="262" y="1725">user_id</text>
+<text class="flag" x="730" y="1725">NN</text>
+<text class="type" x="942" y="1725">BIGINT</text>
+<line x1="192" y1="1730" x2="948" y2="1730" stroke="#30343b" />
+<rect x="190" y="1740" width="34" height="20" rx="5" fill="#31a8df" />
+<text class="badge" x="207" y="1750" fill="#101820">FK</text>
+<text class="column" x="262" y="1754">watch_session_id</text>
+<text class="flag" x="730" y="1754">NN</text>
+<text class="type" x="942" y="1754">BIGINT</text>
+<line x1="192" y1="1759" x2="948" y2="1759" stroke="#30343b" />
+<text class="column" x="262" y="1783">reward_sequence</text>
+<text class="flag" x="730" y="1783">NN</text>
+<text class="type" x="942" y="1783">BIGINT</text>
+<line x1="192" y1="1788" x2="948" y2="1788" stroke="#30343b" />
+<rect x="190" y="1798" width="34" height="20" rx="5" fill="#31a8df" />
+<text class="badge" x="207" y="1808" fill="#101820">FK</text>
+<text class="column" x="262" y="1812">esports_match_id</text>
+<text class="flag" x="730" y="1812">NN</text>
+<text class="type" x="942" y="1812">BIGINT</text>
+<line x1="192" y1="1817" x2="948" y2="1817" stroke="#30343b" />
+<text class="column" x="262" y="1841">awarded_point</text>
+<text class="flag" x="730" y="1841">NN</text>
+<text class="type" x="942" y="1841">BIGINT</text>
+<line x1="192" y1="1846" x2="948" y2="1846" stroke="#30343b" />
+<text class="column" x="262" y="1870">created_at</text>
+<text class="flag" x="730" y="1870">NN</text>
+<text class="type" x="942" y="1870">DATETIME(6)</text>
+<line x1="192" y1="1875" x2="948" y2="1875" stroke="#30343b" />
+<text class="column" x="262" y="1899">updated_at</text>
+<text class="flag" x="730" y="1899">NN</text>
+<text class="type" x="942" y="1899">DATETIME(6)</text>
+<line x1="192" y1="1904" x2="948" y2="1904" stroke="#30343b" />
+<rect x="1400" y="700" width="780" height="444" rx="12" fill="#1c1f25" stroke="#555b66" stroke-width="2" />
+<rect x="1400" y="700" width="780" height="6" rx="3" fill="#8b7cff" />
+<text class="ko" x="1424" y="735">승부예측 이벤트</text>
+<text class="table-name" x="1424" y="759">betting_event</text>
+<line x1="1400" y1="778" x2="2180" y2="778" stroke="#414650" />
+<rect x="1410" y="788" width="34" height="20" rx="5" fill="#d7a725" />
+<text class="badge" x="1427" y="798" fill="#191919">PK</text>
+<text class="column" x="1482" y="802">betting_event_id</text>
+<text class="flag" x="1950" y="802">NN · AI</text>
+<text class="type" x="2162" y="802">BIGINT</text>
+<line x1="1412" y1="807" x2="2168" y2="807" stroke="#30343b" />
+<text class="column" x="1482" y="831">external_match_id</text>
+<text class="flag" x="1950" y="831">NN</text>
+<text class="type" x="2162" y="831">VARCHAR(32)</text>
+<line x1="1412" y1="836" x2="2168" y2="836" stroke="#30343b" />
+<text class="column" x="1482" y="860">external_game_id</text>
+<text class="flag" x="1950" y="860">NULL</text>
+<text class="type" x="2162" y="860">VARCHAR(32)</text>
+<line x1="1412" y1="865" x2="2168" y2="865" stroke="#30343b" />
+<text class="column" x="1482" y="889">set_number</text>
+<text class="flag" x="1950" y="889">NN</text>
+<text class="type" x="2162" y="889">INT</text>
+<line x1="1412" y1="894" x2="2168" y2="894" stroke="#30343b" />
+<text class="column" x="1482" y="918">first_external_team_id</text>
+<text class="flag" x="1950" y="918">NN</text>
+<text class="type" x="2162" y="918">VARCHAR(32)</text>
+<line x1="1412" y1="923" x2="2168" y2="923" stroke="#30343b" />
+<text class="column" x="1482" y="947">second_external_team_id</text>
+<text class="flag" x="1950" y="947">NN</text>
+<text class="type" x="2162" y="947">VARCHAR(32)</text>
+<line x1="1412" y1="952" x2="2168" y2="952" stroke="#30343b" />
+<text class="column" x="1482" y="976">winner_external_team_id</text>
+<text class="flag" x="1950" y="976">NULL</text>
+<text class="type" x="2162" y="976">VARCHAR(32)</text>
+<line x1="1412" y1="981" x2="2168" y2="981" stroke="#30343b" />
+<text class="column" x="1482" y="1005">status</text>
+<text class="flag" x="1950" y="1005">NN</text>
+<text class="type" x="2162" y="1005">VARCHAR(20)</text>
+<line x1="1412" y1="1010" x2="2168" y2="1010" stroke="#30343b" />
+<text class="column" x="1482" y="1034">opened_at</text>
+<text class="flag" x="1950" y="1034">NN</text>
+<text class="type" x="2162" y="1034">DATETIME(6)</text>
+<line x1="1412" y1="1039" x2="2168" y2="1039" stroke="#30343b" />
+<text class="column" x="1482" y="1063">closes_at</text>
+<text class="flag" x="1950" y="1063">NULL</text>
+<text class="type" x="2162" y="1063">DATETIME(6)</text>
+<line x1="1412" y1="1068" x2="2168" y2="1068" stroke="#30343b" />
+<text class="column" x="1482" y="1092">created_at</text>
+<text class="flag" x="1950" y="1092">NN</text>
+<text class="type" x="2162" y="1092">DATETIME(6)</text>
+<line x1="1412" y1="1097" x2="2168" y2="1097" stroke="#30343b" />
+<text class="column" x="1482" y="1121">updated_at</text>
+<text class="flag" x="1950" y="1121">NN</text>
+<text class="type" x="2162" y="1121">DATETIME(6)</text>
+<line x1="1412" y1="1126" x2="2168" y2="1126" stroke="#30343b" />
+<rect x="1400" y="1234" width="780" height="328" rx="12" fill="#1c1f25" stroke="#555b66" stroke-width="2" />
+<rect x="1400" y="1234" width="780" height="6" rx="3" fill="#8b7cff" />
+<text class="ko" x="1424" y="1269">사용자 베팅</text>
+<text class="table-name" x="1424" y="1293">user_bet</text>
+<line x1="1400" y1="1312" x2="2180" y2="1312" stroke="#414650" />
+<rect x="1410" y="1322" width="34" height="20" rx="5" fill="#d7a725" />
+<text class="badge" x="1427" y="1332" fill="#191919">PK</text>
+<text class="column" x="1482" y="1336">user_bet_id</text>
+<text class="flag" x="1950" y="1336">NN · AI</text>
+<text class="type" x="2162" y="1336">BIGINT</text>
+<line x1="1412" y1="1341" x2="2168" y2="1341" stroke="#30343b" />
+<rect x="1410" y="1351" width="34" height="20" rx="5" fill="#31a8df" />
+<text class="badge" x="1427" y="1361" fill="#101820">FK</text>
+<text class="column" x="1482" y="1365">betting_event_id</text>
+<text class="flag" x="1950" y="1365">NN</text>
+<text class="type" x="2162" y="1365">BIGINT</text>
+<line x1="1412" y1="1370" x2="2168" y2="1370" stroke="#30343b" />
+<rect x="1410" y="1380" width="34" height="20" rx="5" fill="#31a8df" />
+<text class="badge" x="1427" y="1390" fill="#101820">FK</text>
+<text class="column" x="1482" y="1394">user_id</text>
+<text class="flag" x="1950" y="1394">NN</text>
+<text class="type" x="2162" y="1394">BIGINT</text>
+<line x1="1412" y1="1399" x2="2168" y2="1399" stroke="#30343b" />
+<text class="column" x="1482" y="1423">selected_external_team_id</text>
+<text class="flag" x="1950" y="1423">NN</text>
+<text class="type" x="2162" y="1423">VARCHAR(32)</text>
+<line x1="1412" y1="1428" x2="2168" y2="1428" stroke="#30343b" />
+<text class="column" x="1482" y="1452">amount</text>
+<text class="flag" x="1950" y="1452">NN</text>
+<text class="type" x="2162" y="1452">BIGINT</text>
+<line x1="1412" y1="1457" x2="2168" y2="1457" stroke="#30343b" />
+<text class="column" x="1482" y="1481">status</text>
+<text class="flag" x="1950" y="1481">NN</text>
+<text class="type" x="2162" y="1481">VARCHAR(20)</text>
+<line x1="1412" y1="1486" x2="2168" y2="1486" stroke="#30343b" />
+<text class="column" x="1482" y="1510">created_at</text>
+<text class="flag" x="1950" y="1510">NN</text>
+<text class="type" x="2162" y="1510">DATETIME(6)</text>
+<line x1="1412" y1="1515" x2="2168" y2="1515" stroke="#30343b" />
+<text class="column" x="1482" y="1539">updated_at</text>
+<text class="flag" x="1950" y="1539">NN</text>
+<text class="type" x="2162" y="1539">DATETIME(6)</text>
+<line x1="1412" y1="1544" x2="2168" y2="1544" stroke="#30343b" />
+<rect x="1400" y="1652" width="780" height="241" rx="12" fill="#1c1f25" stroke="#555b66" stroke-width="2" />
+<rect x="1400" y="1652" width="780" height="6" rx="3" fill="#8b7cff" />
+<text class="ko" x="1424" y="1687">베팅 포인트 거래</text>
+<text class="table-name" x="1424" y="1711">bet_point_transaction</text>
+<line x1="1400" y1="1730" x2="2180" y2="1730" stroke="#414650" />
+<rect x="1410" y="1740" width="34" height="20" rx="5" fill="#d7a725" />
+<text class="badge" x="1427" y="1750" fill="#191919">PK</text>
+<text class="column" x="1482" y="1754">bet_point_transaction_id</text>
+<text class="flag" x="1950" y="1754">NN · AI</text>
+<text class="type" x="2162" y="1754">BIGINT</text>
+<line x1="1412" y1="1759" x2="2168" y2="1759" stroke="#30343b" />
+<rect x="1410" y="1769" width="34" height="20" rx="5" fill="#31a8df" />
+<text class="badge" x="1427" y="1779" fill="#101820">FK</text>
+<text class="column" x="1482" y="1783">user_bet_id</text>
+<text class="flag" x="1950" y="1783">NN</text>
+<text class="type" x="2162" y="1783">BIGINT</text>
+<line x1="1412" y1="1788" x2="2168" y2="1788" stroke="#30343b" />
+<text class="column" x="1482" y="1812">transaction_type</text>
+<text class="flag" x="1950" y="1812">NN</text>
+<text class="type" x="2162" y="1812">VARCHAR(20)</text>
+<line x1="1412" y1="1817" x2="2168" y2="1817" stroke="#30343b" />
+<text class="column" x="1482" y="1841">point_delta</text>
+<text class="flag" x="1950" y="1841">NN</text>
+<text class="type" x="2162" y="1841">BIGINT</text>
+<line x1="1412" y1="1846" x2="2168" y2="1846" stroke="#30343b" />
+<text class="column" x="1482" y="1870">created_at</text>
+<text class="flag" x="1950" y="1870">NN</text>
+<text class="type" x="2162" y="1870">DATETIME(6)</text>
+<line x1="1412" y1="1875" x2="2168" y2="1875" stroke="#30343b" />
+<rect x="2560" y="300" width="780" height="444" rx="12" fill="#1c1f25" stroke="#555b66" stroke-width="2" />
+<rect x="2560" y="300" width="780" height="6" rx="3" fill="#48a7ff" />
+<text class="ko" x="2584" y="335">e스포츠 매치</text>
+<text class="table-name" x="2584" y="359">esports_match</text>
+<line x1="2560" y1="378" x2="3340" y2="378" stroke="#414650" />
+<rect x="2570" y="388" width="34" height="20" rx="5" fill="#d7a725" />
+<text class="badge" x="2587" y="398" fill="#191919">PK</text>
+<text class="column" x="2642" y="402">esports_match_id</text>
+<text class="flag" x="3110" y="402">NN · AI</text>
+<text class="type" x="3322" y="402">BIGINT</text>
+<line x1="2572" y1="407" x2="3328" y2="407" stroke="#30343b" />
+<text class="column" x="2642" y="431">external_match_id</text>
+<text class="flag" x="3110" y="431">NN</text>
+<text class="type" x="3322" y="431">VARCHAR(32)</text>
+<line x1="2572" y1="436" x2="3328" y2="436" stroke="#30343b" />
+<text class="column" x="2642" y="460">league_external_id</text>
+<text class="flag" x="3110" y="460">NN</text>
+<text class="type" x="3322" y="460">VARCHAR(32)</text>
+<line x1="2572" y1="465" x2="3328" y2="465" stroke="#30343b" />
+<text class="column" x="2642" y="489">season_key</text>
+<text class="flag" x="3110" y="489">NN</text>
+<text class="type" x="3322" y="489">VARCHAR(50)</text>
+<line x1="2572" y1="494" x2="3328" y2="494" stroke="#30343b" />
+<text class="column" x="2642" y="518">tournament_external_id</text>
+<text class="flag" x="3110" y="518">NULL</text>
+<text class="type" x="3322" y="518">VARCHAR(32)</text>
+<line x1="2572" y1="523" x2="3328" y2="523" stroke="#30343b" />
+<text class="column" x="2642" y="547">block_name</text>
+<text class="flag" x="3110" y="547">NULL</text>
+<text class="type" x="3322" y="547">VARCHAR(100)</text>
+<line x1="2572" y1="552" x2="3328" y2="552" stroke="#30343b" />
+<text class="column" x="2642" y="576">scheduled_at</text>
+<text class="flag" x="3110" y="576">NN</text>
+<text class="type" x="3322" y="576">DATETIME(6)</text>
+<line x1="2572" y1="581" x2="3328" y2="581" stroke="#30343b" />
+<text class="column" x="2642" y="605">started_at</text>
+<text class="flag" x="3110" y="605">NULL</text>
+<text class="type" x="3322" y="605">DATETIME(6)</text>
+<line x1="2572" y1="610" x2="3328" y2="610" stroke="#30343b" />
+<text class="column" x="2642" y="634">lifecycle_status</text>
+<text class="flag" x="3110" y="634">NN</text>
+<text class="type" x="3322" y="634">VARCHAR(20)</text>
+<line x1="2572" y1="639" x2="3328" y2="639" stroke="#30343b" />
+<text class="column" x="2642" y="663">best_of</text>
+<text class="flag" x="3110" y="663">NULL</text>
+<text class="type" x="3322" y="663">INT</text>
+<line x1="2572" y1="668" x2="3328" y2="668" stroke="#30343b" />
+<text class="column" x="2642" y="692">created_at</text>
+<text class="flag" x="3110" y="692">NN</text>
+<text class="type" x="3322" y="692">DATETIME(6)</text>
+<line x1="2572" y1="697" x2="3328" y2="697" stroke="#30343b" />
+<text class="column" x="2642" y="721">updated_at</text>
+<text class="flag" x="3110" y="721">NN</text>
+<text class="type" x="3322" y="721">DATETIME(6)</text>
+<line x1="2572" y1="726" x2="3328" y2="726" stroke="#30343b" />
+<rect x="3780" y="300" width="780" height="473" rx="12" fill="#1c1f25" stroke="#555b66" stroke-width="2" />
+<rect x="3780" y="300" width="780" height="6" rx="3" fill="#48a7ff" />
+<text class="ko" x="3804" y="335">매치 팀</text>
+<text class="table-name" x="3804" y="359">match_team</text>
+<line x1="3780" y1="378" x2="4560" y2="378" stroke="#414650" />
+<rect x="3790" y="388" width="34" height="20" rx="5" fill="#d7a725" />
+<text class="badge" x="3807" y="398" fill="#191919">PK</text>
+<text class="column" x="3862" y="402">match_team_id</text>
+<text class="flag" x="4330" y="402">NN · AI</text>
+<text class="type" x="4542" y="402">BIGINT</text>
+<line x1="3792" y1="407" x2="4548" y2="407" stroke="#30343b" />
+<rect x="3790" y="417" width="34" height="20" rx="5" fill="#31a8df" />
+<text class="badge" x="3807" y="427" fill="#101820">FK</text>
+<text class="column" x="3862" y="431">match_id</text>
+<text class="flag" x="4330" y="431">NN</text>
+<text class="type" x="4542" y="431">BIGINT</text>
+<line x1="3792" y1="436" x2="4548" y2="436" stroke="#30343b" />
+<text class="column" x="3862" y="460">external_team_id</text>
+<text class="flag" x="4330" y="460">NULL</text>
+<text class="type" x="4542" y="460">VARCHAR(32)</text>
+<line x1="3792" y1="465" x2="4548" y2="465" stroke="#30343b" />
+<text class="column" x="3862" y="489">display_order</text>
+<text class="flag" x="4330" y="489">NN</text>
+<text class="type" x="4542" y="489">INT</text>
+<line x1="3792" y1="494" x2="4548" y2="494" stroke="#30343b" />
+<text class="column" x="3862" y="518">team_code</text>
+<text class="flag" x="4330" y="518">NULL</text>
+<text class="type" x="4542" y="518">VARCHAR(16)</text>
+<line x1="3792" y1="523" x2="4548" y2="523" stroke="#30343b" />
+<text class="column" x="3862" y="547">team_name</text>
+<text class="flag" x="4330" y="547">NULL</text>
+<text class="type" x="4542" y="547">VARCHAR(100)</text>
+<line x1="3792" y1="552" x2="4548" y2="552" stroke="#30343b" />
+<text class="column" x="3862" y="576">team_image_url</text>
+<text class="flag" x="4330" y="576">NULL</text>
+<text class="type" x="4542" y="576">VARCHAR(2048)</text>
+<line x1="3792" y1="581" x2="4548" y2="581" stroke="#30343b" />
+<text class="column" x="3862" y="605">outcome</text>
+<text class="flag" x="4330" y="605">NULL</text>
+<text class="type" x="4542" y="605">VARCHAR(10)</text>
+<line x1="3792" y1="610" x2="4548" y2="610" stroke="#30343b" />
+<text class="column" x="3862" y="634">game_wins</text>
+<text class="flag" x="4330" y="634">NULL</text>
+<text class="type" x="4542" y="634">INT</text>
+<line x1="3792" y1="639" x2="4548" y2="639" stroke="#30343b" />
+<text class="column" x="3862" y="663">record_wins_snapshot</text>
+<text class="flag" x="4330" y="663">NULL</text>
+<text class="type" x="4542" y="663">INT</text>
+<line x1="3792" y1="668" x2="4548" y2="668" stroke="#30343b" />
+<text class="column" x="3862" y="692">record_losses_snapshot</text>
+<text class="flag" x="4330" y="692">NULL</text>
+<text class="type" x="4542" y="692">INT</text>
+<line x1="3792" y1="697" x2="4548" y2="697" stroke="#30343b" />
+<text class="column" x="3862" y="721">created_at</text>
+<text class="flag" x="4330" y="721">NN</text>
+<text class="type" x="4542" y="721">DATETIME(6)</text>
+<line x1="3792" y1="726" x2="4548" y2="726" stroke="#30343b" />
+<text class="column" x="3862" y="750">updated_at</text>
+<text class="flag" x="4330" y="750">NN</text>
+<text class="type" x="4542" y="750">DATETIME(6)</text>
+<line x1="3792" y1="755" x2="4548" y2="755" stroke="#30343b" />
+<rect x="2560" y="834" width="780" height="1140" rx="12" fill="#1c1f25" stroke="#555b66" stroke-width="2" />
+<rect x="2560" y="834" width="780" height="6" rx="3" fill="#48a7ff" />
+<text class="ko" x="2584" y="869">세트 게임</text>
+<text class="table-name" x="2584" y="893">esports_game</text>
+<line x1="2560" y1="912" x2="3340" y2="912" stroke="#414650" />
+<rect x="2570" y="922" width="34" height="20" rx="5" fill="#d7a725" />
+<text class="badge" x="2587" y="932" fill="#191919">PK</text>
+<text class="column" x="2642" y="936">esports_game_id</text>
+<text class="flag" x="3110" y="936">NN · AI</text>
+<text class="type" x="3322" y="936">BIGINT</text>
+<line x1="2572" y1="941" x2="3328" y2="941" stroke="#30343b" />
+<text class="column" x="2642" y="965">external_game_id</text>
+<text class="flag" x="3110" y="965">NN</text>
+<text class="type" x="3322" y="965">VARCHAR(32)</text>
+<line x1="2572" y1="970" x2="3328" y2="970" stroke="#30343b" />
+<rect x="2570" y="980" width="34" height="20" rx="5" fill="#31a8df" />
+<text class="badge" x="2587" y="990" fill="#101820">FK</text>
+<text class="column" x="2642" y="994">match_id</text>
+<text class="flag" x="3110" y="994">NN</text>
+<text class="type" x="3322" y="994">BIGINT</text>
+<line x1="2572" y1="999" x2="3328" y2="999" stroke="#30343b" />
+<text class="column" x="2642" y="1023">game_number</text>
+<text class="flag" x="3110" y="1023">NN</text>
+<text class="type" x="3322" y="1023">INT</text>
+<line x1="2572" y1="1028" x2="3328" y2="1028" stroke="#30343b" />
+<rect x="2570" y="1038" width="34" height="20" rx="5" fill="#31a8df" />
+<text class="badge" x="2587" y="1048" fill="#101820">FK</text>
+<text class="column" x="2642" y="1052">blue_match_team_id</text>
+<text class="flag" x="3110" y="1052">NULL</text>
+<text class="type" x="3322" y="1052">BIGINT</text>
+<line x1="2572" y1="1057" x2="3328" y2="1057" stroke="#30343b" />
+<rect x="2570" y="1067" width="34" height="20" rx="5" fill="#31a8df" />
+<text class="badge" x="2587" y="1077" fill="#101820">FK</text>
+<text class="column" x="2642" y="1081">red_match_team_id</text>
+<text class="flag" x="3110" y="1081">NULL</text>
+<text class="type" x="3322" y="1081">BIGINT</text>
+<line x1="2572" y1="1086" x2="3328" y2="1086" stroke="#30343b" />
+<rect x="2570" y="1096" width="34" height="20" rx="5" fill="#31a8df" />
+<text class="badge" x="2587" y="1106" fill="#101820">FK</text>
+<text class="column" x="2642" y="1110">winner_match_team_id</text>
+<text class="flag" x="3110" y="1110">NULL</text>
+<text class="type" x="3322" y="1110">BIGINT</text>
+<line x1="2572" y1="1115" x2="3328" y2="1115" stroke="#30343b" />
+<text class="column" x="2642" y="1139">winner_decided_at</text>
+<text class="flag" x="3110" y="1139">NULL</text>
+<text class="type" x="3322" y="1139">DATETIME(6)</text>
+<line x1="2572" y1="1144" x2="3328" y2="1144" stroke="#30343b" />
+<text class="column" x="2642" y="1168">lifecycle_status</text>
+<text class="flag" x="3110" y="1168">NN</text>
+<text class="type" x="3322" y="1168">VARCHAR(20)</text>
+<line x1="2572" y1="1173" x2="3328" y2="1173" stroke="#30343b" />
+<text class="column" x="2642" y="1197">telemetry_state</text>
+<text class="flag" x="3110" y="1197">NULL</text>
+<text class="type" x="3322" y="1197">VARCHAR(30)</text>
+<line x1="2572" y1="1202" x2="3328" y2="1202" stroke="#30343b" />
+<text class="column" x="2642" y="1226">patch_version</text>
+<text class="flag" x="3110" y="1226">NULL</text>
+<text class="type" x="3322" y="1226">VARCHAR(50)</text>
+<line x1="2572" y1="1231" x2="3328" y2="1231" stroke="#30343b" />
+<text class="column" x="2642" y="1255">started_at</text>
+<text class="flag" x="3110" y="1255">NULL</text>
+<text class="type" x="3322" y="1255">DATETIME(6)</text>
+<line x1="2572" y1="1260" x2="3328" y2="1260" stroke="#30343b" />
+<text class="column" x="2642" y="1284">ended_at</text>
+<text class="flag" x="3110" y="1284">NULL</text>
+<text class="type" x="3322" y="1284">DATETIME(6)</text>
+<line x1="2572" y1="1289" x2="3328" y2="1289" stroke="#30343b" />
+<text class="column" x="2642" y="1313">duration_seconds</text>
+<text class="flag" x="3110" y="1313">NULL</text>
+<text class="type" x="3322" y="1313">INT</text>
+<line x1="2572" y1="1318" x2="3328" y2="1318" stroke="#30343b" />
+<text class="column" x="2642" y="1342">final_window_frame_at</text>
+<text class="flag" x="3110" y="1342">NULL</text>
+<text class="type" x="3322" y="1342">DATETIME(6)</text>
+<line x1="2572" y1="1347" x2="3328" y2="1347" stroke="#30343b" />
+<text class="column" x="2642" y="1371">final_details_frame_at</text>
+<text class="flag" x="3110" y="1371">NULL</text>
+<text class="type" x="3322" y="1371">DATETIME(6)</text>
+<line x1="2572" y1="1376" x2="3328" y2="1376" stroke="#30343b" />
+<text class="column" x="2642" y="1400">blue_total_gold</text>
+<text class="flag" x="3110" y="1400">NULL</text>
+<text class="type" x="3322" y="1400">BIGINT</text>
+<line x1="2572" y1="1405" x2="3328" y2="1405" stroke="#30343b" />
+<text class="column" x="2642" y="1429">red_total_gold</text>
+<text class="flag" x="3110" y="1429">NULL</text>
+<text class="type" x="3322" y="1429">BIGINT</text>
+<line x1="2572" y1="1434" x2="3328" y2="1434" stroke="#30343b" />
+<text class="column" x="2642" y="1458">blue_total_kills</text>
+<text class="flag" x="3110" y="1458">NULL</text>
+<text class="type" x="3322" y="1458">INT</text>
+<line x1="2572" y1="1463" x2="3328" y2="1463" stroke="#30343b" />
+<text class="column" x="2642" y="1487">red_total_kills</text>
+<text class="flag" x="3110" y="1487">NULL</text>
+<text class="type" x="3322" y="1487">INT</text>
+<line x1="2572" y1="1492" x2="3328" y2="1492" stroke="#30343b" />
+<text class="column" x="2642" y="1516">blue_towers</text>
+<text class="flag" x="3110" y="1516">NULL</text>
+<text class="type" x="3322" y="1516">INT</text>
+<line x1="2572" y1="1521" x2="3328" y2="1521" stroke="#30343b" />
+<text class="column" x="2642" y="1545">red_towers</text>
+<text class="flag" x="3110" y="1545">NULL</text>
+<text class="type" x="3322" y="1545">INT</text>
+<line x1="2572" y1="1550" x2="3328" y2="1550" stroke="#30343b" />
+<text class="column" x="2642" y="1574">blue_inhibitors</text>
+<text class="flag" x="3110" y="1574">NULL</text>
+<text class="type" x="3322" y="1574">INT</text>
+<line x1="2572" y1="1579" x2="3328" y2="1579" stroke="#30343b" />
+<text class="column" x="2642" y="1603">red_inhibitors</text>
+<text class="flag" x="3110" y="1603">NULL</text>
+<text class="type" x="3322" y="1603">INT</text>
+<line x1="2572" y1="1608" x2="3328" y2="1608" stroke="#30343b" />
+<text class="column" x="2642" y="1632">blue_barons</text>
+<text class="flag" x="3110" y="1632">NULL</text>
+<text class="type" x="3322" y="1632">INT</text>
+<line x1="2572" y1="1637" x2="3328" y2="1637" stroke="#30343b" />
+<text class="column" x="2642" y="1661">red_barons</text>
+<text class="flag" x="3110" y="1661">NULL</text>
+<text class="type" x="3322" y="1661">INT</text>
+<line x1="2572" y1="1666" x2="3328" y2="1666" stroke="#30343b" />
+<text class="column" x="2642" y="1690">objectives_json</text>
+<text class="flag" x="3110" y="1690">NULL</text>
+<text class="type" x="3322" y="1690">JSON</text>
+<line x1="2572" y1="1695" x2="3328" y2="1695" stroke="#30343b" />
+<text class="column" x="2642" y="1719">window_collection_status</text>
+<text class="flag" x="3110" y="1719">NN</text>
+<text class="type" x="3322" y="1719">VARCHAR(20)</text>
+<line x1="2572" y1="1724" x2="3328" y2="1724" stroke="#30343b" />
+<text class="column" x="2642" y="1748">details_collection_status</text>
+<text class="flag" x="3110" y="1748">NN</text>
+<text class="type" x="3322" y="1748">VARCHAR(20)</text>
+<line x1="2572" y1="1753" x2="3328" y2="1753" stroke="#30343b" />
+<text class="column" x="2642" y="1777">timeline_collection_status</text>
+<text class="flag" x="3110" y="1777">NN</text>
+<text class="type" x="3322" y="1777">VARCHAR(20)</text>
+<line x1="2572" y1="1782" x2="3328" y2="1782" stroke="#30343b" />
+<text class="column" x="2642" y="1806">timeline_covered_from_seconds</text>
+<text class="flag" x="3110" y="1806">NULL</text>
+<text class="type" x="3322" y="1806">INT</text>
+<line x1="2572" y1="1811" x2="3328" y2="1811" stroke="#30343b" />
+<text class="column" x="2642" y="1835">timeline_covered_to_seconds</text>
+<text class="flag" x="3110" y="1835">NULL</text>
+<text class="type" x="3322" y="1835">INT</text>
+<line x1="2572" y1="1840" x2="3328" y2="1840" stroke="#30343b" />
+<text class="column" x="2642" y="1864">finalized_at</text>
+<text class="flag" x="3110" y="1864">NULL</text>
+<text class="type" x="3322" y="1864">DATETIME(6)</text>
+<line x1="2572" y1="1869" x2="3328" y2="1869" stroke="#30343b" />
+<text class="column" x="2642" y="1893">last_collection_error</text>
+<text class="flag" x="3110" y="1893">NULL</text>
+<text class="type" x="3322" y="1893">VARCHAR(1000)</text>
+<line x1="2572" y1="1898" x2="3328" y2="1898" stroke="#30343b" />
+<text class="column" x="2642" y="1922">created_at</text>
+<text class="flag" x="3110" y="1922">NN</text>
+<text class="type" x="3322" y="1922">DATETIME(6)</text>
+<line x1="2572" y1="1927" x2="3328" y2="1927" stroke="#30343b" />
+<text class="column" x="2642" y="1951">updated_at</text>
+<text class="flag" x="3110" y="1951">NN</text>
+<text class="type" x="3322" y="1951">DATETIME(6)</text>
+<line x1="2572" y1="1956" x2="3328" y2="1956" stroke="#30343b" />
+<rect x="3780" y="863" width="780" height="792" rx="12" fill="#1c1f25" stroke="#555b66" stroke-width="2" />
+<rect x="3780" y="863" width="780" height="6" rx="3" fill="#48a7ff" />
+<text class="ko" x="3804" y="898">게임 플레이어 통계</text>
+<text class="table-name" x="3804" y="922">game_player_stat</text>
+<line x1="3780" y1="941" x2="4560" y2="941" stroke="#414650" />
+<rect x="3790" y="951" width="34" height="20" rx="5" fill="#d7a725" />
+<text class="badge" x="3807" y="961" fill="#191919">PK</text>
+<text class="column" x="3862" y="965">game_player_stat_id</text>
+<text class="flag" x="4330" y="965">NN · AI</text>
+<text class="type" x="4542" y="965">BIGINT</text>
+<line x1="3792" y1="970" x2="4548" y2="970" stroke="#30343b" />
+<rect x="3790" y="980" width="34" height="20" rx="5" fill="#31a8df" />
+<text class="badge" x="3807" y="990" fill="#101820">FK</text>
+<text class="column" x="3862" y="994">game_id</text>
+<text class="flag" x="4330" y="994">NN</text>
+<text class="type" x="4542" y="994">BIGINT</text>
+<line x1="3792" y1="999" x2="4548" y2="999" stroke="#30343b" />
+<rect x="3790" y="1009" width="34" height="20" rx="5" fill="#31a8df" />
+<text class="badge" x="3807" y="1019" fill="#101820">FK</text>
+<text class="column" x="3862" y="1023">match_team_id</text>
+<text class="flag" x="4330" y="1023">NULL</text>
+<text class="type" x="4542" y="1023">BIGINT</text>
+<line x1="3792" y1="1028" x2="4548" y2="1028" stroke="#30343b" />
+<text class="column" x="3862" y="1052">participant_no</text>
+<text class="flag" x="4330" y="1052">NN</text>
+<text class="type" x="4542" y="1052">INT</text>
+<line x1="3792" y1="1057" x2="4548" y2="1057" stroke="#30343b" />
+<text class="column" x="3862" y="1081">side</text>
+<text class="flag" x="4330" y="1081">NN</text>
+<text class="type" x="4542" y="1081">VARCHAR(4)</text>
+<line x1="3792" y1="1086" x2="4548" y2="1086" stroke="#30343b" />
+<text class="column" x="3862" y="1110">external_player_id</text>
+<text class="flag" x="4330" y="1110">NULL</text>
+<text class="type" x="4542" y="1110">VARCHAR(32)</text>
+<line x1="3792" y1="1115" x2="4548" y2="1115" stroke="#30343b" />
+<text class="column" x="3862" y="1139">summoner_name</text>
+<text class="flag" x="4330" y="1139">NULL</text>
+<text class="type" x="4542" y="1139">VARCHAR(100)</text>
+<line x1="3792" y1="1144" x2="4548" y2="1144" stroke="#30343b" />
+<text class="column" x="3862" y="1168">champion_id</text>
+<text class="flag" x="4330" y="1168">NULL</text>
+<text class="type" x="4542" y="1168">VARCHAR(50)</text>
+<line x1="3792" y1="1173" x2="4548" y2="1173" stroke="#30343b" />
+<text class="column" x="3862" y="1197">role</text>
+<text class="flag" x="4330" y="1197">NULL</text>
+<text class="type" x="4542" y="1197">VARCHAR(20)</text>
+<line x1="3792" y1="1202" x2="4548" y2="1202" stroke="#30343b" />
+<text class="column" x="3862" y="1226">level</text>
+<text class="flag" x="4330" y="1226">NULL</text>
+<text class="type" x="4542" y="1226">INT</text>
+<line x1="3792" y1="1231" x2="4548" y2="1231" stroke="#30343b" />
+<text class="column" x="3862" y="1255">kills</text>
+<text class="flag" x="4330" y="1255">NULL</text>
+<text class="type" x="4542" y="1255">INT</text>
+<line x1="3792" y1="1260" x2="4548" y2="1260" stroke="#30343b" />
+<text class="column" x="3862" y="1284">deaths</text>
+<text class="flag" x="4330" y="1284">NULL</text>
+<text class="type" x="4542" y="1284">INT</text>
+<line x1="3792" y1="1289" x2="4548" y2="1289" stroke="#30343b" />
+<text class="column" x="3862" y="1313">assists</text>
+<text class="flag" x="4330" y="1313">NULL</text>
+<text class="type" x="4542" y="1313">INT</text>
+<line x1="3792" y1="1318" x2="4548" y2="1318" stroke="#30343b" />
+<text class="column" x="3862" y="1342">creep_score</text>
+<text class="flag" x="4330" y="1342">NULL</text>
+<text class="type" x="4542" y="1342">INT</text>
+<line x1="3792" y1="1347" x2="4548" y2="1347" stroke="#30343b" />
+<text class="column" x="3862" y="1371">total_gold</text>
+<text class="flag" x="4330" y="1371">NULL</text>
+<text class="type" x="4542" y="1371">BIGINT</text>
+<line x1="3792" y1="1376" x2="4548" y2="1376" stroke="#30343b" />
+<text class="column" x="3862" y="1400">total_gold_earned</text>
+<text class="flag" x="4330" y="1400">NULL</text>
+<text class="type" x="4542" y="1400">BIGINT</text>
+<line x1="3792" y1="1405" x2="4548" y2="1405" stroke="#30343b" />
+<text class="column" x="3862" y="1429">kill_participation_ratio</text>
+<text class="flag" x="4330" y="1429">NULL</text>
+<text class="type" x="4542" y="1429">DECIMAL(7,6)</text>
+<line x1="3792" y1="1434" x2="4548" y2="1434" stroke="#30343b" />
+<text class="column" x="3862" y="1458">champion_damage_share_ratio</text>
+<text class="flag" x="4330" y="1458">NULL</text>
+<text class="type" x="4542" y="1458">DECIMAL(7,6)</text>
+<line x1="3792" y1="1463" x2="4548" y2="1463" stroke="#30343b" />
+<text class="column" x="3862" y="1487">wards_placed</text>
+<text class="flag" x="4330" y="1487">NULL</text>
+<text class="type" x="4542" y="1487">INT</text>
+<line x1="3792" y1="1492" x2="4548" y2="1492" stroke="#30343b" />
+<text class="column" x="3862" y="1516">wards_destroyed</text>
+<text class="flag" x="4330" y="1516">NULL</text>
+<text class="type" x="4542" y="1516">INT</text>
+<line x1="3792" y1="1521" x2="4548" y2="1521" stroke="#30343b" />
+<text class="column" x="3862" y="1545">items_json</text>
+<text class="flag" x="4330" y="1545">NULL</text>
+<text class="type" x="4542" y="1545">JSON</text>
+<line x1="3792" y1="1550" x2="4548" y2="1550" stroke="#30343b" />
+<text class="column" x="3862" y="1574">perks_json</text>
+<text class="flag" x="4330" y="1574">NULL</text>
+<text class="type" x="4542" y="1574">JSON</text>
+<line x1="3792" y1="1579" x2="4548" y2="1579" stroke="#30343b" />
+<text class="column" x="3862" y="1603">created_at</text>
+<text class="flag" x="4330" y="1603">NN</text>
+<text class="type" x="4542" y="1603">DATETIME(6)</text>
+<line x1="3792" y1="1608" x2="4548" y2="1608" stroke="#30343b" />
+<text class="column" x="3862" y="1632">updated_at</text>
+<text class="flag" x="4330" y="1632">NN</text>
+<text class="type" x="4542" y="1632">DATETIME(6)</text>
+<line x1="3792" y1="1637" x2="4548" y2="1637" stroke="#30343b" />
+<rect x="2560" y="2064" width="780" height="299" rx="12" fill="#1c1f25" stroke="#555b66" stroke-width="2" />
+<rect x="2560" y="2064" width="780" height="6" rx="3" fill="#48a7ff" />
+<text class="ko" x="2584" y="2099">게임 타임라인</text>
+<text class="table-name" x="2584" y="2123">game_timeline_point</text>
+<line x1="2560" y1="2142" x2="3340" y2="2142" stroke="#414650" />
+<rect x="2570" y="2152" width="34" height="20" rx="5" fill="#d7a725" />
+<text class="badge" x="2587" y="2162" fill="#191919">PK</text>
+<text class="column" x="2642" y="2166">game_timeline_point_id</text>
+<text class="flag" x="3110" y="2166">NN · AI</text>
+<text class="type" x="3322" y="2166">BIGINT</text>
+<line x1="2572" y1="2171" x2="3328" y2="2171" stroke="#30343b" />
+<rect x="2570" y="2181" width="34" height="20" rx="5" fill="#31a8df" />
+<text class="badge" x="2587" y="2191" fill="#101820">FK</text>
+<text class="column" x="2642" y="2195">game_id</text>
+<text class="flag" x="3110" y="2195">NN</text>
+<text class="type" x="3322" y="2195">BIGINT</text>
+<line x1="2572" y1="2200" x2="3328" y2="2200" stroke="#30343b" />
+<text class="column" x="2642" y="2224">game_time_seconds</text>
+<text class="flag" x="3110" y="2224">NN</text>
+<text class="type" x="3322" y="2224">INT</text>
+<line x1="2572" y1="2229" x2="3328" y2="2229" stroke="#30343b" />
+<text class="column" x="2642" y="2253">blue_gold</text>
+<text class="flag" x="3110" y="2253">NN</text>
+<text class="type" x="3322" y="2253">BIGINT</text>
+<line x1="2572" y1="2258" x2="3328" y2="2258" stroke="#30343b" />
+<text class="column" x="2642" y="2282">red_gold</text>
+<text class="flag" x="3110" y="2282">NN</text>
+<text class="type" x="3322" y="2282">BIGINT</text>
+<line x1="2572" y1="2287" x2="3328" y2="2287" stroke="#30343b" />
+<text class="column" x="2642" y="2311">blue_kills</text>
+<text class="flag" x="3110" y="2311">NN</text>
+<text class="type" x="3322" y="2311">INT</text>
+<line x1="2572" y1="2316" x2="3328" y2="2316" stroke="#30343b" />
+<text class="column" x="2642" y="2340">red_kills</text>
+<text class="flag" x="3110" y="2340">NN</text>
+<text class="type" x="3322" y="2340">INT</text>
+<line x1="2572" y1="2345" x2="3328" y2="2345" stroke="#30343b" />
+<rect x="3780" y="1745" width="780" height="328" rx="12" fill="#1c1f25" stroke="#555b66" stroke-width="2" />
+<rect x="3780" y="1745" width="780" height="6" rx="3" fill="#48a7ff" />
+<text class="ko" x="3804" y="1780">경기 이벤트</text>
+<text class="table-name" x="3804" y="1804">esports_match_event</text>
+<line x1="3780" y1="1823" x2="4560" y2="1823" stroke="#414650" />
+<rect x="3790" y="1833" width="34" height="20" rx="5" fill="#d7a725" />
+<text class="badge" x="3807" y="1843" fill="#191919">PK</text>
+<text class="column" x="3862" y="1847">match_event_id</text>
+<text class="flag" x="4330" y="1847">NN · AI</text>
+<text class="type" x="4542" y="1847">BIGINT</text>
+<line x1="3792" y1="1852" x2="4548" y2="1852" stroke="#30343b" />
+<rect x="3790" y="1862" width="34" height="20" rx="5" fill="#31a8df" />
+<text class="badge" x="3807" y="1872" fill="#101820">FK</text>
+<text class="column" x="3862" y="1876">esports_match_id</text>
+<text class="flag" x="4330" y="1876">NN</text>
+<text class="type" x="4542" y="1876">BIGINT</text>
+<line x1="3792" y1="1881" x2="4548" y2="1881" stroke="#30343b" />
+<text class="column" x="3862" y="1905">external_event_id</text>
+<text class="flag" x="4330" y="1905">NULL</text>
+<text class="type" x="4542" y="1905">VARCHAR(100)</text>
+<line x1="3792" y1="1910" x2="4548" y2="1910" stroke="#30343b" />
+<text class="column" x="3862" y="1934">event_type</text>
+<text class="flag" x="4330" y="1934">NN</text>
+<text class="type" x="4542" y="1934">VARCHAR(50)</text>
+<line x1="3792" y1="1939" x2="4548" y2="1939" stroke="#30343b" />
+<text class="column" x="3862" y="1963">occurred_at</text>
+<text class="flag" x="4330" y="1963">NN</text>
+<text class="type" x="4542" y="1963">DATETIME(6)</text>
+<line x1="3792" y1="1968" x2="4548" y2="1968" stroke="#30343b" />
+<text class="column" x="3862" y="1992">event_data</text>
+<text class="flag" x="4330" y="1992">NULL</text>
+<text class="type" x="4542" y="1992">JSON</text>
+<line x1="3792" y1="1997" x2="4548" y2="1997" stroke="#30343b" />
+<text class="column" x="3862" y="2021">processed_at</text>
+<text class="flag" x="4330" y="2021">NULL</text>
+<text class="type" x="4542" y="2021">DATETIME(6)</text>
+<line x1="3792" y1="2026" x2="4548" y2="2026" stroke="#30343b" />
+<text class="column" x="3862" y="2050">created_at</text>
+<text class="flag" x="4330" y="2050">NN</text>
+<text class="type" x="4542" y="2050">DATETIME(6)</text>
+<line x1="3792" y1="2055" x2="4548" y2="2055" stroke="#30343b" />
+<rect x="4940" y="350" width="780" height="357" rx="12" fill="#1c1f25" stroke="#555b66" stroke-width="2" />
+<rect x="4940" y="350" width="780" height="6" rx="3" fill="#f2a65a" />
+<text class="ko" x="4964" y="385">쿠폰 이벤트</text>
+<text class="table-name" x="4964" y="409">coupon_event</text>
+<line x1="4940" y1="428" x2="5720" y2="428" stroke="#414650" />
+<rect x="4950" y="438" width="34" height="20" rx="5" fill="#d7a725" />
+<text class="badge" x="4967" y="448" fill="#191919">PK</text>
+<text class="column" x="5022" y="452">coupon_event_id</text>
+<text class="flag" x="5490" y="452">NN · AI</text>
+<text class="type" x="5702" y="452">BIGINT</text>
+<line x1="4952" y1="457" x2="5708" y2="457" stroke="#30343b" />
+<rect x="4950" y="467" width="34" height="20" rx="5" fill="#31a8df" />
+<text class="badge" x="4967" y="477" fill="#101820">FK</text>
+<text class="column" x="5022" y="481">esports_match_id</text>
+<text class="flag" x="5490" y="481">NN</text>
+<text class="type" x="5702" y="481">BIGINT</text>
+<line x1="4952" y1="486" x2="5708" y2="486" stroke="#30343b" />
+<text class="column" x="5022" y="510">event_name</text>
+<text class="flag" x="5490" y="510">NN</text>
+<text class="type" x="5702" y="510">VARCHAR(200)</text>
+<line x1="4952" y1="515" x2="5708" y2="515" stroke="#30343b" />
+<text class="column" x="5022" y="539">issue_mode</text>
+<text class="flag" x="5490" y="539">NN</text>
+<text class="type" x="5702" y="539">VARCHAR(30)</text>
+<line x1="4952" y1="544" x2="5708" y2="544" stroke="#30343b" />
+<text class="column" x="5022" y="568">trigger_type</text>
+<text class="flag" x="5490" y="568">NN</text>
+<text class="type" x="5702" y="568">VARCHAR(50)</text>
+<line x1="4952" y1="573" x2="5708" y2="573" stroke="#30343b" />
+<text class="column" x="5022" y="597">event_status</text>
+<text class="flag" x="5490" y="597">NN</text>
+<text class="type" x="5702" y="597">VARCHAR(20)</text>
+<line x1="4952" y1="602" x2="5708" y2="602" stroke="#30343b" />
+<text class="column" x="5022" y="626">claim_window_seconds</text>
+<text class="flag" x="5490" y="626">NN</text>
+<text class="type" x="5702" y="626">INT</text>
+<line x1="4952" y1="631" x2="5708" y2="631" stroke="#30343b" />
+<text class="column" x="5022" y="655">created_at</text>
+<text class="flag" x="5490" y="655">NN</text>
+<text class="type" x="5702" y="655">DATETIME(6)</text>
+<line x1="4952" y1="660" x2="5708" y2="660" stroke="#30343b" />
+<text class="column" x="5022" y="684">updated_at</text>
+<text class="flag" x="5490" y="684">NN</text>
+<text class="type" x="5702" y="684">DATETIME(6)</text>
+<line x1="4952" y1="689" x2="5708" y2="689" stroke="#30343b" />
+<rect x="6160" y="350" width="780" height="299" rx="12" fill="#1c1f25" stroke="#555b66" stroke-width="2" />
+<rect x="6160" y="350" width="780" height="6" rx="3" fill="#f2a65a" />
+<text class="ko" x="6184" y="385">쿠폰 유형</text>
+<text class="table-name" x="6184" y="409">coupon_type</text>
+<line x1="6160" y1="428" x2="6940" y2="428" stroke="#414650" />
+<rect x="6170" y="438" width="34" height="20" rx="5" fill="#d7a725" />
+<text class="badge" x="6187" y="448" fill="#191919">PK</text>
+<text class="column" x="6242" y="452">coupon_type_id</text>
+<text class="flag" x="6710" y="452">NN · AI</text>
+<text class="type" x="6922" y="452">BIGINT</text>
+<line x1="6172" y1="457" x2="6928" y2="457" stroke="#30343b" />
+<text class="column" x="6242" y="481">coupon_name</text>
+<text class="flag" x="6710" y="481">NN</text>
+<text class="type" x="6922" y="481">VARCHAR(100)</text>
+<line x1="6172" y1="486" x2="6928" y2="486" stroke="#30343b" />
+<text class="column" x="6242" y="510">discount_type</text>
+<text class="flag" x="6710" y="510">NN</text>
+<text class="type" x="6922" y="510">VARCHAR(20)</text>
+<line x1="6172" y1="515" x2="6928" y2="515" stroke="#30343b" />
+<text class="column" x="6242" y="539">discount_value</text>
+<text class="flag" x="6710" y="539">NN</text>
+<text class="type" x="6922" y="539">DECIMAL(10,2)</text>
+<line x1="6172" y1="544" x2="6928" y2="544" stroke="#30343b" />
+<text class="column" x="6242" y="568">status</text>
+<text class="flag" x="6710" y="568">NN</text>
+<text class="type" x="6922" y="568">VARCHAR(30)</text>
+<line x1="6172" y1="573" x2="6928" y2="573" stroke="#30343b" />
+<text class="column" x="6242" y="597">created_at</text>
+<text class="flag" x="6710" y="597">NN</text>
+<text class="type" x="6922" y="597">DATETIME(6)</text>
+<line x1="6172" y1="602" x2="6928" y2="602" stroke="#30343b" />
+<text class="column" x="6242" y="626">updated_at</text>
+<text class="flag" x="6710" y="626">NN</text>
+<text class="type" x="6922" y="626">DATETIME(6)</text>
+<line x1="6172" y1="631" x2="6928" y2="631" stroke="#30343b" />
+<rect x="6160" y="739" width="780" height="299" rx="12" fill="#1c1f25" stroke="#555b66" stroke-width="2" />
+<rect x="6160" y="739" width="780" height="6" rx="3" fill="#f2a65a" />
+<text class="ko" x="6184" y="774">이벤트 쿠폰 항목</text>
+<text class="table-name" x="6184" y="798">coupon_event_item</text>
+<line x1="6160" y1="817" x2="6940" y2="817" stroke="#414650" />
+<rect x="6170" y="827" width="34" height="20" rx="5" fill="#d7a725" />
+<text class="badge" x="6187" y="837" fill="#191919">PK</text>
+<text class="column" x="6242" y="841">coupon_event_item_id</text>
+<text class="flag" x="6710" y="841">NN · AI</text>
+<text class="type" x="6922" y="841">BIGINT</text>
+<line x1="6172" y1="846" x2="6928" y2="846" stroke="#30343b" />
+<text class="column" x="6242" y="870">coupon_event_id</text>
+<text class="flag" x="6710" y="870">NN</text>
+<text class="type" x="6922" y="870">BIGINT</text>
+<line x1="6172" y1="875" x2="6928" y2="875" stroke="#30343b" />
+<rect x="6170" y="885" width="34" height="20" rx="5" fill="#31a8df" />
+<text class="badge" x="6187" y="895" fill="#101820">FK</text>
+<text class="column" x="6242" y="899">coupon_type_id</text>
+<text class="flag" x="6710" y="899">NN</text>
+<text class="type" x="6922" y="899">BIGINT</text>
+<line x1="6172" y1="904" x2="6928" y2="904" stroke="#30343b" />
+<text class="column" x="6242" y="928">quantity</text>
+<text class="flag" x="6710" y="928">NN</text>
+<text class="type" x="6922" y="928">INT</text>
+<line x1="6172" y1="933" x2="6928" y2="933" stroke="#30343b" />
+<text class="column" x="6242" y="957">success_count</text>
+<text class="flag" x="6710" y="957">NN</text>
+<text class="type" x="6922" y="957">INT</text>
+<line x1="6172" y1="962" x2="6928" y2="962" stroke="#30343b" />
+<text class="column" x="6242" y="986">created_at</text>
+<text class="flag" x="6710" y="986">NN</text>
+<text class="type" x="6922" y="986">DATETIME(6)</text>
+<line x1="6172" y1="991" x2="6928" y2="991" stroke="#30343b" />
+<text class="column" x="6242" y="1015">updated_at</text>
+<text class="flag" x="6710" y="1015">NN</text>
+<text class="type" x="6922" y="1015">DATETIME(6)</text>
+<line x1="6172" y1="1020" x2="6928" y2="1020" stroke="#30343b" />
+<rect x="4940" y="797" width="780" height="299" rx="12" fill="#1c1f25" stroke="#555b66" stroke-width="2" />
+<rect x="4940" y="797" width="780" height="6" rx="3" fill="#f2a65a" />
+<text class="ko" x="4964" y="832">쿠폰 이벤트 단계</text>
+<text class="table-name" x="4964" y="856">coupon_event_phase</text>
+<line x1="4940" y1="875" x2="5720" y2="875" stroke="#414650" />
+<rect x="4950" y="885" width="34" height="20" rx="5" fill="#d7a725" />
+<text class="badge" x="4967" y="895" fill="#191919">PK</text>
+<text class="column" x="5022" y="899">coupon_event_phase_id</text>
+<text class="flag" x="5490" y="899">NN · AI</text>
+<text class="type" x="5702" y="899">BIGINT</text>
+<line x1="4952" y1="904" x2="5708" y2="904" stroke="#30343b" />
+<rect x="4950" y="914" width="34" height="20" rx="5" fill="#31a8df" />
+<text class="badge" x="4967" y="924" fill="#101820">FK</text>
+<text class="column" x="5022" y="928">coupon_event_id</text>
+<text class="flag" x="5490" y="928">NN</text>
+<text class="type" x="5702" y="928">BIGINT</text>
+<line x1="4952" y1="933" x2="5708" y2="933" stroke="#30343b" />
+<rect x="4950" y="943" width="34" height="20" rx="5" fill="#31a8df" />
+<text class="badge" x="4967" y="953" fill="#101820">FK</text>
+<text class="column" x="5022" y="957">coupon_event_item_id</text>
+<text class="flag" x="5490" y="957">NN</text>
+<text class="type" x="5702" y="957">BIGINT</text>
+<line x1="4952" y1="962" x2="5708" y2="962" stroke="#30343b" />
+<text class="column" x="5022" y="986">phase_sequence</text>
+<text class="flag" x="5490" y="986">NN</text>
+<text class="type" x="5702" y="986">INT</text>
+<line x1="4952" y1="991" x2="5708" y2="991" stroke="#30343b" />
+<text class="column" x="5022" y="1015">open_offset_seconds</text>
+<text class="flag" x="5490" y="1015">NN</text>
+<text class="type" x="5702" y="1015">INT</text>
+<line x1="4952" y1="1020" x2="5708" y2="1020" stroke="#30343b" />
+<text class="column" x="5022" y="1044">created_at</text>
+<text class="flag" x="5490" y="1044">NN</text>
+<text class="type" x="5702" y="1044">DATETIME(6)</text>
+<line x1="4952" y1="1049" x2="5708" y2="1049" stroke="#30343b" />
+<text class="column" x="5022" y="1073">updated_at</text>
+<text class="flag" x="5490" y="1073">NN</text>
+<text class="type" x="5702" y="1073">DATETIME(6)</text>
+<line x1="4952" y1="1078" x2="5708" y2="1078" stroke="#30343b" />
+<rect x="4940" y="1186" width="780" height="502" rx="12" fill="#1c1f25" stroke="#555b66" stroke-width="2" />
+<rect x="4940" y="1186" width="780" height="6" rx="3" fill="#f2a65a" />
+<text class="ko" x="4964" y="1221">이벤트 발생 이력</text>
+<text class="table-name" x="4964" y="1245">coupon_event_occurrence</text>
+<line x1="4940" y1="1264" x2="5720" y2="1264" stroke="#414650" />
+<rect x="4950" y="1274" width="34" height="20" rx="5" fill="#d7a725" />
+<text class="badge" x="4967" y="1284" fill="#191919">PK</text>
+<text class="column" x="5022" y="1288">coupon_event_occurrence_id</text>
+<text class="flag" x="5490" y="1288">NN · AI</text>
+<text class="type" x="5702" y="1288">BIGINT</text>
+<line x1="4952" y1="1293" x2="5708" y2="1293" stroke="#30343b" />
+<rect x="4950" y="1303" width="34" height="20" rx="5" fill="#31a8df" />
+<text class="badge" x="4967" y="1313" fill="#101820">FK</text>
+<text class="column" x="5022" y="1317">coupon_event_id</text>
+<text class="flag" x="5490" y="1317">NN</text>
+<text class="type" x="5702" y="1317">BIGINT</text>
+<line x1="4952" y1="1322" x2="5708" y2="1322" stroke="#30343b" />
+<rect x="4950" y="1332" width="34" height="20" rx="5" fill="#31a8df" />
+<text class="badge" x="4967" y="1342" fill="#101820">FK</text>
+<text class="column" x="5022" y="1346">match_event_id</text>
+<text class="flag" x="5490" y="1346">NULL</text>
+<text class="type" x="5702" y="1346">BIGINT</text>
+<line x1="4952" y1="1351" x2="5708" y2="1351" stroke="#30343b" />
+<text class="column" x="5022" y="1375">source_event_key</text>
+<text class="flag" x="5490" y="1375">NULL</text>
+<text class="type" x="5702" y="1375">VARCHAR(100)</text>
+<line x1="4952" y1="1380" x2="5708" y2="1380" stroke="#30343b" />
+<text class="column" x="5022" y="1404">game_time_seconds</text>
+<text class="flag" x="5490" y="1404">NULL</text>
+<text class="type" x="5702" y="1404">INT</text>
+<line x1="4952" y1="1409" x2="5708" y2="1409" stroke="#30343b" />
+<text class="column" x="5022" y="1433">source_occurred_at</text>
+<text class="flag" x="5490" y="1433">NULL</text>
+<text class="type" x="5702" y="1433">DATETIME(6)</text>
+<line x1="4952" y1="1438" x2="5708" y2="1438" stroke="#30343b" />
+<text class="column" x="5022" y="1462">detected_at</text>
+<text class="flag" x="5490" y="1462">NN</text>
+<text class="type" x="5702" y="1462">DATETIME(6)</text>
+<line x1="4952" y1="1467" x2="5708" y2="1467" stroke="#30343b" />
+<text class="column" x="5022" y="1491">opened_at</text>
+<text class="flag" x="5490" y="1491">NN</text>
+<text class="type" x="5702" y="1491">DATETIME(6)</text>
+<line x1="4952" y1="1496" x2="5708" y2="1496" stroke="#30343b" />
+<text class="column" x="5022" y="1520">expires_at</text>
+<text class="flag" x="5490" y="1520">NN</text>
+<text class="type" x="5702" y="1520">DATETIME(6)</text>
+<line x1="4952" y1="1525" x2="5708" y2="1525" stroke="#30343b" />
+<text class="column" x="5022" y="1549">closed_at</text>
+<text class="flag" x="5490" y="1549">NULL</text>
+<text class="type" x="5702" y="1549">DATETIME(6)</text>
+<line x1="4952" y1="1554" x2="5708" y2="1554" stroke="#30343b" />
+<text class="column" x="5022" y="1578">occurrence_status</text>
+<text class="flag" x="5490" y="1578">NN</text>
+<text class="type" x="5702" y="1578">VARCHAR(20)</text>
+<line x1="4952" y1="1583" x2="5708" y2="1583" stroke="#30343b" />
+<text class="column" x="5022" y="1607">close_reason</text>
+<text class="flag" x="5490" y="1607">NULL</text>
+<text class="type" x="5702" y="1607">VARCHAR(50)</text>
+<line x1="4952" y1="1612" x2="5708" y2="1612" stroke="#30343b" />
+<text class="column" x="5022" y="1636">created_at</text>
+<text class="flag" x="5490" y="1636">NN</text>
+<text class="type" x="5702" y="1636">DATETIME(6)</text>
+<line x1="4952" y1="1641" x2="5708" y2="1641" stroke="#30343b" />
+<text class="column" x="5022" y="1665">updated_at</text>
+<text class="flag" x="5490" y="1665">NN</text>
+<text class="type" x="5702" y="1665">DATETIME(6)</text>
+<line x1="4952" y1="1670" x2="5708" y2="1670" stroke="#30343b" />
+<rect x="6160" y="1128" width="780" height="415" rx="12" fill="#1c1f25" stroke="#555b66" stroke-width="2" />
+<rect x="6160" y="1128" width="780" height="6" rx="3" fill="#f2a65a" />
+<text class="ko" x="6184" y="1163">쿠폰 발급 요청</text>
+<text class="table-name" x="6184" y="1187">coupon_claim_request</text>
+<line x1="6160" y1="1206" x2="6940" y2="1206" stroke="#414650" />
+<rect x="6170" y="1216" width="34" height="20" rx="5" fill="#d7a725" />
+<text class="badge" x="6187" y="1226" fill="#191919">PK</text>
+<text class="column" x="6242" y="1230">coupon_claim_request_id</text>
+<text class="flag" x="6710" y="1230">NN · AI</text>
+<text class="type" x="6922" y="1230">BIGINT</text>
+<line x1="6172" y1="1235" x2="6928" y2="1235" stroke="#30343b" />
+<text class="column" x="6242" y="1259">coupon_event_id</text>
+<text class="flag" x="6710" y="1259">NN</text>
+<text class="type" x="6922" y="1259">BIGINT</text>
+<line x1="6172" y1="1264" x2="6928" y2="1264" stroke="#30343b" />
+<rect x="6170" y="1274" width="34" height="20" rx="5" fill="#31a8df" />
+<text class="badge" x="6187" y="1284" fill="#101820">FK</text>
+<text class="column" x="6242" y="1288">coupon_event_occurrence_id</text>
+<text class="flag" x="6710" y="1288">NULL</text>
+<text class="type" x="6922" y="1288">BIGINT</text>
+<line x1="6172" y1="1293" x2="6928" y2="1293" stroke="#30343b" />
+<text class="column" x="6242" y="1317">coupon_event_item_id</text>
+<text class="flag" x="6710" y="1317">NN</text>
+<text class="type" x="6922" y="1317">BIGINT</text>
+<line x1="6172" y1="1322" x2="6928" y2="1322" stroke="#30343b" />
+<text class="column" x="6242" y="1346">user_id</text>
+<text class="flag" x="6710" y="1346">NN</text>
+<text class="type" x="6922" y="1346">BIGINT</text>
+<line x1="6172" y1="1351" x2="6928" y2="1351" stroke="#30343b" />
+<text class="column" x="6242" y="1375">request_status</text>
+<text class="flag" x="6710" y="1375">NN</text>
+<text class="type" x="6922" y="1375">VARCHAR(30)</text>
+<line x1="6172" y1="1380" x2="6928" y2="1380" stroke="#30343b" />
+<text class="column" x="6242" y="1404">created_at</text>
+<text class="flag" x="6710" y="1404">NN</text>
+<text class="type" x="6922" y="1404">DATETIME(6)</text>
+<line x1="6172" y1="1409" x2="6928" y2="1409" stroke="#30343b" />
+<text class="column" x="6242" y="1433">updated_at</text>
+<text class="flag" x="6710" y="1433">NN</text>
+<text class="type" x="6922" y="1433">DATETIME(6)</text>
+<line x1="6172" y1="1438" x2="6928" y2="1438" stroke="#30343b" />
+<text class="column" x="6242" y="1462">completed_at</text>
+<text class="flag" x="6710" y="1462">NULL</text>
+<text class="type" x="6922" y="1462">DATETIME(6)</text>
+<line x1="6172" y1="1467" x2="6928" y2="1467" stroke="#30343b" />
+<text class="column" x="6242" y="1491">failure_code</text>
+<text class="flag" x="6710" y="1491">NULL</text>
+<text class="type" x="6922" y="1491">VARCHAR(30)</text>
+<line x1="6172" y1="1496" x2="6928" y2="1496" stroke="#30343b" />
+<text class="column" x="6242" y="1520">failure_reason</text>
+<text class="flag" x="6710" y="1520">NULL</text>
+<text class="type" x="6922" y="1520">VARCHAR(500)</text>
+<line x1="6172" y1="1525" x2="6928" y2="1525" stroke="#30343b" />
+<rect x="4940" y="1778" width="780" height="560" rx="12" fill="#1c1f25" stroke="#555b66" stroke-width="2" />
+<rect x="4940" y="1778" width="780" height="6" rx="3" fill="#f2a65a" />
+<text class="ko" x="4964" y="1813">사용자 보유 쿠폰</text>
+<text class="table-name" x="4964" y="1837">user_coupon</text>
+<line x1="4940" y1="1856" x2="5720" y2="1856" stroke="#414650" />
+<rect x="4950" y="1866" width="34" height="20" rx="5" fill="#d7a725" />
+<text class="badge" x="4967" y="1876" fill="#191919">PK</text>
+<text class="column" x="5022" y="1880">user_coupon_id</text>
+<text class="flag" x="5490" y="1880">NN · AI</text>
+<text class="type" x="5702" y="1880">BIGINT</text>
+<line x1="4952" y1="1885" x2="5708" y2="1885" stroke="#30343b" />
+<text class="column" x="5022" y="1909">user_id</text>
+<text class="flag" x="5490" y="1909">NN</text>
+<text class="type" x="5702" y="1909">BIGINT</text>
+<line x1="4952" y1="1914" x2="5708" y2="1914" stroke="#30343b" />
+<text class="column" x="5022" y="1938">coupon_event_id</text>
+<text class="flag" x="5490" y="1938">NN</text>
+<text class="type" x="5702" y="1938">BIGINT</text>
+<line x1="4952" y1="1943" x2="5708" y2="1943" stroke="#30343b" />
+<rect x="4950" y="1953" width="34" height="20" rx="5" fill="#31a8df" />
+<text class="badge" x="4967" y="1963" fill="#101820">FK</text>
+<text class="column" x="5022" y="1967">coupon_event_occurrence_id</text>
+<text class="flag" x="5490" y="1967">NULL</text>
+<text class="type" x="5702" y="1967">BIGINT</text>
+<line x1="4952" y1="1972" x2="5708" y2="1972" stroke="#30343b" />
+<text class="column" x="5022" y="1996">coupon_event_item_id</text>
+<text class="flag" x="5490" y="1996">NN</text>
+<text class="type" x="5702" y="1996">BIGINT</text>
+<line x1="4952" y1="2001" x2="5708" y2="2001" stroke="#30343b" />
+<text class="column" x="5022" y="2025">coupon_code</text>
+<text class="flag" x="5490" y="2025">NN</text>
+<text class="type" x="5702" y="2025">VARCHAR(100)</text>
+<line x1="4952" y1="2030" x2="5708" y2="2030" stroke="#30343b" />
+<text class="column" x="5022" y="2054">coupon_status</text>
+<text class="flag" x="5490" y="2054">NN</text>
+<text class="type" x="5702" y="2054">VARCHAR(30)</text>
+<line x1="4952" y1="2059" x2="5708" y2="2059" stroke="#30343b" />
+<text class="column" x="5022" y="2083">created_at</text>
+<text class="flag" x="5490" y="2083">NN</text>
+<text class="type" x="5702" y="2083">DATETIME(6)</text>
+<line x1="4952" y1="2088" x2="5708" y2="2088" stroke="#30343b" />
+<text class="column" x="5022" y="2112">updated_at</text>
+<text class="flag" x="5490" y="2112">NN</text>
+<text class="type" x="5702" y="2112">DATETIME(6)</text>
+<line x1="4952" y1="2117" x2="5708" y2="2117" stroke="#30343b" />
+<text class="column" x="5022" y="2141">claim_id</text>
+<text class="flag" x="5490" y="2141">NN</text>
+<text class="type" x="5702" y="2141">BIGINT</text>
+<line x1="4952" y1="2146" x2="5708" y2="2146" stroke="#30343b" />
+<text class="column" x="5022" y="2170">discount_type</text>
+<text class="flag" x="5490" y="2170">NN</text>
+<text class="type" x="5702" y="2170">VARCHAR(20)</text>
+<line x1="4952" y1="2175" x2="5708" y2="2175" stroke="#30343b" />
+<text class="column" x="5022" y="2199">discount_value</text>
+<text class="flag" x="5490" y="2199">NN</text>
+<text class="type" x="5702" y="2199">DECIMAL(10,2)</text>
+<line x1="4952" y1="2204" x2="5708" y2="2204" stroke="#30343b" />
+<text class="column" x="5022" y="2228">expires_at</text>
+<text class="flag" x="5490" y="2228">NN</text>
+<text class="type" x="5702" y="2228">DATETIME(6)</text>
+<line x1="4952" y1="2233" x2="5708" y2="2233" stroke="#30343b" />
+<text class="column" x="5022" y="2257">used_at</text>
+<text class="flag" x="5490" y="2257">NULL</text>
+<text class="type" x="5702" y="2257">DATETIME(6)</text>
+<line x1="4952" y1="2262" x2="5708" y2="2262" stroke="#30343b" />
+<text class="column" x="5022" y="2286">cancelled_at</text>
+<text class="flag" x="5490" y="2286">NULL</text>
+<text class="type" x="5702" y="2286">DATETIME(6)</text>
+<line x1="4952" y1="2291" x2="5708" y2="2291" stroke="#30343b" />
+<text class="column" x="5022" y="2315">cancel_reason</text>
+<text class="flag" x="5490" y="2315">NULL</text>
+<text class="type" x="5702" y="2315">VARCHAR(255)</text>
+<line x1="4952" y1="2320" x2="5708" y2="2320" stroke="#30343b" />
+<rect x="2560" y="3900" width="780" height="328" rx="12" fill="#1c1f25" stroke="#555b66" stroke-width="2" transform="translate(2740 160)" />
+<rect x="2560" y="3900" width="780" height="6" rx="3" fill="#ef767a" transform="translate(2740 160)" />
+<text class="ko" x="2584" y="3935" transform="translate(2740 160)">지갑 아웃박스</text>
+<text class="table-name" x="2584" y="3959" transform="translate(2740 160)">wallet_outbox</text>
+<line x1="2560" y1="3978" x2="3340" y2="3978" stroke="#414650" transform="translate(2740 160)" />
+<rect x="2570" y="3988" width="34" height="20" rx="5" fill="#d7a725" transform="translate(2740 160)" />
+<text class="badge" x="2587" y="3998" fill="#191919" transform="translate(2740 160)">PK</text>
+<text class="column" x="2642" y="4002" transform="translate(2740 160)">id</text>
+<text class="flag" x="3110" y="4002" transform="translate(2740 160)">NN · AI</text>
+<text class="type" x="3322" y="4002" transform="translate(2740 160)">BIGINT</text>
+<line x1="2572" y1="4007" x2="3328" y2="4007" stroke="#30343b" transform="translate(2740 160)" />
+<text class="column" x="2642" y="4031" transform="translate(2740 160)">aggregate_id</text>
+<text class="flag" x="3110" y="4031" transform="translate(2740 160)">NN</text>
+<text class="type" x="3322" y="4031" transform="translate(2740 160)">BIGINT</text>
+<line x1="2572" y1="4036" x2="3328" y2="4036" stroke="#30343b" transform="translate(2740 160)" />
+<text class="column" x="2642" y="4060" transform="translate(2740 160)">topic</text>
+<text class="flag" x="3110" y="4060" transform="translate(2740 160)">NN</text>
+<text class="type" x="3322" y="4060" transform="translate(2740 160)">VARCHAR(100)</text>
+<line x1="2572" y1="4065" x2="3328" y2="4065" stroke="#30343b" transform="translate(2740 160)" />
+<text class="column" x="2642" y="4089" transform="translate(2740 160)">payload</text>
+<text class="flag" x="3110" y="4089" transform="translate(2740 160)">NN</text>
+<text class="type" x="3322" y="4089" transform="translate(2740 160)">JSON</text>
+<line x1="2572" y1="4094" x2="3328" y2="4094" stroke="#30343b" transform="translate(2740 160)" />
+<text class="column" x="2642" y="4118" transform="translate(2740 160)">status</text>
+<text class="flag" x="3110" y="4118" transform="translate(2740 160)">NN</text>
+<text class="type" x="3322" y="4118" transform="translate(2740 160)">VARCHAR(20)</text>
+<line x1="2572" y1="4123" x2="3328" y2="4123" stroke="#30343b" transform="translate(2740 160)" />
+<text class="column" x="2642" y="4147" transform="translate(2740 160)">retry_count</text>
+<text class="flag" x="3110" y="4147" transform="translate(2740 160)">NN</text>
+<text class="type" x="3322" y="4147" transform="translate(2740 160)">INT</text>
+<line x1="2572" y1="4152" x2="3328" y2="4152" stroke="#30343b" transform="translate(2740 160)" />
+<text class="column" x="2642" y="4176" transform="translate(2740 160)">created_at</text>
+<text class="flag" x="3110" y="4176" transform="translate(2740 160)">NN</text>
+<text class="type" x="3322" y="4176" transform="translate(2740 160)">DATETIME(6)</text>
+<line x1="2572" y1="4181" x2="3328" y2="4181" stroke="#30343b" transform="translate(2740 160)" />
+<text class="column" x="2642" y="4205" transform="translate(2740 160)">sent_at</text>
+<text class="flag" x="3110" y="4205" transform="translate(2740 160)">NULL</text>
+<text class="type" x="3322" y="4205" transform="translate(2740 160)">DATETIME(6)</text>
+<line x1="2572" y1="4210" x2="3328" y2="4210" stroke="#30343b" transform="translate(2740 160)" />
+<rect x="3780" y="3900" width="780" height="357" rx="12" fill="#1c1f25" stroke="#555b66" stroke-width="2" transform="translate(2380 160)" />
+<rect x="3780" y="3900" width="780" height="6" rx="3" fill="#ef767a" transform="translate(2380 160)" />
+<text class="ko" x="3804" y="3935" transform="translate(2380 160)">쿠폰 발급 아웃박스</text>
+<text class="table-name" x="3804" y="3959" transform="translate(2380 160)">coupon_claim_outbox</text>
+<line x1="3780" y1="3978" x2="4560" y2="3978" stroke="#414650" transform="translate(2380 160)" />
+<rect x="3790" y="3988" width="34" height="20" rx="5" fill="#d7a725" transform="translate(2380 160)" />
+<text class="badge" x="3807" y="3998" fill="#191919" transform="translate(2380 160)">PK</text>
+<text class="column" x="3862" y="4002" transform="translate(2380 160)">id</text>
+<text class="flag" x="4330" y="4002" transform="translate(2380 160)">NN · AI</text>
+<text class="type" x="4542" y="4002" transform="translate(2380 160)">BIGINT</text>
+<line x1="3792" y1="4007" x2="4548" y2="4007" stroke="#30343b" transform="translate(2380 160)" />
+<text class="column" x="3862" y="4031" transform="translate(2380 160)">message_id</text>
+<text class="flag" x="4330" y="4031" transform="translate(2380 160)">NN</text>
+<text class="type" x="4542" y="4031" transform="translate(2380 160)">VARCHAR(36)</text>
+<line x1="3792" y1="4036" x2="4548" y2="4036" stroke="#30343b" transform="translate(2380 160)" />
+<text class="column" x="3862" y="4060" transform="translate(2380 160)">aggregate_id</text>
+<text class="flag" x="4330" y="4060" transform="translate(2380 160)">NN</text>
+<text class="type" x="4542" y="4060" transform="translate(2380 160)">BIGINT</text>
+<line x1="3792" y1="4065" x2="4548" y2="4065" stroke="#30343b" transform="translate(2380 160)" />
+<text class="column" x="3862" y="4089" transform="translate(2380 160)">topic</text>
+<text class="flag" x="4330" y="4089" transform="translate(2380 160)">NN</text>
+<text class="type" x="4542" y="4089" transform="translate(2380 160)">VARCHAR(100)</text>
+<line x1="3792" y1="4094" x2="4548" y2="4094" stroke="#30343b" transform="translate(2380 160)" />
+<text class="column" x="3862" y="4118" transform="translate(2380 160)">payload</text>
+<text class="flag" x="4330" y="4118" transform="translate(2380 160)">NN</text>
+<text class="type" x="4542" y="4118" transform="translate(2380 160)">JSON</text>
+<line x1="3792" y1="4123" x2="4548" y2="4123" stroke="#30343b" transform="translate(2380 160)" />
+<text class="column" x="3862" y="4147" transform="translate(2380 160)">status</text>
+<text class="flag" x="4330" y="4147" transform="translate(2380 160)">NN</text>
+<text class="type" x="4542" y="4147" transform="translate(2380 160)">VARCHAR(20)</text>
+<line x1="3792" y1="4152" x2="4548" y2="4152" stroke="#30343b" transform="translate(2380 160)" />
+<text class="column" x="3862" y="4176" transform="translate(2380 160)">retry_count</text>
+<text class="flag" x="4330" y="4176" transform="translate(2380 160)">NN</text>
+<text class="type" x="4542" y="4176" transform="translate(2380 160)">INT</text>
+<line x1="3792" y1="4181" x2="4548" y2="4181" stroke="#30343b" transform="translate(2380 160)" />
+<text class="column" x="3862" y="4205" transform="translate(2380 160)">created_at</text>
+<text class="flag" x="4330" y="4205" transform="translate(2380 160)">NN</text>
+<text class="type" x="4542" y="4205" transform="translate(2380 160)">DATETIME(6)</text>
+<line x1="3792" y1="4210" x2="4548" y2="4210" stroke="#30343b" transform="translate(2380 160)" />
+<text class="column" x="3862" y="4234" transform="translate(2380 160)">sent_at</text>
+<text class="flag" x="4330" y="4234" transform="translate(2380 160)">NULL</text>
+<text class="type" x="4542" y="4234" transform="translate(2380 160)">DATETIME(6)</text>
+<line x1="3792" y1="4239" x2="4548" y2="4239" stroke="#30343b" transform="translate(2380 160)" />
+<rect x="4940" y="3500" width="780" height="328" rx="12" fill="#1c1f25" stroke="#555b66" stroke-width="2" transform="translate(-2195 60)" />
+<rect x="4940" y="3500" width="780" height="6" rx="3" fill="#55c6a9" transform="translate(-2195 60)" />
+<text class="ko" x="4964" y="3535" transform="translate(-2195 60)">쿠폰 발급 통계</text>
+<text class="table-name" x="4964" y="3559" transform="translate(-2195 60)">coupon_issue_statistics</text>
+<line x1="4940" y1="3578" x2="5720" y2="3578" stroke="#414650" transform="translate(-2195 60)" />
+<rect x="4950" y="3588" width="34" height="20" rx="5" fill="#d7a725" transform="translate(-2195 60)" />
+<text class="badge" x="4967" y="3598" fill="#191919" transform="translate(-2195 60)">PK</text>
+<rect x="4991" y="3588" width="34" height="20" rx="5" fill="#31a8df" transform="translate(-2195 60)" />
+<text class="badge" x="5008" y="3598" fill="#101820" transform="translate(-2195 60)">FK</text>
+<text class="column" x="5057" y="3602" transform="translate(-2195 60)">coupon_event_id</text>
+<text class="flag" x="5490" y="3602" transform="translate(-2195 60)">NN</text>
+<text class="type" x="5702" y="3602" transform="translate(-2195 60)">BIGINT</text>
+<line x1="4952" y1="3607" x2="5708" y2="3607" stroke="#30343b" transform="translate(-2195 60)" />
+<text class="column" x="5022" y="3631" transform="translate(-2195 60)">success_count</text>
+<text class="flag" x="5490" y="3631" transform="translate(-2195 60)">NN</text>
+<text class="type" x="5702" y="3631" transform="translate(-2195 60)">BIGINT</text>
+<line x1="4952" y1="3636" x2="5708" y2="3636" stroke="#30343b" transform="translate(-2195 60)" />
+<text class="column" x="5022" y="3660" transform="translate(-2195 60)">failure_count</text>
+<text class="flag" x="5490" y="3660" transform="translate(-2195 60)">NN</text>
+<text class="type" x="5702" y="3660" transform="translate(-2195 60)">BIGINT</text>
+<line x1="4952" y1="3665" x2="5708" y2="3665" stroke="#30343b" transform="translate(-2195 60)" />
+<text class="column" x="5022" y="3689" transform="translate(-2195 60)">processing_error_count</text>
+<text class="flag" x="5490" y="3689" transform="translate(-2195 60)">NN</text>
+<text class="type" x="5702" y="3689" transform="translate(-2195 60)">BIGINT</text>
+<line x1="4952" y1="3694" x2="5708" y2="3694" stroke="#30343b" transform="translate(-2195 60)" />
+<text class="column" x="5022" y="3718" transform="translate(-2195 60)">last_result_at</text>
+<text class="flag" x="5490" y="3718" transform="translate(-2195 60)">NULL</text>
+<text class="type" x="5702" y="3718" transform="translate(-2195 60)">DATETIME(6)</text>
+<line x1="4952" y1="3723" x2="5708" y2="3723" stroke="#30343b" transform="translate(-2195 60)" />
+<text class="column" x="5022" y="3747" transform="translate(-2195 60)">last_error_at</text>
+<text class="flag" x="5490" y="3747" transform="translate(-2195 60)">NULL</text>
+<text class="type" x="5702" y="3747" transform="translate(-2195 60)">DATETIME(6)</text>
+<line x1="4952" y1="3752" x2="5708" y2="3752" stroke="#30343b" transform="translate(-2195 60)" />
+<text class="column" x="5022" y="3776" transform="translate(-2195 60)">created_at</text>
+<text class="flag" x="5490" y="3776" transform="translate(-2195 60)">NN</text>
+<text class="type" x="5702" y="3776" transform="translate(-2195 60)">DATETIME(6)</text>
+<line x1="4952" y1="3781" x2="5708" y2="3781" stroke="#30343b" transform="translate(-2195 60)" />
+<text class="column" x="5022" y="3805" transform="translate(-2195 60)">updated_at</text>
+<text class="flag" x="5490" y="3805" transform="translate(-2195 60)">NN</text>
+<text class="type" x="5702" y="3805" transform="translate(-2195 60)">DATETIME(6)</text>
+<line x1="4952" y1="3810" x2="5708" y2="3810" stroke="#30343b" transform="translate(-2195 60)" />
+<rect x="6160" y="3500" width="780" height="270" rx="12" fill="#1c1f25" stroke="#555b66" stroke-width="2" transform="translate(-2195 60)" />
+<rect x="6160" y="3500" width="780" height="6" rx="3" fill="#55c6a9" transform="translate(-2195 60)" />
+<text class="ko" x="6184" y="3535" transform="translate(-2195 60)">발급 통계 메시지</text>
+<text class="table-name" x="6184" y="3559" transform="translate(-2195 60)">coupon_issue_statistics_message</text>
+<line x1="6160" y1="3578" x2="6940" y2="3578" stroke="#414650" transform="translate(-2195 60)" />
+<rect x="6170" y="3588" width="34" height="20" rx="5" fill="#d7a725" transform="translate(-2195 60)" />
+<text class="badge" x="6187" y="3598" fill="#191919" transform="translate(-2195 60)">PK</text>
+<text class="column" x="6242" y="3602" transform="translate(-2195 60)">message_id</text>
+<text class="flag" x="6710" y="3602" transform="translate(-2195 60)">NN</text>
+<text class="type" x="6922" y="3602" transform="translate(-2195 60)">VARCHAR(100)</text>
+<line x1="6172" y1="3607" x2="6928" y2="3607" stroke="#30343b" transform="translate(-2195 60)" />
+<text class="column" x="6242" y="3631" transform="translate(-2195 60)">claim_id</text>
+<text class="flag" x="6710" y="3631" transform="translate(-2195 60)">NN</text>
+<text class="type" x="6922" y="3631" transform="translate(-2195 60)">BIGINT</text>
+<line x1="6172" y1="3636" x2="6928" y2="3636" stroke="#30343b" transform="translate(-2195 60)" />
+<rect x="6170" y="3646" width="34" height="20" rx="5" fill="#31a8df" transform="translate(-2195 60)" />
+<text class="badge" x="6187" y="3656" fill="#101820" transform="translate(-2195 60)">FK</text>
+<text class="column" x="6242" y="3660" transform="translate(-2195 60)">coupon_event_id</text>
+<text class="flag" x="6710" y="3660" transform="translate(-2195 60)">NN</text>
+<text class="type" x="6922" y="3660" transform="translate(-2195 60)">BIGINT</text>
+<line x1="6172" y1="3665" x2="6928" y2="3665" stroke="#30343b" transform="translate(-2195 60)" />
+<text class="column" x="6242" y="3689" transform="translate(-2195 60)">result_status</text>
+<text class="flag" x="6710" y="3689" transform="translate(-2195 60)">NN</text>
+<text class="type" x="6922" y="3689" transform="translate(-2195 60)">VARCHAR(20)</text>
+<line x1="6172" y1="3694" x2="6928" y2="3694" stroke="#30343b" transform="translate(-2195 60)" />
+<text class="column" x="6242" y="3718" transform="translate(-2195 60)">occurred_at</text>
+<text class="flag" x="6710" y="3718" transform="translate(-2195 60)">NN</text>
+<text class="type" x="6922" y="3718" transform="translate(-2195 60)">DATETIME(6)</text>
+<line x1="6172" y1="3723" x2="6928" y2="3723" stroke="#30343b" transform="translate(-2195 60)" />
+<text class="column" x="6242" y="3747" transform="translate(-2195 60)">processed_at</text>
+<text class="flag" x="6710" y="3747" transform="translate(-2195 60)">NN</text>
+<text class="type" x="6922" y="3747" transform="translate(-2195 60)">DATETIME(6)</text>
+<line x1="6172" y1="3752" x2="6928" y2="3752" stroke="#30343b" transform="translate(-2195 60)" />
+<rect x="6160" y="3860" width="780" height="473" rx="12" fill="#1c1f25" stroke="#555b66" stroke-width="2" transform="translate(-2195 60)" />
+<rect x="6160" y="3860" width="780" height="6" rx="3" fill="#55c6a9" transform="translate(-2195 60)" />
+<text class="ko" x="6184" y="3895" transform="translate(-2195 60)">Kafka 처리 오류</text>
+<text class="table-name" x="6184" y="3919" transform="translate(-2195 60)">coupon_kafka_processing_error</text>
+<line x1="6160" y1="3938" x2="6940" y2="3938" stroke="#414650" transform="translate(-2195 60)" />
+<rect x="6170" y="3948" width="34" height="20" rx="5" fill="#d7a725" transform="translate(-2195 60)" />
+<text class="badge" x="6187" y="3958" fill="#191919" transform="translate(-2195 60)">PK</text>
+<text class="column" x="6242" y="3962" transform="translate(-2195 60)">coupon_kafka_processing_error_id</text>
+<text class="flag" x="6710" y="3962" transform="translate(-2195 60)">NN · AI</text>
+<text class="type" x="6922" y="3962" transform="translate(-2195 60)">BIGINT</text>
+<line x1="6172" y1="3967" x2="6928" y2="3967" stroke="#30343b" transform="translate(-2195 60)" />
+<text class="column" x="6242" y="3991" transform="translate(-2195 60)">original_consumer_group</text>
+<text class="flag" x="6710" y="3991" transform="translate(-2195 60)">NN</text>
+<text class="type" x="6922" y="3991" transform="translate(-2195 60)">VARCHAR(200)</text>
+<line x1="6172" y1="3996" x2="6928" y2="3996" stroke="#30343b" transform="translate(-2195 60)" />
+<text class="column" x="6242" y="4020" transform="translate(-2195 60)">original_topic</text>
+<text class="flag" x="6710" y="4020" transform="translate(-2195 60)">NN</text>
+<text class="type" x="6922" y="4020" transform="translate(-2195 60)">VARCHAR(200)</text>
+<line x1="6172" y1="4025" x2="6928" y2="4025" stroke="#30343b" transform="translate(-2195 60)" />
+<text class="column" x="6242" y="4049" transform="translate(-2195 60)">original_partition</text>
+<text class="flag" x="6710" y="4049" transform="translate(-2195 60)">NN</text>
+<text class="type" x="6922" y="4049" transform="translate(-2195 60)">INT</text>
+<line x1="6172" y1="4054" x2="6928" y2="4054" stroke="#30343b" transform="translate(-2195 60)" />
+<text class="column" x="6242" y="4078" transform="translate(-2195 60)">original_offset</text>
+<text class="flag" x="6710" y="4078" transform="translate(-2195 60)">NN</text>
+<text class="type" x="6922" y="4078" transform="translate(-2195 60)">BIGINT</text>
+<line x1="6172" y1="4083" x2="6928" y2="4083" stroke="#30343b" transform="translate(-2195 60)" />
+<text class="column" x="6242" y="4107" transform="translate(-2195 60)">message_id</text>
+<text class="flag" x="6710" y="4107" transform="translate(-2195 60)">NULL</text>
+<text class="type" x="6922" y="4107" transform="translate(-2195 60)">VARCHAR(100)</text>
+<line x1="6172" y1="4112" x2="6928" y2="4112" stroke="#30343b" transform="translate(-2195 60)" />
+<text class="column" x="6242" y="4136" transform="translate(-2195 60)">claim_id</text>
+<text class="flag" x="6710" y="4136" transform="translate(-2195 60)">NULL</text>
+<text class="type" x="6922" y="4136" transform="translate(-2195 60)">BIGINT</text>
+<line x1="6172" y1="4141" x2="6928" y2="4141" stroke="#30343b" transform="translate(-2195 60)" />
+<rect x="6170" y="4151" width="34" height="20" rx="5" fill="#31a8df" transform="translate(-2195 60)" />
+<text class="badge" x="6187" y="4161" fill="#101820" transform="translate(-2195 60)">FK</text>
+<text class="column" x="6242" y="4165" transform="translate(-2195 60)">coupon_event_id</text>
+<text class="flag" x="6710" y="4165" transform="translate(-2195 60)">NULL</text>
+<text class="type" x="6922" y="4165" transform="translate(-2195 60)">BIGINT</text>
+<line x1="6172" y1="4170" x2="6928" y2="4170" stroke="#30343b" transform="translate(-2195 60)" />
+<text class="column" x="6242" y="4194" transform="translate(-2195 60)">exception_type</text>
+<text class="flag" x="6710" y="4194" transform="translate(-2195 60)">NULL</text>
+<text class="type" x="6922" y="4194" transform="translate(-2195 60)">VARCHAR(500)</text>
+<line x1="6172" y1="4199" x2="6928" y2="4199" stroke="#30343b" transform="translate(-2195 60)" />
+<text class="column" x="6242" y="4223" transform="translate(-2195 60)">exception_message</text>
+<text class="flag" x="6710" y="4223" transform="translate(-2195 60)">NULL</text>
+<text class="type" x="6922" y="4223" transform="translate(-2195 60)">VARCHAR(1000)</text>
+<line x1="6172" y1="4228" x2="6928" y2="4228" stroke="#30343b" transform="translate(-2195 60)" />
+<text class="column" x="6242" y="4252" transform="translate(-2195 60)">payload</text>
+<text class="flag" x="6710" y="4252" transform="translate(-2195 60)">NULL</text>
+<text class="type" x="6922" y="4252" transform="translate(-2195 60)">VARCHAR(4000)</text>
+<line x1="6172" y1="4257" x2="6928" y2="4257" stroke="#30343b" transform="translate(-2195 60)" />
+<text class="column" x="6242" y="4281" transform="translate(-2195 60)">original_occurred_at</text>
+<text class="flag" x="6710" y="4281" transform="translate(-2195 60)">NULL</text>
+<text class="type" x="6922" y="4281" transform="translate(-2195 60)">DATETIME(6)</text>
+<line x1="6172" y1="4286" x2="6928" y2="4286" stroke="#30343b" transform="translate(-2195 60)" />
+<text class="column" x="6242" y="4310" transform="translate(-2195 60)">recorded_at</text>
+<text class="flag" x="6710" y="4310" transform="translate(-2195 60)">NN</text>
+<text class="type" x="6922" y="4310" transform="translate(-2195 60)">DATETIME(6)</text>
+<line x1="6172" y1="4315" x2="6928" y2="4315" stroke="#30343b" transform="translate(-2195 60)" />
+<rect x="4940" y="3918" width="780" height="270" rx="12" fill="#1c1f25" stroke="#555b66" stroke-width="2" transform="translate(-2195 60)" />
+<rect x="4940" y="3918" width="780" height="6" rx="3" fill="#55c6a9" transform="translate(-2195 60)" />
+<text class="ko" x="4964" y="3953" transform="translate(-2195 60)">발급 거절 메시지</text>
+<text class="table-name" x="4964" y="3977" transform="translate(-2195 60)">coupon_claim_rejection_message</text>
+<line x1="4940" y1="3996" x2="5720" y2="3996" stroke="#414650" transform="translate(-2195 60)" />
+<rect x="4950" y="4006" width="34" height="20" rx="5" fill="#d7a725" transform="translate(-2195 60)" />
+<text class="badge" x="4967" y="4016" fill="#191919" transform="translate(-2195 60)">PK</text>
+<text class="column" x="5022" y="4020" transform="translate(-2195 60)">message_id</text>
+<text class="flag" x="5490" y="4020" transform="translate(-2195 60)">NN</text>
+<text class="type" x="5702" y="4020" transform="translate(-2195 60)">VARCHAR(100)</text>
+<line x1="4952" y1="4025" x2="5708" y2="4025" stroke="#30343b" transform="translate(-2195 60)" />
+<text class="column" x="5022" y="4049" transform="translate(-2195 60)">coupon_event_id</text>
+<text class="flag" x="5490" y="4049" transform="translate(-2195 60)">NN</text>
+<text class="type" x="5702" y="4049" transform="translate(-2195 60)">BIGINT</text>
+<line x1="4952" y1="4054" x2="5708" y2="4054" stroke="#30343b" transform="translate(-2195 60)" />
+<text class="column" x="5022" y="4078" transform="translate(-2195 60)">coupon_event_occurrence_id</text>
+<text class="flag" x="5490" y="4078" transform="translate(-2195 60)">NN</text>
+<text class="type" x="5702" y="4078" transform="translate(-2195 60)">BIGINT</text>
+<line x1="4952" y1="4083" x2="5708" y2="4083" stroke="#30343b" transform="translate(-2195 60)" />
+<text class="column" x="5022" y="4107" transform="translate(-2195 60)">rejection_reason</text>
+<text class="flag" x="5490" y="4107" transform="translate(-2195 60)">NN</text>
+<text class="type" x="5702" y="4107" transform="translate(-2195 60)">VARCHAR(100)</text>
+<line x1="4952" y1="4112" x2="5708" y2="4112" stroke="#30343b" transform="translate(-2195 60)" />
+<text class="column" x="5022" y="4136" transform="translate(-2195 60)">occurred_at</text>
+<text class="flag" x="5490" y="4136" transform="translate(-2195 60)">NN</text>
+<text class="type" x="5702" y="4136" transform="translate(-2195 60)">DATETIME(6)</text>
+<line x1="4952" y1="4141" x2="5708" y2="4141" stroke="#30343b" transform="translate(-2195 60)" />
+<text class="column" x="5022" y="4165" transform="translate(-2195 60)">processed_at</text>
+<text class="flag" x="5490" y="4165" transform="translate(-2195 60)">NN</text>
+<text class="type" x="5702" y="4165" transform="translate(-2195 60)">DATETIME(6)</text>
+<line x1="4952" y1="4170" x2="5708" y2="4170" stroke="#30343b" transform="translate(-2195 60)" />
+<rect x="4940" y="4278" width="780" height="299" rx="12" fill="#1c1f25" stroke="#555b66" stroke-width="2" transform="translate(-2195 60)" />
+<rect x="4940" y="4278" width="780" height="6" rx="3" fill="#55c6a9" transform="translate(-2195 60)" />
+<text class="ko" x="4964" y="4313" transform="translate(-2195 60)">쿠폰 일별 발급 통계</text>
+<text class="table-name" x="4964" y="4337" transform="translate(-2195 60)">coupon_issue_daily_statistics</text>
+<line x1="4940" y1="4356" x2="5720" y2="4356" stroke="#414650" transform="translate(-2195 60)" />
+<rect x="4950" y="4366" width="34" height="20" rx="5" fill="#d7a725" transform="translate(-2195 60)" />
+<text class="badge" x="4967" y="4376" fill="#191919" transform="translate(-2195 60)">PK</text>
+<text class="column" x="5022" y="4380" transform="translate(-2195 60)">statistics_date</text>
+<text class="flag" x="5490" y="4380" transform="translate(-2195 60)">NN</text>
+<text class="type" x="5702" y="4380" transform="translate(-2195 60)">DATE</text>
+<line x1="4952" y1="4385" x2="5708" y2="4385" stroke="#30343b" transform="translate(-2195 60)" />
+<rect x="4950" y="4395" width="34" height="20" rx="5" fill="#d7a725" transform="translate(-2195 60)" />
+<text class="badge" x="4967" y="4405" fill="#191919" transform="translate(-2195 60)">PK</text>
+<text class="column" x="5022" y="4409" transform="translate(-2195 60)">coupon_event_id</text>
+<text class="flag" x="5490" y="4409" transform="translate(-2195 60)">NN</text>
+<text class="type" x="5702" y="4409" transform="translate(-2195 60)">BIGINT</text>
+<line x1="4952" y1="4414" x2="5708" y2="4414" stroke="#30343b" transform="translate(-2195 60)" />
+<text class="column" x="5022" y="4438" transform="translate(-2195 60)">success_count</text>
+<text class="flag" x="5490" y="4438" transform="translate(-2195 60)">NN</text>
+<text class="type" x="5702" y="4438" transform="translate(-2195 60)">BIGINT</text>
+<line x1="4952" y1="4443" x2="5708" y2="4443" stroke="#30343b" transform="translate(-2195 60)" />
+<text class="column" x="5022" y="4467" transform="translate(-2195 60)">failure_count</text>
+<text class="flag" x="5490" y="4467" transform="translate(-2195 60)">NN</text>
+<text class="type" x="5702" y="4467" transform="translate(-2195 60)">BIGINT</text>
+<line x1="4952" y1="4472" x2="5708" y2="4472" stroke="#30343b" transform="translate(-2195 60)" />
+<text class="column" x="5022" y="4496" transform="translate(-2195 60)">rejection_count</text>
+<text class="flag" x="5490" y="4496" transform="translate(-2195 60)">NN</text>
+<text class="type" x="5702" y="4496" transform="translate(-2195 60)">BIGINT</text>
+<line x1="4952" y1="4501" x2="5708" y2="4501" stroke="#30343b" transform="translate(-2195 60)" />
+<text class="column" x="5022" y="4525" transform="translate(-2195 60)">created_at</text>
+<text class="flag" x="5490" y="4525" transform="translate(-2195 60)">NN</text>
+<text class="type" x="5702" y="4525" transform="translate(-2195 60)">DATETIME(6)</text>
+<line x1="4952" y1="4530" x2="5708" y2="4530" stroke="#30343b" transform="translate(-2195 60)" />
+<text class="column" x="5022" y="4554" transform="translate(-2195 60)">updated_at</text>
+<text class="flag" x="5490" y="4554" transform="translate(-2195 60)">NN</text>
+<text class="type" x="5702" y="4554" transform="translate(-2195 60)">DATETIME(6)</text>
+<line x1="4952" y1="4559" x2="5708" y2="4559" stroke="#30343b" transform="translate(-2195 60)" />
+<rect x="180" y="3600" width="780" height="850" rx="12" fill="#1c1f25" stroke="#555b66" stroke-width="2" transform="translate(355 0)" />
+<rect x="180" y="3600" width="780" height="6" rx="3" fill="#d48cff" transform="translate(355 0)" />
+<text class="ko" x="204" y="3635" transform="translate(355 0)">쿠폰 정합성 검증</text>
+<text class="table-name" x="204" y="3659" transform="translate(355 0)">coupon_integrity_check</text>
+<line x1="180" y1="3678" x2="960" y2="3678" stroke="#414650" transform="translate(355 0)" />
+<rect x="190" y="3688" width="34" height="20" rx="5" fill="#d7a725" transform="translate(355 0)" />
+<text class="badge" x="207" y="3698" fill="#191919" transform="translate(355 0)">PK</text>
+<text class="column" x="262" y="3702" transform="translate(355 0)">coupon_integrity_check_id</text>
+<text class="flag" x="730" y="3702" transform="translate(355 0)">NN · AI</text>
+<text class="type" x="942" y="3702" transform="translate(355 0)">BIGINT</text>
+<line x1="192" y1="3707" x2="948" y2="3707" stroke="#30343b" transform="translate(355 0)" />
+<text class="column" x="262" y="3731" transform="translate(355 0)">execution_status</text>
+<text class="flag" x="730" y="3731" transform="translate(355 0)">NN</text>
+<text class="type" x="942" y="3731" transform="translate(355 0)">VARCHAR(20)</text>
+<line x1="192" y1="3736" x2="948" y2="3736" stroke="#30343b" transform="translate(355 0)" />
+<text class="column" x="262" y="3760" transform="translate(355 0)">overall_verdict</text>
+<text class="flag" x="730" y="3760" transform="translate(355 0)">NULL</text>
+<text class="type" x="942" y="3760" transform="translate(355 0)">VARCHAR(20)</text>
+<line x1="192" y1="3765" x2="948" y2="3765" stroke="#30343b" transform="translate(355 0)" />
+<rect x="190" y="3775" width="34" height="20" rx="5" fill="#31a8df" transform="translate(355 0)" />
+<text class="badge" x="207" y="3785" fill="#101820" transform="translate(355 0)">FK</text>
+<text class="column" x="262" y="3789" transform="translate(355 0)">requested_by</text>
+<text class="flag" x="730" y="3789" transform="translate(355 0)">NN</text>
+<text class="type" x="942" y="3789" transform="translate(355 0)">BIGINT</text>
+<line x1="192" y1="3794" x2="948" y2="3794" stroke="#30343b" transform="translate(355 0)" />
+<text class="column" x="262" y="3818" transform="translate(355 0)">as_of_utc</text>
+<text class="flag" x="730" y="3818" transform="translate(355 0)">NULL</text>
+<text class="type" x="942" y="3818" transform="translate(355 0)">DATETIME(6)</text>
+<line x1="192" y1="3823" x2="948" y2="3823" stroke="#30343b" transform="translate(355 0)" />
+<text class="column" x="262" y="3847" transform="translate(355 0)">started_at</text>
+<text class="flag" x="730" y="3847" transform="translate(355 0)">NN</text>
+<text class="type" x="942" y="3847" transform="translate(355 0)">DATETIME(6)</text>
+<line x1="192" y1="3852" x2="948" y2="3852" stroke="#30343b" transform="translate(355 0)" />
+<text class="column" x="262" y="3876" transform="translate(355 0)">completed_at</text>
+<text class="flag" x="730" y="3876" transform="translate(355 0)">NULL</text>
+<text class="type" x="942" y="3876" transform="translate(355 0)">DATETIME(6)</text>
+<line x1="192" y1="3881" x2="948" y2="3881" stroke="#30343b" transform="translate(355 0)" />
+<text class="column" x="262" y="3905" transform="translate(355 0)">user_count</text>
+<text class="flag" x="730" y="3905" transform="translate(355 0)">NULL</text>
+<text class="type" x="942" y="3905" transform="translate(355 0)">BIGINT</text>
+<line x1="192" y1="3910" x2="948" y2="3910" stroke="#30343b" transform="translate(355 0)" />
+<text class="column" x="262" y="3934" transform="translate(355 0)">claim_request_count</text>
+<text class="flag" x="730" y="3934" transform="translate(355 0)">NULL</text>
+<text class="type" x="942" y="3934" transform="translate(355 0)">BIGINT</text>
+<line x1="192" y1="3939" x2="948" y2="3939" stroke="#30343b" transform="translate(355 0)" />
+<text class="column" x="262" y="3963" transform="translate(355 0)">user_coupon_count</text>
+<text class="flag" x="730" y="3963" transform="translate(355 0)">NULL</text>
+<text class="type" x="942" y="3963" transform="translate(355 0)">BIGINT</text>
+<line x1="192" y1="3968" x2="948" y2="3968" stroke="#30343b" transform="translate(355 0)" />
+<text class="column" x="262" y="3992" transform="translate(355 0)">coupon_event_count</text>
+<text class="flag" x="730" y="3992" transform="translate(355 0)">NULL</text>
+<text class="type" x="942" y="3992" transform="translate(355 0)">BIGINT</text>
+<line x1="192" y1="3997" x2="948" y2="3997" stroke="#30343b" transform="translate(355 0)" />
+<text class="column" x="262" y="4021" transform="translate(355 0)">occurrence_count</text>
+<text class="flag" x="730" y="4021" transform="translate(355 0)">NULL</text>
+<text class="type" x="942" y="4021" transform="translate(355 0)">BIGINT</text>
+<line x1="192" y1="4026" x2="948" y2="4026" stroke="#30343b" transform="translate(355 0)" />
+<text class="column" x="262" y="4050" transform="translate(355 0)">event_item_count</text>
+<text class="flag" x="730" y="4050" transform="translate(355 0)">NULL</text>
+<text class="type" x="942" y="4050" transform="translate(355 0)">BIGINT</text>
+<line x1="192" y1="4055" x2="948" y2="4055" stroke="#30343b" transform="translate(355 0)" />
+<text class="column" x="262" y="4079" transform="translate(355 0)">claim_request_min_id</text>
+<text class="flag" x="730" y="4079" transform="translate(355 0)">NULL</text>
+<text class="type" x="942" y="4079" transform="translate(355 0)">BIGINT</text>
+<line x1="192" y1="4084" x2="948" y2="4084" stroke="#30343b" transform="translate(355 0)" />
+<text class="column" x="262" y="4108" transform="translate(355 0)">claim_request_max_id</text>
+<text class="flag" x="730" y="4108" transform="translate(355 0)">NULL</text>
+<text class="type" x="942" y="4108" transform="translate(355 0)">BIGINT</text>
+<line x1="192" y1="4113" x2="948" y2="4113" stroke="#30343b" transform="translate(355 0)" />
+<text class="column" x="262" y="4137" transform="translate(355 0)">claim_request_fingerprint</text>
+<text class="flag" x="730" y="4137" transform="translate(355 0)">NULL</text>
+<text class="type" x="942" y="4137" transform="translate(355 0)">BIGINT UNSIGNED</text>
+<line x1="192" y1="4142" x2="948" y2="4142" stroke="#30343b" transform="translate(355 0)" />
+<text class="column" x="262" y="4166" transform="translate(355 0)">user_coupon_min_id</text>
+<text class="flag" x="730" y="4166" transform="translate(355 0)">NULL</text>
+<text class="type" x="942" y="4166" transform="translate(355 0)">BIGINT</text>
+<line x1="192" y1="4171" x2="948" y2="4171" stroke="#30343b" transform="translate(355 0)" />
+<text class="column" x="262" y="4195" transform="translate(355 0)">user_coupon_max_id</text>
+<text class="flag" x="730" y="4195" transform="translate(355 0)">NULL</text>
+<text class="type" x="942" y="4195" transform="translate(355 0)">BIGINT</text>
+<line x1="192" y1="4200" x2="948" y2="4200" stroke="#30343b" transform="translate(355 0)" />
+<text class="column" x="262" y="4224" transform="translate(355 0)">user_coupon_fingerprint</text>
+<text class="flag" x="730" y="4224" transform="translate(355 0)">NULL</text>
+<text class="type" x="942" y="4224" transform="translate(355 0)">BIGINT UNSIGNED</text>
+<line x1="192" y1="4229" x2="948" y2="4229" stroke="#30343b" transform="translate(355 0)" />
+<text class="column" x="262" y="4253" transform="translate(355 0)">check_count</text>
+<text class="flag" x="730" y="4253" transform="translate(355 0)">NULL</text>
+<text class="type" x="942" y="4253" transform="translate(355 0)">BIGINT</text>
+<line x1="192" y1="4258" x2="948" y2="4258" stroke="#30343b" transform="translate(355 0)" />
+<text class="column" x="262" y="4282" transform="translate(355 0)">pass_count</text>
+<text class="flag" x="730" y="4282" transform="translate(355 0)">NULL</text>
+<text class="type" x="942" y="4282" transform="translate(355 0)">BIGINT</text>
+<line x1="192" y1="4287" x2="948" y2="4287" stroke="#30343b" transform="translate(355 0)" />
+<text class="column" x="262" y="4311" transform="translate(355 0)">info_count</text>
+<text class="flag" x="730" y="4311" transform="translate(355 0)">NULL</text>
+<text class="type" x="942" y="4311" transform="translate(355 0)">BIGINT</text>
+<line x1="192" y1="4316" x2="948" y2="4316" stroke="#30343b" transform="translate(355 0)" />
+<text class="column" x="262" y="4340" transform="translate(355 0)">warn_count</text>
+<text class="flag" x="730" y="4340" transform="translate(355 0)">NULL</text>
+<text class="type" x="942" y="4340" transform="translate(355 0)">BIGINT</text>
+<line x1="192" y1="4345" x2="948" y2="4345" stroke="#30343b" transform="translate(355 0)" />
+<text class="column" x="262" y="4369" transform="translate(355 0)">fail_count</text>
+<text class="flag" x="730" y="4369" transform="translate(355 0)">NULL</text>
+<text class="type" x="942" y="4369" transform="translate(355 0)">BIGINT</text>
+<line x1="192" y1="4374" x2="948" y2="4374" stroke="#30343b" transform="translate(355 0)" />
+<text class="column" x="262" y="4398" transform="translate(355 0)">error_code</text>
+<text class="flag" x="730" y="4398" transform="translate(355 0)">NULL</text>
+<text class="type" x="942" y="4398" transform="translate(355 0)">VARCHAR(100)</text>
+<line x1="192" y1="4403" x2="948" y2="4403" stroke="#30343b" transform="translate(355 0)" />
+<text class="column" x="262" y="4427" transform="translate(355 0)">error_message</text>
+<text class="flag" x="730" y="4427" transform="translate(355 0)">NULL</text>
+<text class="type" x="942" y="4427" transform="translate(355 0)">VARCHAR(500)</text>
+<line x1="192" y1="4432" x2="948" y2="4432" stroke="#30343b" transform="translate(355 0)" />
+<rect x="1400" y="3600" width="780" height="328" rx="12" fill="#1c1f25" stroke="#555b66" stroke-width="2" transform="translate(355 0)" />
+<rect x="1400" y="3600" width="780" height="6" rx="3" fill="#d48cff" transform="translate(355 0)" />
+<text class="ko" x="1424" y="3635" transform="translate(355 0)">정합성 검증 결과</text>
+<text class="table-name" x="1424" y="3659" transform="translate(355 0)">coupon_integrity_check_result</text>
+<line x1="1400" y1="3678" x2="2180" y2="3678" stroke="#414650" transform="translate(355 0)" />
+<rect x="1410" y="3688" width="34" height="20" rx="5" fill="#d7a725" transform="translate(355 0)" />
+<text class="badge" x="1427" y="3698" fill="#191919" transform="translate(355 0)">PK</text>
+<text class="column" x="1482" y="3702" transform="translate(355 0)">coupon_integrity_check_result_id</text>
+<text class="flag" x="1950" y="3702" transform="translate(355 0)">NN · AI</text>
+<text class="type" x="2162" y="3702" transform="translate(355 0)">BIGINT</text>
+<line x1="1412" y1="3707" x2="2168" y2="3707" stroke="#30343b" transform="translate(355 0)" />
+<rect x="1410" y="3717" width="34" height="20" rx="5" fill="#31a8df" transform="translate(355 0)" />
+<text class="badge" x="1427" y="3727" fill="#101820" transform="translate(355 0)">FK</text>
+<text class="column" x="1482" y="3731" transform="translate(355 0)">coupon_integrity_check_id</text>
+<text class="flag" x="1950" y="3731" transform="translate(355 0)">NN</text>
+<text class="type" x="2162" y="3731" transform="translate(355 0)">BIGINT</text>
+<line x1="1412" y1="3736" x2="2168" y2="3736" stroke="#30343b" transform="translate(355 0)" />
+<text class="column" x="1482" y="3760" transform="translate(355 0)">check_code</text>
+<text class="flag" x="1950" y="3760" transform="translate(355 0)">NN</text>
+<text class="type" x="2162" y="3760" transform="translate(355 0)">VARCHAR(100)</text>
+<line x1="1412" y1="3765" x2="2168" y2="3765" stroke="#30343b" transform="translate(355 0)" />
+<text class="column" x="1482" y="3789" transform="translate(355 0)">severity</text>
+<text class="flag" x="1950" y="3789" transform="translate(355 0)">NN</text>
+<text class="type" x="2162" y="3789" transform="translate(355 0)">VARCHAR(20)</text>
+<line x1="1412" y1="3794" x2="2168" y2="3794" stroke="#30343b" transform="translate(355 0)" />
+<text class="column" x="1482" y="3818" transform="translate(355 0)">verdict</text>
+<text class="flag" x="1950" y="3818" transform="translate(355 0)">NN</text>
+<text class="type" x="2162" y="3818" transform="translate(355 0)">VARCHAR(20)</text>
+<line x1="1412" y1="3823" x2="2168" y2="3823" stroke="#30343b" transform="translate(355 0)" />
+<text class="column" x="1482" y="3847" transform="translate(355 0)">violation_count</text>
+<text class="flag" x="1950" y="3847" transform="translate(355 0)">NN</text>
+<text class="type" x="2162" y="3847" transform="translate(355 0)">BIGINT</text>
+<line x1="1412" y1="3852" x2="2168" y2="3852" stroke="#30343b" transform="translate(355 0)" />
+<text class="column" x="1482" y="3876" transform="translate(355 0)">description</text>
+<text class="flag" x="1950" y="3876" transform="translate(355 0)">NN</text>
+<text class="type" x="2162" y="3876" transform="translate(355 0)">VARCHAR(500)</text>
+<line x1="1412" y1="3881" x2="2168" y2="3881" stroke="#30343b" transform="translate(355 0)" />
+<text class="column" x="1482" y="3905" transform="translate(355 0)">display_order</text>
+<text class="flag" x="1950" y="3905" transform="translate(355 0)">NN</text>
+<text class="type" x="2162" y="3905" transform="translate(355 0)">INT</text>
+<line x1="1412" y1="3910" x2="2168" y2="3910" stroke="#30343b" transform="translate(355 0)" />
+<circle cx="570" cy="1028" r="5.5" fill="#d4dce8" /><circle cx="570" cy="1118" r="5.5" fill="#d4dce8" /><circle cx="570" cy="1028" r="5.5" fill="#d4dce8" /><circle cx="570" cy="1594" r="5.5" fill="#d4dce8" /><circle cx="570" cy="1504" r="5.5" fill="#d4dce8" /><circle cx="570" cy="1594" r="5.5" fill="#d4dce8" /><circle cx="1790" cy="1144" r="5.5" fill="#d4dce8" /><circle cx="1790" cy="1234" r="5.5" fill="#d4dce8" /><circle cx="960" cy="864" r="5.5" fill="#d4dce8" /><circle cx="1400" cy="1398" r="5.5" fill="#d4dce8" /><circle cx="1790" cy="1562" r="5.5" fill="#d4dce8" /><circle cx="1790" cy="1652" r="5.5" fill="#d4dce8" /><circle cx="6550" cy="649" r="5.5" fill="#d4dce8" /><circle cx="6550" cy="739" r="5.5" fill="#d4dce8" /><circle cx="5330" cy="707" r="5.5" fill="#d4dce8" /><circle cx="5330" cy="797" r="5.5" fill="#d4dce8" /><circle cx="6160" cy="888.5" r="5.5" fill="#d4dce8" /><circle cx="5720" cy="946.5" r="5.5" fill="#d4dce8" /><circle cx="5330" cy="707" r="5.5" fill="#d4dce8" /><circle cx="5330" cy="1186" r="5.5" fill="#d4dce8" /><circle cx="5720" cy="1437" r="5.5" fill="#d4dce8" /><circle cx="6160" cy="1335.5" r="5.5" fill="#d4dce8" /><circle cx="5330" cy="1688" r="5.5" fill="#d4dce8" /><circle cx="5330" cy="1778" r="5.5" fill="#d4dce8" /><circle cx="960" cy="4025" r="5.5" fill="#d4dce8" transform="translate(355 0)" /><circle cx="1400" cy="3764" r="5.5" fill="#d4dce8" transform="translate(355 0)" /><circle cx="960" cy="1311" r="5.5" fill="#d4dce8" /><circle cx="960" cy="1758" r="5.5" fill="#d4dce8" /><circle cx="4940" cy="528.5" r="5.5" fill="#d4dce8" /><circle cx="4940" cy="1437" r="5.5" fill="#d4dce8" /><circle cx="570" cy="1028" r="5.5" fill="#d4dce8" /><circle cx="570" cy="3600" r="5.5" fill="#d4dce8" transform="translate(355 0)" /><circle cx="5330" cy="707" r="5.5" fill="#d4dce8" /><circle cx="5330" cy="3500" r="5.5" fill="#d4dce8" transform="translate(-2195 60)" /><circle cx="6550" cy="3500" r="5.5" fill="#d4dce8" transform="translate(-2195 60)" /><circle cx="6550" cy="3860" r="5.5" fill="#d4dce8" transform="translate(-2195 60)" /><circle cx="3340" cy="480" r="6" fill="#d8e1ee" /><circle cx="3780" cy="480" r="6" fill="#d8e1ee" /><circle cx="3340" cy="1253" r="6" fill="#d8e1ee" /><circle cx="3780" cy="1253" r="6" fill="#d8e1ee" /><circle cx="3340" cy="954" r="6" fill="#d8e1ee" /><circle cx="3780" cy="690" r="6" fill="#d8e1ee" /><circle cx="3090.4" cy="300" r="6" fill="#d8e1ee" /><circle cx="4560" cy="1815" r="6" fill="#d8e1ee" /><circle cx="2950" cy="744" r="6" fill="#d8e1ee" /><circle cx="2950" cy="834" r="6" fill="#d8e1ee" /><circle cx="4170" cy="773" r="6" fill="#d8e1ee" /><circle cx="4170" cy="863" r="6" fill="#d8e1ee" /><circle cx="2950" cy="1974" r="6" fill="#d8e1ee" /><circle cx="2950" cy="2064" r="6" fill="#d8e1ee" /><text x="600" y="1074" class="cardinality" data-cardinality-for="user-watch-session" text-anchor="middle" dominant-baseline="middle" font-family="Inter, Pretendard, Arial, sans-serif" font-size="14" font-weight="700" fill="#d8e1ee" stroke="#202124" stroke-width="4" stroke-linejoin="round" paint-order="stroke fill">1:N</text><text x="600" y="1550" class="cardinality" data-cardinality-for="user-or-session-watch-point" text-anchor="middle" dominant-baseline="middle" font-family="Inter, Pretendard, Arial, sans-serif" font-size="14" font-weight="700" fill="#d8e1ee" stroke="#202124" stroke-width="4" stroke-linejoin="round" paint-order="stroke fill">1:N</text><text x="1820" y="1204" class="cardinality" data-cardinality-for="betting-event-user-bet" text-anchor="middle" dominant-baseline="middle" font-family="Inter, Pretendard, Arial, sans-serif" font-size="14" font-weight="700" fill="#d8e1ee" stroke="#202124" stroke-width="4" stroke-linejoin="round" paint-order="stroke fill">1:N</text><text x="1365" y="1378" class="cardinality" data-cardinality-for="user-user-bet" text-anchor="middle" dominant-baseline="middle" font-family="Inter, Pretendard, Arial, sans-serif" font-size="14" font-weight="700" fill="#d8e1ee" stroke="#202124" stroke-width="4" stroke-linejoin="round" paint-order="stroke fill">1:N</text><text x="1820" y="1622" class="cardinality" data-cardinality-for="user-bet-point-transaction" text-anchor="middle" dominant-baseline="middle" font-family="Inter, Pretendard, Arial, sans-serif" font-size="14" font-weight="700" fill="#d8e1ee" stroke="#202124" stroke-width="4" stroke-linejoin="round" paint-order="stroke fill">1:N</text><text x="1000" y="1292" class="cardinality" data-cardinality-for="match-watch-session" text-anchor="middle" dominant-baseline="middle" font-family="Inter, Pretendard, Arial, sans-serif" font-size="14" font-weight="700" fill="#d8e1ee" stroke="#202124" stroke-width="4" stroke-linejoin="round" paint-order="stroke fill">1:N</text><text x="1000" y="1739" class="cardinality" data-cardinality-for="match-watch-point" text-anchor="middle" dominant-baseline="middle" font-family="Inter, Pretendard, Arial, sans-serif" font-size="14" font-weight="700" fill="#d8e1ee" stroke="#202124" stroke-width="4" stroke-linejoin="round" paint-order="stroke fill">1:N</text><text x="905" y="3400" class="cardinality" data-cardinality-for="user-verification" text-anchor="middle" dominant-baseline="middle" font-family="Inter, Pretendard, Arial, sans-serif" font-size="14" font-weight="700" fill="#d8e1ee" stroke="#202124" stroke-width="4" stroke-linejoin="round" paint-order="stroke fill">1:N</text><text x="3560" y="462" class="cardinality" data-cardinality-for="match-match-team" text-anchor="middle" dominant-baseline="middle" font-family="Inter, Pretendard, Arial, sans-serif" font-size="14" font-weight="700" fill="#d8e1ee" stroke="#202124" stroke-width="4" stroke-linejoin="round" paint-order="stroke fill">1:N</text><text x="2980" y="804" class="cardinality" data-cardinality-for="match-game" text-anchor="middle" dominant-baseline="middle" font-family="Inter, Pretendard, Arial, sans-serif" font-size="14" font-weight="700" fill="#d8e1ee" stroke="#202124" stroke-width="4" stroke-linejoin="round" paint-order="stroke fill">1:N</text><text x="3470" y="930" class="cardinality" data-cardinality-for="match-team-game" text-anchor="middle" dominant-baseline="middle" font-family="Inter, Pretendard, Arial, sans-serif" font-size="14" font-weight="700" fill="#d8e1ee" stroke="#202124" stroke-width="4" stroke-linejoin="round" paint-order="stroke fill">1:N</text><text x="3560" y="1237" class="cardinality" data-cardinality-for="game-player-stat" text-anchor="middle" dominant-baseline="middle" font-family="Inter, Pretendard, Arial, sans-serif" font-size="14" font-weight="700" fill="#d8e1ee" stroke="#202124" stroke-width="4" stroke-linejoin="round" paint-order="stroke fill">1:N</text><text x="4200" y="826" class="cardinality" data-cardinality-for="match-team-player-stat" text-anchor="middle" dominant-baseline="middle" font-family="Inter, Pretendard, Arial, sans-serif" font-size="14" font-weight="700" fill="#d8e1ee" stroke="#202124" stroke-width="4" stroke-linejoin="round" paint-order="stroke fill">1:N</text><text x="2980" y="2034" class="cardinality" data-cardinality-for="game-timeline" text-anchor="middle" dominant-baseline="middle" font-family="Inter, Pretendard, Arial, sans-serif" font-size="14" font-weight="700" fill="#d8e1ee" stroke="#202124" stroke-width="4" stroke-linejoin="round" paint-order="stroke fill">1:N</text><text x="4400" y="264" class="cardinality" data-cardinality-for="match-match-event" text-anchor="middle" dominant-baseline="middle" font-family="Inter, Pretendard, Arial, sans-serif" font-size="14" font-weight="700" fill="#d8e1ee" stroke="#202124" stroke-width="4" stroke-linejoin="round" paint-order="stroke fill">1:N</text><text x="4720" y="510" class="cardinality" data-cardinality-for="match-coupon-event" text-anchor="middle" dominant-baseline="middle" font-family="Inter, Pretendard, Arial, sans-serif" font-size="14" font-weight="700" fill="#d8e1ee" stroke="#202124" stroke-width="4" stroke-linejoin="round" paint-order="stroke fill">1:N</text><text x="4770" y="1418" class="cardinality" data-cardinality-for="match-event-coupon-occurrence" text-anchor="middle" dominant-baseline="middle" font-family="Inter, Pretendard, Arial, sans-serif" font-size="14" font-weight="700" fill="#d8e1ee" stroke="#202124" stroke-width="4" stroke-linejoin="round" paint-order="stroke fill">1:N</text><text x="6580" y="716" class="cardinality" data-cardinality-for="coupon-type-event-item" text-anchor="middle" dominant-baseline="middle" font-family="Inter, Pretendard, Arial, sans-serif" font-size="14" font-weight="700" fill="#d8e1ee" stroke="#202124" stroke-width="4" stroke-linejoin="round" paint-order="stroke fill">1:N</text><text x="5360" y="770" class="cardinality" data-cardinality-for="coupon-event-phase" text-anchor="middle" dominant-baseline="middle" font-family="Inter, Pretendard, Arial, sans-serif" font-size="14" font-weight="700" fill="#d8e1ee" stroke="#202124" stroke-width="4" stroke-linejoin="round" paint-order="stroke fill">1:N</text><text x="5940" y="930" class="cardinality" data-cardinality-for="coupon-item-phase" text-anchor="middle" dominant-baseline="middle" font-family="Inter, Pretendard, Arial, sans-serif" font-size="14" font-weight="700" fill="#d8e1ee" stroke="#202124" stroke-width="4" stroke-linejoin="round" paint-order="stroke fill">1:N</text><text x="5360" y="1158" class="cardinality" data-cardinality-for="coupon-event-occurrence" text-anchor="middle" dominant-baseline="middle" font-family="Inter, Pretendard, Arial, sans-serif" font-size="14" font-weight="700" fill="#d8e1ee" stroke="#202124" stroke-width="4" stroke-linejoin="round" paint-order="stroke fill">1:N</text><text x="6080" y="1320" class="cardinality" data-cardinality-for="coupon-occurrence-claim" text-anchor="middle" dominant-baseline="middle" font-family="Inter, Pretendard, Arial, sans-serif" font-size="14" font-weight="700" fill="#d8e1ee" stroke="#202124" stroke-width="4" stroke-linejoin="round" paint-order="stroke fill">1:N</text><text x="5360" y="1750" class="cardinality" data-cardinality-for="coupon-occurrence-user-coupon" text-anchor="middle" dominant-baseline="middle" font-family="Inter, Pretendard, Arial, sans-serif" font-size="14" font-weight="700" fill="#d8e1ee" stroke="#202124" stroke-width="4" stroke-linejoin="round" paint-order="stroke fill">1:N</text><text x="1715" y="3800" class="cardinality" data-cardinality-for="verification-result" text-anchor="middle" dominant-baseline="middle" font-family="Inter, Pretendard, Arial, sans-serif" font-size="14" font-weight="700" fill="#d8e1ee" stroke="#202124" stroke-width="4" stroke-linejoin="round" paint-order="stroke fill">1:N</text><text x="3160" y="3515" class="cardinality" data-cardinality-for="coupon-event-issue-statistics" text-anchor="middle" dominant-baseline="middle" font-family="Inter, Pretendard, Arial, sans-serif" font-size="14" font-weight="700" fill="#d8e1ee" stroke="#202124" stroke-width="4" stroke-linejoin="round" paint-order="stroke fill">1:N</text><text x="4380" y="3515" class="cardinality" data-cardinality-for="coupon-event-statistics-message" text-anchor="middle" dominant-baseline="middle" font-family="Inter, Pretendard, Arial, sans-serif" font-size="14" font-weight="700" fill="#d8e1ee" stroke="#202124" stroke-width="4" stroke-linejoin="round" paint-order="stroke fill">1:N</text><text x="4380" y="3900" class="cardinality" data-cardinality-for="coupon-event-kafka-error" text-anchor="middle" dominant-baseline="middle" font-family="Inter, Pretendard, Arial, sans-serif" font-size="14" font-weight="700" fill="#d8e1ee" stroke="#202124" stroke-width="4" stroke-linejoin="round" paint-order="stroke fill">1:N</text></svg>
