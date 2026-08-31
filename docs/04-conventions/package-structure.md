@@ -224,7 +224,7 @@ Kafka 4.2는 쿠폰 후속 이벤트를 비동기로 전달한다. 현재 코드
 - Replay 서버는 녹화 fixture를 재생하지만, 발생한 경기·배팅·포인트·쿠폰 데이터는 실제
   애플리케이션 흐름과 MySQL을 사용한다.
 
-상세 전환 정책은 `docs/03-decisions/001-runtime-external-source-switching.md`를 따른다.
+상세 전환 정책은 `docs/03-decisions/008-runtime-external-source-switching.md`를 따른다.
 
 ## 모니터링과 부하 테스트
 

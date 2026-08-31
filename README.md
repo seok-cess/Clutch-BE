@@ -381,7 +381,7 @@ Redis Lua Script가 활성 세션·최신 `sessionKey`·heartbeat 순번과 서�
 | [쿠폰 성공 수량 집계 분리](docs/03-decisions/003-async-coupon-success-count.md) | 발급 hot path의 공통 행 갱신 제거 |
 | [Kafka 발급 결과 기반 통계](docs/03-decisions/004-kafka-coupon-issue-statistics.md) | 요청 응답과 관리자 통계 반영 분리 |
 | [비동기 정합성 검증](docs/03-decisions/006-async-coupon-integrity-check.md) | 관리자 요청과 대량 집계를 분리하고 결과 영속화 |
-| [운영자 제어형 외부 소스 전환](docs/03-decisions/001-runtime-external-source-switching.md) | 외부 장애로 자동 전환하지 않고 운영자가 `REAL`·`STUB` 선택 |
+| [운영자 제어형 외부 소스 전환](docs/03-decisions/008-runtime-external-source-switching.md) | 외부 장애로 자동 전환하지 않고 운영자가 `REAL`·`STUB` 선택 |
 
 ## 9. 테스트
 

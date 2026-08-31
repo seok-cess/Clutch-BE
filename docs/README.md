@@ -18,6 +18,7 @@
    확인한다.
 7. 운영 절차는 `06-operations/`, 검증 근거는 `07-verification/`, 문제 해결 기록은
    `08-troubleshooting/`에서 확인한다.
+8. 데이터 구조는 `erd/`의 전체 및 도메인별 ERDCloud 입력 스키마에서 확인한다.
 
 ## 문서 구조
 
@@ -33,6 +34,7 @@
 | [`07-verification/`](07-verification/) | 검증 방법, 실행 스크립트와 날짜별 결과 |
 | [`08-troubleshooting/`](08-troubleshooting/) | 실제 문제의 증상, 원인, 해결과 재검증 기록 |
 | [`assets/`](assets/) | 문서에서 사용하는 아키텍처와 모니터링 이미지 |
+| [`erd/`](erd/) | 전체 및 도메인별 ERDCloud 입력 스키마 |
 
 ## 상황별 문서 찾기
 
@@ -52,6 +54,7 @@
 | 쿠폰 데이터 정합성을 어떻게 검증하는가? | [쿠폰 대량 데이터 정합성 검증](07-verification/README.md) |
 | 쿠폰 20,000 VU 부하 테스트를 어떻게 실행하는가? | [쿠폰 Ramp 테스트 가이드](../k6/ramp/README.md) |
 | 개발 중 발생한 쿠폰 문제와 해결 과정은 무엇인가? | [`08-troubleshooting/`](08-troubleshooting/) |
+| 전체 또는 기능별 데이터 구조는 어디에서 확인하는가? | [`erd/`](erd/) |
 
 ## 현재 문서 목록
 
@@ -61,6 +64,15 @@
 - [확정 요구사항](00-project/requirements.md)
 - [아키텍처 문서 안내](05-architecture/README.md)
 - [시스템 전체 구성](05-architecture/system-overview.md)
+
+### ERD
+
+- [전체 ERDCloud 입력 스키마](erd/clutch-erdcloud-import.sql)
+- [경기 데이터 ERD](erd/domains/01-match-data.sql)
+- [쿠폰 이벤트 ERD](erd/domains/02-coupon-event.sql)
+- [쿠폰 발급 ERD](erd/domains/03-coupon-issuance.sql)
+- [시청 포인트 ERD](erd/domains/04-watch-reward.sql)
+- [승패 배팅 ERD](erd/domains/05-betting.sql)
 
 ### API 계약
 
@@ -87,6 +99,7 @@
 ### 기술 결정과 개발 규칙
 
 - [ADR 작성 방법과 목록](03-decisions/README.md)
+- [운영자 제어형 외부 데이터 소스 전환](03-decisions/008-runtime-external-source-switching.md)
 - [Redis 쿠폰 재고 복구 결정](03-decisions/002-redis-coupon-stock-recovery.md)
 - [Kafka 발급 결과 통계 결정](03-decisions/004-kafka-coupon-issue-statistics.md)
 - [Kafka 쿠폰 신청 거절 통계 결정](03-decisions/005-kafka-coupon-claim-rejection-statistics.md)
@@ -108,6 +121,9 @@
 - [쿠폰 대량 발급 행 잠금 문제](08-troubleshooting/coupon-claim-lock-contention-troubleshooting.md)
 - [새 쿠폰 회차 첫 발급 실패 문제](08-troubleshooting/coupon-first-claim-initialization-troubleshooting.md)
 - [쿠폰 20,000 VU 부하 테스트 문제](08-troubleshooting/coupon-20000-vu-load-test-troubleshooting.md)
+- [관리자 쿠폰 발급 내역 조회와 개인정보 보호](08-troubleshooting/admin-coupon-claim-query-and-privacy.md)
+- [외부 경기 피드의 지연된 종료 상태](08-troubleshooting/lolesports-delayed-match-end.md)
+- [시청 heartbeat와 포인트 수령 경합](08-troubleshooting/watch-heartbeat-and-point-claim-race.md)
 
 ## 문서별 역할
 
