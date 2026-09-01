@@ -44,24 +44,24 @@ CLUTCH는 LoL Esports 경기 중 발생하는 사건과 시청 경험을 선착�
 
 ### 프로젝트 정보
 
-| 항목 | 내용 |
-|---|---|
-| 유형 | 6인 팀 프로젝트 |
-| 개발 기간 | 2026.08.11 ~ 2026.08.31 |
-| 백엔드 | Java 21, Spring Boot 4.1 기반 모듈형 모놀리스 |
-| 핵심 목표 | 선착순 쿠폰의 초과·중복 발급 방지와 대량 데이터 정합성 검증 |
+| 항목           | 내용                                                            |
+| -------------- | --------------------------------------------------------------- |
+| 유형           | 6인 팀 프로젝트                                                 |
+| 개발 기간      | 2026.08.11 ~ 2026.08.31                                         |
+| 백엔드         | Java 21, Spring Boot 4.1 기반 모듈형 모놀리스                   |
+| 핵심 목표      | 선착순 쿠폰의 초과·중복 발급 방지와 대량 데이터 정합성 검증     |
 | 주요 연계 기능 | LoL Esports 경기 피드, 시청 포인트, 세트 승패 배팅, 관리자 운영 |
 
 ### 담당 영역
 
-| 조원 | 담당 영역 | 주요 내용 |
-|---|---|---|
-| 김재우 | LoL Esports 피드 | 일정·순위·라이브 경기·세트 통계를 수집·적재하고 조회 API를 제공합니다. |
-| 김현정 | 쿠폰 이벤트 생성 | 경기 이벤트와 트리거 조건을 연결하고 쿠폰 종류·이벤트 생성 정책을 관리합니다. |
-| 석종수 | 관리자 운영 및 검증 | 관리자 기능, 모니터링과 대규모 부하·정합성 검증 환경을 구성했습니다. |
-| 안제홍 | 쿠폰 관리 | 쿠폰 이벤트·정책 관리와 발급 이력 조회를 담당했습니다. |
-| 전민규 | 쿠폰 발급 | Redis 원자 제어 기반 선착순 발급, 중복 방지와 발급 결과 저장을 구현했습니다. |
-| 최민혁 | 포인트 및 승패 예측 | 시청 세션·포인트 수령과 세트 승패 배팅·정산·환불을 구현했습니다. |
+| 조원   | 담당 영역           | 주요 내용                                                                     |
+| ------ | ------------------- | ----------------------------------------------------------------------------- |
+| 김재우 | LoL Esports 피드    | 일정·순위·라이브 경기·세트 통계를 수집·적재하고 조회 API를 제공합니다.        |
+| 김현정 | 쿠폰 이벤트 생성    | 경기 이벤트와 트리거 조건을 연결하고 쿠폰 종류·이벤트 생성 정책을 관리합니다. |
+| 석종수 | 관리자 운영 및 검증 | 관리자 기능, 모니터링과 대규모 부하·정합성 검증 환경을 구성했습니다.          |
+| 안제홍 | 쿠폰 관리           | 쿠폰 이벤트·정책 관리와 발급 이력 조회를 담당했습니다.                        |
+| 전민규 | 쿠폰 발급           | Redis 원자 제어 기반 선착순 발급, 중복 방지와 발급 결과 저장을 구현했습니다.  |
+| 최민혁 | 포인트 및 승패 예측 | 시청 세션·포인트 수령과 세트 승패 배팅·정산·환불을 구현했습니다.              |
 
 ## 2. 협업 및 개발 방식
 
@@ -126,19 +126,19 @@ Jira Task
 
 ## 4. 기술 스택
 
-| 구분 | 기술 | 사용 목적 |
-|---|---|---|
-| Language | Java 21 | 애플리케이션 구현 |
-| Framework | Spring Boot 4.1, Spring MVC | REST API와 애플리케이션 구성 |
-| Persistence | Spring Data JPA, Hibernate, JdbcTemplate | 영속 모델과 대량 집계 조회 |
-| Database | MySQL 8.4, Flyway | 최종 기준 데이터와 스키마 이력 관리 |
-| Cache / State | Redis 8.4, Lua Script | 재고·중복 발급·시청 세션의 원자적 상태 제어 |
-| Messaging | Kafka 4.2, Transactional Outbox | 쿠폰 후속 이벤트의 비동기 전달과 재시도 |
-| External API | Spring WebClient, LoL Esports API | 일정·순위·라이브 경기 데이터 수집 |
-| Test | JUnit 5, Spring Boot Test | 도메인·서비스·API·Repository·통합 테스트 |
-| Load Test | k6 | 쿠폰 Ramp·Burst·분산·Smoke 시나리오 |
-| Observability | Actuator, Micrometer, Prometheus, Grafana | 애플리케이션·DB·Redis·부하 지표 관측 |
-| Build / Runtime | Gradle 9.5.1, Docker Compose | 빌드와 로컬 인프라 실행 |
+| 구분            | 기술                                      | 사용 목적                                   |
+| --------------- | ----------------------------------------- | ------------------------------------------- |
+| Language        | Java 21                                   | 애플리케이션 구현                           |
+| Framework       | Spring Boot 4.1, Spring MVC               | REST API와 애플리케이션 구성                |
+| Persistence     | Spring Data JPA, Hibernate, JdbcTemplate  | 영속 모델과 대량 집계 조회                  |
+| Database        | MySQL 8.4, Flyway                         | 최종 기준 데이터와 스키마 이력 관리         |
+| Cache / State   | Redis 8.4, Lua Script                     | 재고·중복 발급·시청 세션의 원자적 상태 제어 |
+| Messaging       | Kafka 4.2, Transactional Outbox           | 쿠폰 후속 이벤트의 비동기 전달과 재시도     |
+| External API    | Spring WebClient, LoL Esports API         | 일정·순위·라이브 경기 데이터 수집           |
+| Test            | JUnit 5, Spring Boot Test                 | 도메인·서비스·API·Repository·통합 테스트    |
+| Load Test       | k6                                        | 쿠폰 Ramp·Burst·분산·Smoke 시나리오         |
+| Observability   | Actuator, Micrometer, Prometheus, Grafana | 애플리케이션·DB·Redis·부하 지표 관측        |
+| Build / Runtime | Gradle 9.5.1, Docker Compose              | 빌드와 로컬 인프라 실행                     |
 
 ## 5. 아키텍처
 
@@ -146,15 +146,15 @@ Jira Task
 
 CLUTCH는 기능을 도메인별 패키지로 분리하지만 하나의 애플리케이션과 JVM에서 실행하는 모듈형 모놀리스입니다.
 
-| 구성 요소 | 역할 |
-|---|---|
-| 사용자 웹 / 관리자 콘솔 | REST/JSON API 호출과 쿠폰 재고 SSE 구독 |
-| CLUTCH API | 경기·배팅·시청·쿠폰·지갑·사용자·Replay 유스케이스 실행 |
-| MySQL | 사용자, 경기, 포인트, 배팅, 쿠폰과 Outbox를 저장하는 최종 기준 저장소 |
-| Redis | 쿠폰 재고·중복 발급과 시청 세션의 고빈도·원자적 상태 제어 |
-| Kafka | 요청 응답과 분리 가능한 쿠폰 후속 이벤트 전달 |
-| LoL Esports API / Replay STUB | 실제 경기 데이터 또는 재현 가능한 녹화 데이터 제공 |
-| Prometheus / Grafana / k6 | 지표 수집·시각화와 부하 요청 생성 |
+| 구성 요소                     | 역할                                                                  |
+| ----------------------------- | --------------------------------------------------------------------- |
+| 사용자 웹 / 관리자 콘솔       | REST/JSON API 호출과 쿠폰 재고 SSE 구독                               |
+| CLUTCH API                    | 경기·배팅·시청·쿠폰·지갑·사용자·Replay 유스케이스 실행                |
+| MySQL                         | 사용자, 경기, 포인트, 배팅, 쿠폰과 Outbox를 저장하는 최종 기준 저장소 |
+| Redis                         | 쿠폰 재고·중복 발급과 시청 세션의 고빈도·원자적 상태 제어             |
+| Kafka                         | 요청 응답과 분리 가능한 쿠폰 후속 이벤트 전달                         |
+| LoL Esports API / Replay STUB | 실제 경기 데이터 또는 재현 가능한 녹화 데이터 제공                    |
+| Prometheus / Grafana / k6     | 지표 수집·시각화와 부하 요청 생성                                     |
 
 ### 쿠폰 발급 흐름
 
@@ -203,46 +203,22 @@ Repository
 
 ## 6. ERD / 데이터 모델
 
-아래 그림은 전체 테이블의 모든 컬럼을 나열하는 물리 ERD가 아니라, Flyway 스키마에서 핵심 도메인 관계만 추린 논리 데이터 모델입니다.
+Flyway migration을 기준으로 생성한 전체 데이터베이스 ERD입니다. 테이블별 주요 컬럼과 관계선, `1:N` 관계를 함께 표시합니다.
 
-```mermaid
-erDiagram
-    USER ||--o{ USER_COUPON : owns
-    USER ||--o{ COUPON_CLAIM_REQUEST : requests
-    USER ||--o{ WATCH_SESSION : watches
-    USER ||--o{ USER_BET : places
+![CLUTCH 전체 데이터베이스 ERD](docs/assets/full-database-erd-relations.png)
 
-    ESPORTS_MATCH ||--o{ ESPORTS_GAME : contains
-    ESPORTS_MATCH ||--o{ MATCH_TEAM : has
-    ESPORTS_GAME ||--o{ GAME_PLAYER_STAT : records
-    ESPORTS_GAME ||--o{ GAME_TIMELINE_POINT : records
-    ESPORTS_GAME ||--o{ BETTING_EVENT : opens
-
-    COUPON_TYPE ||--o{ COUPON_EVENT_ITEM : configures
-    COUPON_EVENT ||--o{ COUPON_EVENT_PHASE : has
-    COUPON_EVENT ||--o{ COUPON_EVENT_ITEM : offers
-    COUPON_EVENT ||--o{ COUPON_EVENT_OCCURRENCE : opens
-    COUPON_EVENT_OCCURRENCE ||--o{ COUPON_CLAIM_REQUEST : receives
-    COUPON_EVENT_ITEM ||--o{ COUPON_CLAIM_REQUEST : targets
-    COUPON_CLAIM_REQUEST ||--o| USER_COUPON : issues
-
-    BETTING_EVENT ||--o{ USER_BET : receives
-    USER_BET ||--o{ BET_POINT_TRANSACTION : settles
-    WATCH_SESSION ||--o{ WATCH_POINT_TRANSACTION : rewards
-
-    COUPON_INTEGRITY_CHECK ||--o{ COUPON_INTEGRITY_CHECK_RESULT : contains
-```
+원본 벡터 파일은 [full-database-erd-relations.svg](docs/assets/full-database-erd-relations.svg)에서 확인할 수 있습니다.
 
 ### 주요 모델과 설계 기준
 
-| 영역 | 주요 모델 | 설계 기준 |
-|---|---|---|
-| 쿠폰 정의 | `coupon_type`, `coupon_event`, `coupon_event_phase`, `coupon_event_item` | 재사용 가능한 할인 정책과 실제 경기 이벤트·단계·재고를 분리합니다. |
-| 쿠폰 발급 | `coupon_event_occurrence`, `coupon_claim_request`, `user_coupon` | 발급 시도와 실제 사용자 쿠폰을 분리해 성공·거절·복구 상태를 추적합니다. |
-| 경기 | `esports_match`, `esports_game`, `match_team`, 통계·타임라인 테이블 | 외부 ID와 내부 데이터를 분리하고 경기 당시 표시 정보를 보존합니다. |
-| 배팅 | `betting_event`, `user_bet`, `bet_point_transaction` | 배팅 이벤트, 사용자 선택과 포인트 거래를 분리해 정산·환불을 추적합니다. |
-| 시청 | `watch_session`, `watch_point_transaction` | 고빈도 누적 상태는 Redis에, 세션과 실제 지급 이력은 MySQL에 저장합니다. |
-| 정합성 | `coupon_integrity_check`, `coupon_integrity_check_result` | 실행 이력과 항목별 결과를 남겨 같은 기준 시각의 판정을 추적합니다. |
+| 영역      | 주요 모델                                                                | 설계 기준                                                               |
+| --------- | ------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
+| 쿠폰 정의 | `coupon_type`, `coupon_event`, `coupon_event_phase`, `coupon_event_item` | 재사용 가능한 할인 정책과 실제 경기 이벤트·단계·재고를 분리합니다.      |
+| 쿠폰 발급 | `coupon_event_occurrence`, `coupon_claim_request`, `user_coupon`         | 발급 시도와 실제 사용자 쿠폰을 분리해 성공·거절·복구 상태를 추적합니다. |
+| 경기      | `esports_match`, `esports_game`, `match_team`, 통계·타임라인 테이블      | 외부 ID와 내부 데이터를 분리하고 경기 당시 표시 정보를 보존합니다.      |
+| 배팅      | `betting_event`, `user_bet`, `bet_point_transaction`                     | 배팅 이벤트, 사용자 선택과 포인트 거래를 분리해 정산·환불을 추적합니다. |
+| 시청      | `watch_session`, `watch_point_transaction`                               | 고빈도 누적 상태는 Redis에, 세션과 실제 지급 이력은 MySQL에 저장합니다. |
+| 정합성    | `coupon_integrity_check`, `coupon_integrity_check_result`                | 실행 이력과 항목별 결과를 남겨 같은 기준 시각의 판정을 추적합니다.      |
 
 중복 발급은 Redis에서 선제적으로 거절하고, MySQL의 사용자·회차 기준 유일성 제약으로 최종 방어합니다. 스키마는 [`src/main/resources/db/migration`](src/main/resources/db/migration)의 Flyway migration을 기준으로 하며 Hibernate는 `ddl-auto: validate`로 매핑을 검증합니다.
 
@@ -250,25 +226,25 @@ erDiagram
 
 ### 대표 엔드포인트
 
-| 영역 | Method | URL | 설명 |
-|---|---|---|---|
-| 경기 | `GET` | `/api/schedule` | 경기 일정 조회 |
-| 경기 | `GET` | `/api/live` | 라이브 경기 조회 |
-| 경기 | `GET` | `/api/live/{gameId}/details` | 세트 상세 데이터 조회 |
-| 외부 소스 | `PUT` | `/api/operator/external-source` | `REAL`·`STUB` 데이터 소스 전환 |
-| 쿠폰 | `GET` | `/api/v1/coupon-events/active` | 현재 활성 쿠폰 회차 조회 |
-| 쿠폰 | `POST` | `/api/v1/coupon-events/{eventId}/occurrences/{occurrenceId}/claims` | 선착순 쿠폰 발급 신청 |
-| 쿠폰 | `GET` | `/api/v1/coupon-event-items/{itemId}/stock` | 현재 쿠폰 재고 조회 |
-| 쿠폰 | `GET` | `/api/v1/coupon-event-items/{itemId}/stock/stream` | 쿠폰 재고 SSE 구독 |
-| 시청 | `POST` | `/api/users/{userId}/matches/{matchId}/watch-sessions` | 시청 세션 시작 |
-| 시청 | `POST` | `/api/users/{userId}/watch-sessions/{sessionKey}/heartbeat` | 유효 시청 시간 누적 |
-| 시청 | `POST` | `/api/users/{userId}/watch-sessions/{sessionKey}/point-claims` | 시청 포인트 수령 |
-| 배팅 | `GET` | `/api/betting-candidates` | 현재 배팅 후보 조회 |
-| 배팅 | `POST` | `/api/betting-events/{bettingEventId}/bets` | 세트 승패 배팅 등록 |
-| 지갑 | `GET` | `/api/users/me/coupons` | 내 쿠폰 목록 조회 |
-| 관리자 | `GET` | `/api/v1/admin/coupon-claims` | 쿠폰 발급 이력 검색 |
-| 관리자 | `POST` | `/api/v1/admin/integrity-checks` | 쿠폰 정합성 검증 실행 |
-| 관리자 | `GET` | `/api/v1/admin/coupon-dashboard` | 쿠폰 운영 대시보드 조회 |
+| 영역      | Method | URL                                                                 | 설명                           |
+| --------- | ------ | ------------------------------------------------------------------- | ------------------------------ |
+| 경기      | `GET`  | `/api/schedule`                                                     | 경기 일정 조회                 |
+| 경기      | `GET`  | `/api/live`                                                         | 라이브 경기 조회               |
+| 경기      | `GET`  | `/api/live/{gameId}/details`                                        | 세트 상세 데이터 조회          |
+| 외부 소스 | `PUT`  | `/api/operator/external-source`                                     | `REAL`·`STUB` 데이터 소스 전환 |
+| 쿠폰      | `GET`  | `/api/v1/coupon-events/active`                                      | 현재 활성 쿠폰 회차 조회       |
+| 쿠폰      | `POST` | `/api/v1/coupon-events/{eventId}/occurrences/{occurrenceId}/claims` | 선착순 쿠폰 발급 신청          |
+| 쿠폰      | `GET`  | `/api/v1/coupon-event-items/{itemId}/stock`                         | 현재 쿠폰 재고 조회            |
+| 쿠폰      | `GET`  | `/api/v1/coupon-event-items/{itemId}/stock/stream`                  | 쿠폰 재고 SSE 구독             |
+| 시청      | `POST` | `/api/users/{userId}/matches/{matchId}/watch-sessions`              | 시청 세션 시작                 |
+| 시청      | `POST` | `/api/users/{userId}/watch-sessions/{sessionKey}/heartbeat`         | 유효 시청 시간 누적            |
+| 시청      | `POST` | `/api/users/{userId}/watch-sessions/{sessionKey}/point-claims`      | 시청 포인트 수령               |
+| 배팅      | `GET`  | `/api/betting-candidates`                                           | 현재 배팅 후보 조회            |
+| 배팅      | `POST` | `/api/betting-events/{bettingEventId}/bets`                         | 세트 승패 배팅 등록            |
+| 지갑      | `GET`  | `/api/users/me/coupons`                                             | 내 쿠폰 목록 조회              |
+| 관리자    | `GET`  | `/api/v1/admin/coupon-claims`                                       | 쿠폰 발급 이력 검색            |
+| 관리자    | `POST` | `/api/v1/admin/integrity-checks`                                    | 쿠폰 정합성 검증 실행          |
+| 관리자    | `GET`  | `/api/v1/admin/coupon-dashboard`                                    | 쿠폰 운영 대시보드 조회        |
 
 ### 도메인별 상세 문서
 
@@ -373,28 +349,28 @@ Redis Lua Script가 활성 세션·최신 `sessionKey`·heartbeat 순번과 서�
 
 ### 주요 ADR
 
-| 결정 | 선택 |
-|---|---|
-| [실제 쿠폰 생성 기준의 동기 발급](docs/03-decisions/001-synchronous-coupon-issuance.md) | 접수와 실제 쿠폰 생성을 동기 경로에서 완료한 뒤 성공 응답 |
-| [MySQL 기준 Redis 재고 재구축](docs/03-decisions/002-redis-coupon-stock-recovery.md) | Redis 장애 시 실제 사용자 쿠폰 수를 기준으로 복구 |
-| [쿠폰 성공 수량 집계 분리](docs/03-decisions/003-async-coupon-success-count.md) | 발급 hot path의 공통 행 갱신 제거 |
-| [Kafka 발급 결과 기반 통계](docs/03-decisions/004-kafka-coupon-issue-statistics.md) | 요청 응답과 관리자 통계 반영 분리 |
-| [비동기 정합성 검증](docs/03-decisions/006-async-coupon-integrity-check.md) | 관리자 요청과 대량 집계를 분리하고 결과 영속화 |
-| [운영자 제어형 외부 소스 전환](docs/03-decisions/001-runtime-external-source-switching.md) | 외부 장애로 자동 전환하지 않고 운영자가 `REAL`·`STUB` 선택 |
+| 결정                                                                                       | 선택                                                       |
+| ------------------------------------------------------------------------------------------ | ---------------------------------------------------------- |
+| [실제 쿠폰 생성 기준의 동기 발급](docs/03-decisions/001-synchronous-coupon-issuance.md)    | 접수와 실제 쿠폰 생성을 동기 경로에서 완료한 뒤 성공 응답  |
+| [MySQL 기준 Redis 재고 재구축](docs/03-decisions/002-redis-coupon-stock-recovery.md)       | Redis 장애 시 실제 사용자 쿠폰 수를 기준으로 복구          |
+| [쿠폰 성공 수량 집계 분리](docs/03-decisions/003-async-coupon-success-count.md)            | 발급 hot path의 공통 행 갱신 제거                          |
+| [Kafka 발급 결과 기반 통계](docs/03-decisions/004-kafka-coupon-issue-statistics.md)        | 요청 응답과 관리자 통계 반영 분리                          |
+| [비동기 정합성 검증](docs/03-decisions/006-async-coupon-integrity-check.md)                | 관리자 요청과 대량 집계를 분리하고 결과 영속화             |
+| [운영자 제어형 외부 소스 전환](docs/03-decisions/008-runtime-external-source-switching.md) | 외부 장애로 자동 전환하지 않고 운영자가 `REAL`·`STUB` 선택 |
 
 ## 9. 테스트
 
 ### 테스트 전략
 
-| 범위 | 검증 내용 |
-|---|---|
-| Domain | 쿠폰·배팅·시청 상태와 상태 전이, 금액·시간 경계값 |
-| Service | 발급·정산·환불·복구 유스케이스와 실패 분기 |
-| Controller | 요청 검증, HTTP 상태, 응답 계약과 개인정보 마스킹 |
-| Repository | 동적 조회, 인덱스 활용 대상 쿼리, 잠금과 유일성 제약 |
-| Integration | Redis Lua, MySQL 트랜잭션, Outbox·Kafka, 동시 요청 |
-| Load | k6 Ramp·Burst·분산·Smoke 시나리오와 Prometheus 지표 |
-| Integrity | 100만 사용자·300만 건 이상 요청 이력의 전체 집계 검증 |
+| 범위        | 검증 내용                                             |
+| ----------- | ----------------------------------------------------- |
+| Domain      | 쿠폰·배팅·시청 상태와 상태 전이, 금액·시간 경계값     |
+| Service     | 발급·정산·환불·복구 유스케이스와 실패 분기            |
+| Controller  | 요청 검증, HTTP 상태, 응답 계약과 개인정보 마스킹     |
+| Repository  | 동적 조회, 인덱스 활용 대상 쿼리, 잠금과 유일성 제약  |
+| Integration | Redis Lua, MySQL 트랜잭션, Outbox·Kafka, 동시 요청    |
+| Load        | k6 Ramp·Burst·분산·Smoke 시나리오와 Prometheus 지표   |
+| Integrity   | 100만 사용자·300만 건 이상 요청 이력의 전체 집계 검증 |
 
 별도 커버리지 수치는 관리하지 않으므로 임의의 커버리지 값을 제시하지 않습니다. 2026-08-31 기록 기준 `clean build`에서 전체 558개 테스트가 통과했습니다.
 
@@ -402,17 +378,17 @@ Redis Lua Script가 활성 세션·최신 `sessionKey`·heartbeat 순번과 서�
 
 재고 10,000장, 고유 사용자 20,000명, 60초 ramp-up 조건에서 Windows 네이티브 k6로 검증했습니다.
 
-| 항목 | 결과 |
-|---|---:|
-| 신청 시도 | 20,000건 |
-| 발급 성공 | 10,000건 |
-| 정상 품절 | 10,000건 |
-| 전송 실패 | 0건 |
-| 예상하지 못한 응답 | 0건 |
-| 최대 활성 VU | 20,000 |
-| Claim 평균 | 336.95ms |
-| Claim p95 | 951.19ms |
-| 최종 판정 | **PASS** |
+| 항목               |     결과 |
+| ------------------ | -------: |
+| 신청 시도          | 20,000건 |
+| 발급 성공          | 10,000건 |
+| 정상 품절          | 10,000건 |
+| 전송 실패          |      0건 |
+| 예상하지 못한 응답 |      0건 |
+| 최대 활성 VU       |   20,000 |
+| Claim 평균         | 336.95ms |
+| Claim p95          | 951.19ms |
+| 최종 판정          | **PASS** |
 
 이 결과는 최대 20,000 VU에 도달한 Ramp 테스트이며, 20,000개의 요청을 완전히 같은 순간에 발사한 Burst 테스트라는 의미는 아닙니다. 상세 조건과 한계는 [부하 테스트 결과 보고서](docs/07-verification/results/2026-08-30-coupon-20000-vu-load-test.md)를 따릅니다.
 
@@ -482,13 +458,13 @@ docker compose --profile app up -d --build --wait
 curl http://localhost:8080/actuator/health
 ```
 
-| 서비스 | 기본 주소 |
-|---|---|
+| 서비스          | 기본 주소               |
+| --------------- | ----------------------- |
 | Spring Boot API | `http://localhost:8080` |
-| MySQL | `localhost:3306` |
-| Redis | `localhost:6379` |
-| Kafka | `localhost:9092` |
-| Replay STUB | `http://localhost:4000` |
+| MySQL           | `localhost:3306`        |
+| Redis           | `localhost:6379`        |
+| Kafka           | `localhost:9092`        |
+| Replay STUB     | `http://localhost:4000` |
 
 ### 모니터링
 
@@ -601,4 +577,3 @@ Clutch-BE/
 - OpenAPI 또는 Spring REST Docs를 도입하고 CI에서 API 문서 생성을 검증합니다.
 - Ramp 결과와 별도로 짧은 시간에 요청을 집중시키는 Burst 및 분산 부하 결과를 동일한 판정 기준으로 기록합니다.
 - 전체 정합성 검증 결과를 실행별 리포트로 축적하고 부하 테스트 결과와 연결합니다.
-
