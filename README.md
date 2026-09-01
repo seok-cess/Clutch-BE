@@ -47,11 +47,10 @@ CLUTCH는 LoL Esports 경기 중 발생하는 사건과 시청 경험을 선착�
 | 항목 | 내용 |
 |---|---|
 | 유형 | 6인 팀 프로젝트 |
+| 개발 기간 | 2026.08.11 ~ 2026.08.31 |
 | 백엔드 | Java 21, Spring Boot 4.1 기반 모듈형 모놀리스 |
 | 핵심 목표 | 선착순 쿠폰의 초과·중복 발급 방지와 대량 데이터 정합성 검증 |
 | 주요 연계 기능 | LoL Esports 경기 피드, 시청 포인트, 세트 승패 배팅, 관리자 운영 |
-
-> 개발 기간은 저장소의 확정 문서에서 확인할 수 없어 임의로 기재하지 않았습니다.
 
 ### 담당 영역
 
@@ -133,7 +132,7 @@ Jira Task
 | Framework | Spring Boot 4.1, Spring MVC | REST API와 애플리케이션 구성 |
 | Persistence | Spring Data JPA, Hibernate, JdbcTemplate | 영속 모델과 대량 집계 조회 |
 | Database | MySQL 8.4, Flyway | 최종 기준 데이터와 스키마 이력 관리 |
-| Cache / State | Redis 8.4, Lua Script, Spring Session | 재고·중복 발급·시청 세션의 원자적 상태 제어 |
+| Cache / State | Redis 8.4, Lua Script | 재고·중복 발급·시청 세션의 원자적 상태 제어 |
 | Messaging | Kafka 4.2, Transactional Outbox | 쿠폰 후속 이벤트의 비동기 전달과 재시도 |
 | External API | Spring WebClient, LoL Esports API | 일정·순위·라이브 경기 데이터 수집 |
 | Test | JUnit 5, Spring Boot Test | 도메인·서비스·API·Repository·통합 테스트 |
@@ -593,7 +592,7 @@ Clutch-BE/
 - 쿠폰 SSE 구독자와 일부 외부 경기 수집 상태가 애플리케이션 메모리에 있어 전체 기능의 수평 확장을 보장하지 않습니다.
 - 20,000 VU 결과는 60초 Ramp 조건이며 완전 동시 Burst의 처리 결과가 아닙니다.
 - Swagger UI 또는 자동 생성된 REST Docs 사이트가 없어 API 문서와 실제 Controller 사이의 자동 동기화가 부족합니다.
-- 저장소에서 확인 가능한 개발 기간과 확정된 사용자·관리자 화면 자료가 없습니다.
+- 저장소에 확정된 사용자·관리자 화면 자료가 없습니다.
 
 ### 개선 계획
 
