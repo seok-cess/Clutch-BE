@@ -1,5 +1,17 @@
-#  CLUTCH
 # 🏆유레카 백엔드 종합 프로젝트 우수상 프로젝트🏆
+
+<details>
+<summary>[2026. 09. 01] LG U+ 유레카 백엔드 종합 프로젝트 우수상</summary>
+
+<p align="center">
+  <img src="docs/assets/clutch-excellence-award.png" alt="유레카 백엔드 종합 프로젝트 우수상 증서" width="720">
+</p>
+
+[원본 PDF 열기](docs/assets/clutch-excellence-award.pdf)
+
+</details>
+
+# CLUTCH
 
 > 대규모 트래픽에서도 재고와 사용자별 발급 정합성을 보장하는 LoL Esports 연계 선착순 쿠폰 시스템
 
